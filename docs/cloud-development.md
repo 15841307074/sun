@@ -71,6 +71,41 @@ git -C E:\cloud-0090\.storage-maintenance\sun-cloud status --short --branch
 
 ## 把云端修改纳入原业务分支
 
+### 一键同步 Java 业务源码
+
+在本地 PowerShell 中安装一次快捷命令（需要 Python 3）：
+
+```powershell
+Set-Location E:\cloud-0090
+git cloud-fetch
+git cloud-pull
+python .storage-maintenance\sun-cloud\tools\cloud-apply.py --business-repo E:\cloud-0090 --install-alias
+```
+
+以后从原项目执行一条命令：
+
+```powershell
+git cloud-sync
+```
+
+它先更新独立云端目录，再把初始源码快照之后的 Java 源码及 Java 测试差异应用到当前原业务分支的工作区。原 GitLab 远端、分支、POM、YAML、SQL 和本地配置保持不变，结果由你在 IDEA 中检查并正常提交。配置、依赖变更和其他文件会列出，需单独整合，不会自动覆盖。首次同步可能因原目录已经含有同样的代码或存在未提交修改而发生冲突，此时不修改文件，也不推进同步记录；请让本地 Codex 检查并合并，不要强制覆盖。
+
+同步记录保存在原项目的本地 Git 配置中，按业务分支分别记录；成功后重复执行不会重复应用。原目录中的相同代码位置被修改、存在 Git 合并操作、目标源码为符号链接或云端历史被改写时，脚本停止。它不自动提交、不执行原项目的推送。
+
+可先预检，确认会应用哪些文件：
+
+```powershell
+python .storage-maintenance\sun-cloud\tools\cloud-apply.py --business-repo E:\cloud-0090 --dry-run
+```
+
+云端开发任务在相关检查完成后提交并推送其授权的改动；只有合入共享 `main` 的提交会被上述命令应用。本地新增业务代码上传仍需要在本地 Codex 中检查差异、同步到独立脱敏目录并提交推送；不能定时将原项目整个分支或工作区直接推送到 GitHub。可以在原项目的本地对话中用“上传本次业务修改到云端”作为操作口令，让本地 Codex 处理脱敏和冲突。
+
+快捷命令在云端的隔离 Git 仓库中验证了源码应用、配置保留、未提交文件保留、重复运行、冲突时原子停止、预检和错误仓库拒绝。当前云端对话无法执行 Windows 本地安装；Windows 实际路径、Python 和原目录的现有修改需要在本地对话中验证。
+
+同步脚本的回归检查可使用 `python tools/tests/test_cloud_apply.py` 执行；它只创建临时 Git 仓库，不连接真实业务服务。
+
+### 手动挑选提交
+
 快照与原业务仓库历史独立。不要直接合并整个 `cloud/main`，也不要把原分支直接推送到 GitHub，因为原分支仍含本地凭据。
 
 确认云端新提交后，可在原业务分支逐个 `git cherry-pick <云端新提交号>`（不要选初始快照提交）。若凭据占位或原有未跟踪文件导致冲突，应逐文件检查和合并，保留本地真实配置与未提交内容。操作前先提交或备份准备整合的本地业务文件。
