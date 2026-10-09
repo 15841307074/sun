@@ -203,11 +203,11 @@
                 <nacos.discovery.server>127.0.0.1:8848</nacos.discovery.server>
                 <nacos.discovery.namespace>local-cloud-0090-id</nacos.discovery.namespace>
                 <nacos.discovery.username>nacos</nacos.discovery.username>
-                <nacos.discovery.password>nacos</nacos.discovery.password>
+                <nacos.discovery.password>${CLOUD_NACOS_DISCOVERY_PASSWORD:}</nacos.discovery.password>
                 <nacos.config.server>192.168.31.141:8848,192.168.31.142:8848,192.168.31.143:8848</nacos.config.server>
                 <nacos.config.namespace>local-cloud-0090-id</nacos.config.namespace>
                 <nacos.config.username>nacos</nacos.config.username>
-                <nacos.config.password>Front_0090hbgc_cn</nacos.config.password>
+                <nacos.config.password>${CLOUD_NACOS_CONFIG_PASSWORD:}</nacos.config.password>
             </properties>
         </profile>
         <profile>
@@ -217,11 +217,11 @@
                 <nacos.discovery.server>192.168.31.141:8848,192.168.31.142:8848,192.168.31.143:8848</nacos.discovery.server>
                 <nacos.discovery.namespace>test-cloud-0090-id</nacos.discovery.namespace>
                 <nacos.discovery.username>nacos</nacos.discovery.username>
-                <nacos.discovery.password>Front_0090hbgc_cn</nacos.discovery.password>
+                <nacos.discovery.password>${CLOUD_NACOS_DISCOVERY_PASSWORD:}</nacos.discovery.password>
                 <nacos.config.server>192.168.31.141:8848,192.168.31.142:8848,192.168.31.143:8848</nacos.config.server>
                 <nacos.config.namespace>test-cloud-0090-id</nacos.config.namespace>
                 <nacos.config.username>nacos</nacos.config.username>
-                <nacos.config.password>Front_0090hbgc_cn</nacos.config.password>
+                <nacos.config.password>${CLOUD_NACOS_CONFIG_PASSWORD:}</nacos.config.password>
             </properties>
         </profile>
         <profile>
@@ -231,11 +231,11 @@
                 <nacos.discovery.server>192.168.31.161:8848,192.168.31.162:8848,192.168.31.163:8848</nacos.discovery.server>
                 <nacos.discovery.namespace>uat-cloud-0090-id</nacos.discovery.namespace>
                 <nacos.discovery.username>nacos</nacos.discovery.username>
-                <nacos.discovery.password>Front_0090hbgc_cn</nacos.discovery.password>
+                <nacos.discovery.password>${CLOUD_NACOS_DISCOVERY_PASSWORD:}</nacos.discovery.password>
                 <nacos.config.server>192.168.31.161:8848,192.168.31.162:8848,192.168.31.163:8848</nacos.config.server>
                 <nacos.config.namespace>uat-cloud-0090-id</nacos.config.namespace>
                 <nacos.config.username>nacos</nacos.config.username>
-                <nacos.config.password>Front_0090hbgc_cn</nacos.config.password>
+                <nacos.config.password>${CLOUD_NACOS_CONFIG_PASSWORD:}</nacos.config.password>
             </properties>
         </profile>
         <profile>
@@ -245,11 +245,11 @@
                 <nacos.discovery.server>10.40.3.208:8848,10.40.3.216:8848,10.40.3.221:8848</nacos.discovery.server>
                 <nacos.discovery.namespace>prod-cloud-0090-id</nacos.discovery.namespace>
                 <nacos.discovery.username>nacos</nacos.discovery.username>
-                <nacos.discovery.password>Front_0090hbgc_cn</nacos.discovery.password>
+                <nacos.discovery.password>${CLOUD_NACOS_DISCOVERY_PASSWORD:}</nacos.discovery.password>
                 <nacos.config.server>10.40.3.208:8848,10.40.3.216:8848,10.40.3.221:8848</nacos.config.server>
                 <nacos.config.namespace>prod-cloud-0090-id</nacos.config.namespace>
                 <nacos.config.username>nacos</nacos.config.username>
-                <nacos.config.password>Front_0090hbgc_cn</nacos.config.password>
+                <nacos.config.password>${CLOUD_NACOS_CONFIG_PASSWORD:}</nacos.config.password>
             </properties>
             <activation>
                 <activeByDefault>true</activeByDefault>

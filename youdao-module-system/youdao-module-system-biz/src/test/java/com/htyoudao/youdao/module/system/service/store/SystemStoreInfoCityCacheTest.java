@@ -8,6 +8,7 @@ import com.htyoudao.youdao.module.system.dal.mysql.store.SystemStoreInfoMapper;
 import com.htyoudao.youdao.module.system.dal.mysql.wxstore.StoreWecomConfigMapper;
 import com.htyoudao.youdao.module.system.service.store.cache.StoreCityListCacheService;
 import com.htyoudao.youdao.module.system.service.store.cache.StoreCityListCacheValue;
+import com.htyoudao.youdao.module.system.service.storebackground.StoreBackgroundCacheService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -36,6 +37,8 @@ class SystemStoreInfoCityCacheTest {
     @Mock
     private StoreCityListCacheService cacheService;
     @Mock
+    private StoreBackgroundCacheService backgroundCacheService;
+    @Mock
     private GrayStoreConfig grayStoreConfig;
     @Mock
     private SystemStoreInfoMapper storeInfoMapper;
@@ -61,7 +64,7 @@ class SystemStoreInfoCityCacheTest {
         when(cacheService.getStoresByCity("沈阳市"))
                 .thenReturn(new ArrayList<>(List.of(cacheValue)));
         when(grayStoreConfig.getMemberIdsByStore(1001L)).thenReturn(Collections.emptySet());
-        when(cacheService.getBackgroundImages(anyCollection()))
+        when(backgroundCacheService.getBackgroundImages(anyCollection()))
                 .thenReturn(Map.of(1001L, "https://example.com/background.png"));
 
         StoreWecomConfigReqVO request = new StoreWecomConfigReqVO();
@@ -85,7 +88,7 @@ class SystemStoreInfoCityCacheTest {
         request.setCityName(" ");
 
         assertTrue(service.storeListByCity(request).isEmpty());
-        verifyNoInteractions(cacheService, storeInfoMapper, storeExpensesMapper, storeWecomConfigMapper);
+        verifyNoInteractions(cacheService, backgroundCacheService, storeInfoMapper, storeExpensesMapper, storeWecomConfigMapper);
     }
 
     /**
@@ -105,7 +108,7 @@ class SystemStoreInfoCityCacheTest {
         when(cacheService.getStoresByCity("沈阳市"))
                 .thenReturn(new ArrayList<>(List.of(cacheValue)));
         when(grayStoreConfig.getMemberIdsByStore(1002L)).thenReturn(Collections.emptySet());
-        when(cacheService.getBackgroundImages(anyCollection())).thenReturn(Collections.emptyMap());
+        when(backgroundCacheService.getBackgroundImages(anyCollection())).thenReturn(Collections.emptyMap());
 
         StoreWecomConfigReqVO request = new StoreWecomConfigReqVO();
         request.setCityName("沈阳市");

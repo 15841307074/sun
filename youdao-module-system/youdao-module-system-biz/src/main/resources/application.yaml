@@ -28,13 +28,13 @@ spring:
       discovery: # 【配置中心】配置项
         server-addr: @nacos.discovery.server@ # Nacos 服务器地址
         username: @nacos.discovery.username@ # Nacos 账号
-        password: ${CLOUD_APPLICATION_PASSWORD_L31:}
+        password: ${CLOUD_NACOS_DISCOVERY_PASSWORD:${CLOUD_APPLICATION_PASSWORD_L31:}}
         namespace: @nacos.discovery.namespace@ # 命名空间。这里使用 dev 开发环境
         group: DEFAULT_GROUP # 使用的 Nacos 配置分组，默认为 DEFAULT_GROUP
       config: # 【注册中心】配置项
         server-addr: @nacos.config.server@ # Nacos 服务器地址
         username: @nacos.config.username@ # Nacos 账号
-        password: ${CLOUD_APPLICATION_PASSWORD_L37:}
+        password: ${CLOUD_NACOS_CONFIG_PASSWORD:${CLOUD_APPLICATION_PASSWORD_L37:}}
         namespace: @nacos.config.namespace@ # 命名空间。这里使用 dev 开发环境
         group: DEFAULT_GROUP # 使用的 Nacos 配置分组，默认为 DEFAULT_GROUP
 

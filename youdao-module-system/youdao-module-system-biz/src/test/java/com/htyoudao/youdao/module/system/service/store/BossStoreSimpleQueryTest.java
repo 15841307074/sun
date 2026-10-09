@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.core.conditions.AbstractWrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.htyoudao.youdao.framework.datapermission.core.annotation.DataPermission;
+import com.htyoudao.youdao.module.system.controller.app.store.vo.BossStoreSimpleRespVO;
 import com.htyoudao.youdao.module.system.dal.dataobject.store.SystemStoreInfoDO;
 import com.htyoudao.youdao.module.system.dal.mysql.store.SystemStoreInfoMapper;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
@@ -70,11 +71,19 @@ class BossStoreSimpleQueryTest {
 
     @Test
     void responseContainsOnlyFiveFieldsIncludingUnsetStatus() {
-        var node = new ObjectMapper().valueToTree(new BossStoreSimpleRespVO());
+        BossStoreSimpleRespVO response = new BossStoreSimpleRespVO();
+        response.setStoreId(101L);
+        response.setStoreName("测试门店");
+        var node = new ObjectMapper().valueToTree(response);
         assertEquals(5, node.size());
         for (String field : List.of("id", "storeId", "name", "storeName", "useStatus")) {
             assertTrue(node.has(field));
         }
+        assertEquals(node.get("storeId"), node.get("id"));
+        assertEquals(node.get("storeName"), node.get("name"));
+        assertEquals(101L, node.get("id").asLong());
+        assertEquals("测试门店", node.get("name").asText());
+        assertTrue(node.get("useStatus").isNull());
     }
 
     /** 执行真实默认查询方法，仅截获数据库入口，测试无需连接数据库。 */
