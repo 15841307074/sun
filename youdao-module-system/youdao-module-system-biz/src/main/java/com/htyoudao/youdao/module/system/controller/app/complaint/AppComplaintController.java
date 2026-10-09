@@ -76,6 +76,13 @@ public class AppComplaintController {
     public CommonResult<Long> getComplaintCount() throws IOException {
         return success(complaintService.getComplaintCount());
     }
+
+    @GetMapping("/getRegionPendingCount")
+    @Operation(summary = "当前账号全部有权限门店的待处理投诉数量", description = "用于投诉管理角标。统计当前组织及下级门店与账号直接关联店长门店的并集，不受前端当前选中门店影响；无门店权限返回0。")
+    @PreAuthorize("isAuthenticated()")
+    public CommonResult<Long> getRegionPendingCount() {
+        return success(complaintService.getRegionPendingCount());
+    }
     /**
      * 小程序
      */

@@ -27,6 +27,9 @@ public interface ComplaintService {
      * 待处理数量
      */
     Long getComplaintCount();
+
+    /** 当前账号组织及下级门店、直接关联店长门店的未处理投诉总数，供角标使用。 */
+    Long getRegionPendingCount();
     /**
      * 新增投诉
      */

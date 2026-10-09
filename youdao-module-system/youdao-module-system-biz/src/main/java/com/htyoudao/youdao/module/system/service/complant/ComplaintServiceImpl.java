@@ -40,6 +40,7 @@ import java.util.stream.Collectors;
 
 import static com.htyoudao.youdao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static com.htyoudao.youdao.module.system.enums.ErrorCodeConstants.*;
+import static com.htyoudao.youdao.framework.common.exception.enums.GlobalErrorCodeConstants.UNAUTHORIZED;
 
 @Service
 @Slf4j
@@ -115,6 +116,31 @@ public class ComplaintServiceImpl implements ComplaintService {
         queryWrapperX.eq(ComplaintDO::getComplaintType, ComplaintStatusEnum.NOTPROCESSED.getStatus());
         queryWrapperX.inIfPresent(ComplaintDO::getStoreId, storeList);
         return complaintMapper.selectCount(queryWrapperX);
+    }
+
+    @Override
+    public Long getRegionPendingCount() {
+        Long userId = WebFrameworkUtils.getLoginUserId();
+        if (userId == null) throw exception(UNAUTHORIZED);
+        long businessId = BusinessContextHolder.getRequiredBusinessId();
+        Set<Long> scope = orgService.getStoreIdsByUser();
+        Set<Long> storeIds = new HashSet<>();
+        if (CollectionUtil.isNotEmpty(scope)) storeIds.addAll(scope);
+        // 与 PC 列表范围一致：组织门店与本人直接关联门店取并集；type=1 为店长。
+        storeUserMapper.selectList(new LambdaQueryWrapperX<StoreUserDO>()
+                        .eq(StoreUserDO::getUserId, userId)
+                        .eq(StoreUserDO::getBusinessId, businessId)
+                        .eq(StoreUserDO::getType, 1)
+                        .eq(StoreUserDO::getDeleted, false))
+                .stream().map(StoreUserDO::getStoreId).forEach(storeIds::add);
+        storeIds.removeIf(id -> id == null || id <= 0);
+        if (storeIds.isEmpty()) return 0L;
+        // 必须使用非空门店范围；不能用 inIfPresent，否则空权限会退化成统计全项目。
+        return complaintMapper.selectCount(new LambdaQueryWrapperX<ComplaintDO>()
+                .eq(ComplaintDO::getBusinessId, businessId)
+                .eq(ComplaintDO::getComplaintType, ComplaintStatusEnum.NOTPROCESSED.getStatus())
+                .eq(ComplaintDO::getDeleted, false)
+                .in(ComplaintDO::getStoreId, storeIds));
     }
 
     /**
