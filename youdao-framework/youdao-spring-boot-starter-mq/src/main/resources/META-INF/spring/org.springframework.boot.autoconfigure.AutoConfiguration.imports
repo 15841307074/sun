@@ -1,0 +1,4 @@
+com.htyoudao.youdao.framework.mq.redis.config.YoudaoRedisMQProducerAutoConfiguration
+com.htyoudao.youdao.framework.mq.redis.config.YoudaoRedisMQConsumerAutoConfiguration
+com.htyoudao.youdao.framework.mq.rabbitmq.config.YoudaoRabbitMQAutoConfiguration
+com.htyoudao.youdao.framework.mq.rabbitmq.service.RabbitMQService

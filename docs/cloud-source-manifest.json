@@ -1,0 +1,1056 @@
+{
+  "source_branch": "feature/store_tags_cache_20260921",
+  "source_commit": "927e286ecf3cba6477172e9468a05039ffb39c95",
+  "history": "Independent sanitized snapshot; original Git history was not exported.",
+  "excluded": [
+    {
+      "path": ".lottery-edit.py",
+      "reason": "one-off local editing script"
+    },
+    {
+      "path": ".lottery-read-edit.py",
+      "reason": "one-off local editing script"
+    },
+    {
+      "path": ".lottery-runtime-wire.py",
+      "reason": "one-off local editing script"
+    },
+    {
+      "path": ".lottery-store-feed-edit.py",
+      "reason": "one-off local editing script"
+    },
+    {
+      "path": ".lottery-wire.py",
+      "reason": "one-off local editing script"
+    },
+    {
+      "path": ".storage-maintenance/Browser-Host-Migration.ps1",
+      "reason": "dependency/build/cache/tooling directory"
+    },
+    {
+      "path": ".storage-maintenance/Clean-System-Authorized.ps1",
+      "reason": "dependency/build/cache/tooling directory"
+    },
+    {
+      "path": ".storage-maintenance/Client-ProcessScope.ps1",
+      "reason": "dependency/build/cache/tooling directory"
+    },
+    {
+      "path": ".storage-maintenance/Diagnose-ClientPaths.ps1",
+      "reason": "dependency/build/cache/tooling directory"
+    },
+    {
+      "path": ".storage-maintenance/Diagnose-MigrationLocks.ps1",
+      "reason": "dependency/build/cache/tooling directory"
+    },
+    {
+      "path": ".storage-maintenance/Preflight-ClientRepair.ps1",
+      "reason": "dependency/build/cache/tooling directory"
+    },
+    {
+      "path": ".storage-maintenance/Preflight-Switch.ps1",
+      "reason": "dependency/build/cache/tooling directory"
+    },
+    {
+      "path": ".storage-maintenance/Register-ClientRepairTask.ps1",
+      "reason": "dependency/build/cache/tooling directory"
+    },
+    {
+      "path": ".storage-maintenance/Restore-ClientDefaults.ps1",
+      "reason": "dependency/build/cache/tooling directory"
+    },
+    {
+      "path": ".storage-maintenance/Start-Admin-Migration.ps1",
+      "reason": "dependency/build/cache/tooling directory"
+    },
+    {
+      "path": ".storage-maintenance/Start-ClientRepair.ps1",
+      "reason": "dependency/build/cache/tooling directory"
+    },
+    {
+      "path": ".storage-maintenance/Test-ClientProcessScope.ps1",
+      "reason": "dependency/build/cache/tooling directory"
+    },
+    {
+      "path": ".storage-maintenance/Wait-And-Migrate.ps1",
+      "reason": "dependency/build/cache/tooling directory"
+    },
+    {
+      "path": ".storage-maintenance/Watch-ClientRepair.ps1",
+      "reason": "dependency/build/cache/tooling directory"
+    },
+    {
+      "path": ".storage-maintenance/appdata_cleanup.py",
+      "reason": "dependency/build/cache/tooling directory"
+    },
+    {
+      "path": ".storage-maintenance/clean_e_logs_caches.py",
+      "reason": "dependency/build/cache/tooling directory"
+    },
+    {
+      "path": ".storage-maintenance/clean_obsolete_migration_copies.py",
+      "reason": "dependency/build/cache/tooling directory"
+    },
+    {
+      "path": ".storage-maintenance/clean_tencent_logs.py",
+      "reason": "dependency/build/cache/tooling directory"
+    },
+    {
+      "path": ".storage-maintenance/inspect_client_bundle.py",
+      "reason": "dependency/build/cache/tooling directory"
+    },
+    {
+      "path": ".storage-maintenance/inspect_remote_bundle.py",
+      "reason": "dependency/build/cache/tooling directory"
+    },
+    {
+      "path": ".storage-maintenance/inspect_tencent.py",
+      "reason": "dependency/build/cache/tooling directory"
+    },
+    {
+      "path": ".storage-maintenance/preflight_acls.py",
+      "reason": "dependency/build/cache/tooling directory"
+    },
+    {
+      "path": ".storage-maintenance/remove_verified_oem_package.py",
+      "reason": "dependency/build/cache/tooling directory"
+    },
+    {
+      "path": ".storage-maintenance/scan_c_other.py",
+      "reason": "dependency/build/cache/tooling directory"
+    },
+    {
+      "path": ".storage-maintenance/scan_e_drive.py",
+      "reason": "dependency/build/cache/tooling directory"
+    },
+    {
+      "path": ".storage-maintenance/storage_tools.py",
+      "reason": "dependency/build/cache/tooling directory"
+    },
+    {
+      "path": ".storage-maintenance/test_acl_verification.py",
+      "reason": "dependency/build/cache/tooling directory"
+    },
+    {
+      "path": ".storage-maintenance/test_checksum_retry.py",
+      "reason": "dependency/build/cache/tooling directory"
+    },
+    {
+      "path": ".storage-maintenance/test_child_file_lock.py",
+      "reason": "dependency/build/cache/tooling directory"
+    },
+    {
+      "path": ".storage-maintenance/test_directory_lock.py",
+      "reason": "dependency/build/cache/tooling directory"
+    },
+    {
+      "path": ".storage-maintenance/test_migration_locks.ps1",
+      "reason": "dependency/build/cache/tooling directory"
+    },
+    {
+      "path": ".storage-maintenance/test_switch_rehearsal.ps1",
+      "reason": "dependency/build/cache/tooling directory"
+    },
+    {
+      "path": ".tmp_doc_review/pages/page-1.png",
+      "reason": "dependency/build/cache/tooling directory"
+    },
+    {
+      "path": ".tmp_doc_review/pages/page-2.png",
+      "reason": "dependency/build/cache/tooling directory"
+    },
+    {
+      "path": ".tmp_doc_review/pages/page-3.png",
+      "reason": "dependency/build/cache/tooling directory"
+    },
+    {
+      "path": ".tmp_doc_review/pages/page-4.png",
+      "reason": "dependency/build/cache/tooling directory"
+    },
+    {
+      "path": ".tmp_doc_review/pages/page-5.png",
+      "reason": "dependency/build/cache/tooling directory"
+    },
+    {
+      "path": ".tmp_doc_review/plan-review.pdf",
+      "reason": "dependency/build/cache/tooling directory"
+    },
+    {
+      "path": ".tmp_doc_review/update-lottery-response-doc.py",
+      "reason": "dependency/build/cache/tooling directory"
+    },
+    {
+      "path": ".tmp_doc_review/verify-lottery-doc.py",
+      "reason": "dependency/build/cache/tooling directory"
+    },
+    {
+      "path": ".tmp_doc_review/verify-lottery-release.py",
+      "reason": "dependency/build/cache/tooling directory"
+    },
+    {
+      "path": "LOG_FILE_IS_UNDEFINED",
+      "reason": "local configuration or generated artifact"
+    },
+    {
+      "path": "state_5.sqlite.remote-control-backup",
+      "reason": "local backup"
+    },
+    {
+      "path": "youdao-module-promotion/youdao-module-promotion-biz/src/main/resources/apiclient_cert.pem",
+      "reason": "credential, binary, archive or generated artifact"
+    },
+    {
+      "path": "youdao-module-promotion/youdao-module-promotion-biz/src/main/resources/apiclient_key.pem",
+      "reason": "credential, binary, archive or generated artifact"
+    },
+    {
+      "path": "youdao-module-promotion/youdao-module-promotion-biz/src/main/resources/pub_key.pem",
+      "reason": "credential, binary, archive or generated artifact"
+    },
+    {
+      "path": "youdao-sentinel-dashboard/src/main/webapp/resources/dist/css/app.css",
+      "reason": "dependency/build/cache/tooling directory"
+    },
+    {
+      "path": "youdao-sentinel-dashboard/src/main/webapp/resources/dist/js/app.js",
+      "reason": "dependency/build/cache/tooling directory"
+    },
+    {
+      "path": "youdao-sentinel-dashboard/src/main/webapp/resources/dist/js/app.vendor.js",
+      "reason": "dependency/build/cache/tooling directory"
+    },
+    {
+      "path": "sql/上线SQL/1-【system-张吉鹤】.sql",
+      "reason": "historical credential-bearing SQL data export"
+    },
+    {
+      "path": "sql/上线SQL/2-【infra-张吉鹤】.sql",
+      "reason": "historical credential-bearing SQL data export"
+    },
+    {
+      "path": "sql/上线SQL/5-【初始化用户-冬冬】.sql",
+      "reason": "historical credential-bearing SQL data export"
+    },
+    {
+      "path": "sql/上线SQL/原始-不执行.sql",
+      "reason": "historical credential-bearing SQL data export"
+    },
+    {
+      "path": "sql/OA原始表/act_1028.sql",
+      "reason": "historical database export with internal database metadata; excluded after automatic approval review"
+    },
+    {
+      "path": "sql/OA原始表/bpm_1028.sql",
+      "reason": "historical database export with internal database metadata; excluded after automatic approval review"
+    },
+    {
+      "path": "sql/OA原始表/flw_1028.sql",
+      "reason": "historical database export with internal database metadata; excluded after automatic approval review"
+    },
+    {
+      "path": "sql/上线SQL/10-【订单-张吉鹤】.sql",
+      "reason": "historical database export with internal database metadata; excluded after automatic approval review"
+    },
+    {
+      "path": "sql/上线SQL/11-【初始化项目ID-张吉鹤】.sql",
+      "reason": "historical database export with internal database metadata; excluded after automatic approval review"
+    },
+    {
+      "path": "sql/上线SQL/12-【营销活动】.sql",
+      "reason": "historical database export with internal database metadata; excluded after automatic approval review"
+    },
+    {
+      "path": "sql/上线SQL/14- 抖音.sql",
+      "reason": "historical database export with internal database metadata; excluded after automatic approval review"
+    },
+    {
+      "path": "sql/上线SQL/15- CDN.sql",
+      "reason": "historical database export with internal database metadata; excluded after automatic approval review"
+    },
+    {
+      "path": "sql/上线SQL/3-【商品-张吉鹤】.sql",
+      "reason": "historical database export with internal database metadata; excluded after automatic approval review"
+    },
+    {
+      "path": "sql/上线SQL/4-【门店&用户-晟直】.sql",
+      "reason": "historical database export with internal database metadata; excluded after automatic approval review"
+    },
+    {
+      "path": "sql/上线SQL/6-【初始化打包费-张吉鹤】不执行.sql",
+      "reason": "historical database export with internal database metadata; excluded after automatic approval review"
+    },
+    {
+      "path": "sql/上线SQL/7-【优惠券-昊田】.sql",
+      "reason": "historical database export with internal database metadata; excluded after automatic approval review"
+    },
+    {
+      "path": "sql/上线SQL/8-【积分&广告-清林】.sql",
+      "reason": "historical database export with internal database metadata; excluded after automatic approval review"
+    },
+    {
+      "path": "sql/上线SQL/【9-会员&抽奖-博文】/1.小程序页面装修页.sql",
+      "reason": "historical database export with internal database metadata; excluded after automatic approval review"
+    },
+    {
+      "path": "sql/上线SQL/【9-会员&抽奖-博文】/10.活动记录表_7.sql",
+      "reason": "historical database export with internal database metadata; excluded after automatic approval review"
+    },
+    {
+      "path": "sql/上线SQL/【9-会员&抽奖-博文】/11.活动记录表_8.sql",
+      "reason": "historical database export with internal database metadata; excluded after automatic approval review"
+    },
+    {
+      "path": "sql/上线SQL/【9-会员&抽奖-博文】/12.活动记录表_9.sql",
+      "reason": "historical database export with internal database metadata; excluded after automatic approval review"
+    },
+    {
+      "path": "sql/上线SQL/【9-会员&抽奖-博文】/13.活动奖品表.sql",
+      "reason": "historical database export with internal database metadata; excluded after automatic approval review"
+    },
+    {
+      "path": "sql/上线SQL/【9-会员&抽奖-博文】/14.活动抽奖设置表.sql",
+      "reason": "historical database export with internal database metadata; excluded after automatic approval review"
+    },
+    {
+      "path": "sql/上线SQL/【9-会员&抽奖-博文】/15.会员表.sql",
+      "reason": "historical database export with internal database metadata; excluded after automatic approval review"
+    },
+    {
+      "path": "sql/上线SQL/【9-会员&抽奖-博文】/16.会员表_0.sql",
+      "reason": "historical database export with internal database metadata; excluded after automatic approval review"
+    },
+    {
+      "path": "sql/上线SQL/【9-会员&抽奖-博文】/17.会员表_1.sql",
+      "reason": "historical database export with internal database metadata; excluded after automatic approval review"
+    },
+    {
+      "path": "sql/上线SQL/【9-会员&抽奖-博文】/18.会员表_2.sql",
+      "reason": "historical database export with internal database metadata; excluded after automatic approval review"
+    },
+    {
+      "path": "sql/上线SQL/【9-会员&抽奖-博文】/19.会员表_3.sql",
+      "reason": "historical database export with internal database metadata; excluded after automatic approval review"
+    },
+    {
+      "path": "sql/上线SQL/【9-会员&抽奖-博文】/2.活动记录表.sql",
+      "reason": "historical database export with internal database metadata; excluded after automatic approval review"
+    },
+    {
+      "path": "sql/上线SQL/【9-会员&抽奖-博文】/20.会员表_4.sql",
+      "reason": "historical database export with internal database metadata; excluded after automatic approval review"
+    },
+    {
+      "path": "sql/上线SQL/【9-会员&抽奖-博文】/21.会员表_5.sql",
+      "reason": "historical database export with internal database metadata; excluded after automatic approval review"
+    },
+    {
+      "path": "sql/上线SQL/【9-会员&抽奖-博文】/22.会员表_6.sql",
+      "reason": "historical database export with internal database metadata; excluded after automatic approval review"
+    },
+    {
+      "path": "sql/上线SQL/【9-会员&抽奖-博文】/23.会员表_7.sql",
+      "reason": "historical database export with internal database metadata; excluded after automatic approval review"
+    },
+    {
+      "path": "sql/上线SQL/【9-会员&抽奖-博文】/24.会员表_8.sql",
+      "reason": "historical database export with internal database metadata; excluded after automatic approval review"
+    },
+    {
+      "path": "sql/上线SQL/【9-会员&抽奖-博文】/25.会员表_9.sql",
+      "reason": "historical database export with internal database metadata; excluded after automatic approval review"
+    },
+    {
+      "path": "sql/上线SQL/【9-会员&抽奖-博文】/26.会员地址表.sql",
+      "reason": "historical database export with internal database metadata; excluded after automatic approval review"
+    },
+    {
+      "path": "sql/上线SQL/【9-会员&抽奖-博文】/27.新增索引.sql",
+      "reason": "historical database export with internal database metadata; excluded after automatic approval review"
+    },
+    {
+      "path": "sql/上线SQL/【9-会员&抽奖-博文】/3.活动记录表_0.sql",
+      "reason": "historical database export with internal database metadata; excluded after automatic approval review"
+    },
+    {
+      "path": "sql/上线SQL/【9-会员&抽奖-博文】/4.活动记录表_1.sql",
+      "reason": "historical database export with internal database metadata; excluded after automatic approval review"
+    },
+    {
+      "path": "sql/上线SQL/【9-会员&抽奖-博文】/5.活动记录表_2.sql",
+      "reason": "historical database export with internal database metadata; excluded after automatic approval review"
+    },
+    {
+      "path": "sql/上线SQL/【9-会员&抽奖-博文】/6.活动记录表_3.sql",
+      "reason": "historical database export with internal database metadata; excluded after automatic approval review"
+    },
+    {
+      "path": "sql/上线SQL/【9-会员&抽奖-博文】/7.活动记录表_4.sql",
+      "reason": "historical database export with internal database metadata; excluded after automatic approval review"
+    },
+    {
+      "path": "sql/上线SQL/【9-会员&抽奖-博文】/8.活动记录表_5.sql",
+      "reason": "historical database export with internal database metadata; excluded after automatic approval review"
+    },
+    {
+      "path": "sql/上线SQL/【9-会员&抽奖-博文】/9.活动记录表_6.sql",
+      "reason": "historical database export with internal database metadata; excluded after automatic approval review"
+    },
+    {
+      "path": "sql/上线SQL/初始化接口.txt",
+      "reason": "historical database export with internal database metadata; excluded after automatic approval review"
+    },
+    {
+      "path": "sql/上线SQL/同步商品表数据-不执行.sql",
+      "reason": "historical database export with internal database metadata; excluded after automatic approval review"
+    },
+    {
+      "path": "sql/上线SQL/最后执行- 门店挂组织.sql",
+      "reason": "historical database export with internal database metadata; excluded after automatic approval review"
+    }
+  ],
+  "sanitized_files": [
+    ".gitignore",
+    "config/analysis-local.yaml",
+    "config/application-common-local.yaml",
+    "config/commodity-local.yaml",
+    "config/dashboard-local.yml",
+    "config/datasource-local.yaml",
+    "config/dubbo.yaml",
+    "config/gateway-local.yaml",
+    "config/infra-local.yaml",
+    "config/member-local.yaml",
+    "config/order-local.yaml",
+    "config/promotion-local.yaml",
+    "config/sharding-local.yaml",
+    "config/system-local.yaml",
+    "youdao-framework/youdao-spring-boot-starter-security/src/main/java/com/htyoudao/youdao/framework/security/config/SecurityProperties.java",
+    "youdao-gateway/src/main/java/com/htyoudao/youdao/gateway/config/SecurityProperties.java",
+    "youdao-gateway/src/main/resources/application.yaml",
+    "youdao-module-analysis/youdao-module-analysis-biz/src/main/resources/application.yaml",
+    "youdao-module-bpm/youdao-module-bpm-biz/src/main/java/com/htyoudao/youdao/module/bpm/controller/admin/oa/BpmOALeaveController.http",
+    "youdao-module-bpm/youdao-module-bpm-biz/src/main/java/com/htyoudao/youdao/module/bpm/controller/admin/task/BpmProcessInstanceController.http",
+    "youdao-module-bpm/youdao-module-bpm-biz/src/main/java/com/htyoudao/youdao/module/bpm/service/task/BpmTaskServiceImpl.java",
+    "youdao-module-bpm/youdao-module-bpm-biz/src/main/resources/application.yaml",
+    "youdao-module-commodity/youdao-module-commodity-biz/src/main/resources/application.yaml",
+    "youdao-module-demo/youdao-module-demo-biz/src/main/resources/application.yaml",
+    "youdao-module-errand/youdao-module-errand-biz/src/main/java/com/htyoudao/youdao/module/errand/util/WXPayUtility.java",
+    "youdao-module-errand/youdao-module-errand-biz/src/main/resources/application.yaml",
+    "youdao-module-infra/youdao-module-infra-biz/src/main/java/com/htyoudao/youdao/module/infra/controller/admin/file/FileConfigController.http",
+    "youdao-module-infra/youdao-module-infra-biz/src/main/java/com/htyoudao/youdao/module/infra/controller/admin/redis/RedisController.http",
+    "youdao-module-infra/youdao-module-infra-biz/src/main/resources/application.yaml",
+    "youdao-module-member/youdao-module-member-biz/src/main/java/com/htyoudao/youdao/module/member/controller/admin/wecom/config/WecomConfig.java",
+    "youdao-module-member/youdao-module-member-biz/src/main/java/com/htyoudao/youdao/module/member/service/auth/WechatServiceImpl.java",
+    "youdao-module-member/youdao-module-member-biz/src/main/resources/application.yaml",
+    "youdao-module-order/youdao-module-order-biz/src/main/java/com/htyoudao/youdao/module/order/controller/app/sq/service/SqProcessServiceImpl.java",
+    "youdao-module-order/youdao-module-order-biz/src/main/java/com/htyoudao/youdao/module/order/service/order/BzOrderLogServiceImpl.java",
+    "youdao-module-order/youdao-module-order-biz/src/main/java/com/htyoudao/youdao/module/order/service/pay/BzOrderPayServiceImpl.java",
+    "youdao-module-order/youdao-module-order-biz/src/main/java/com/htyoudao/youdao/module/order/util/feie/FeiESendUtil.java",
+    "youdao-module-order/youdao-module-order-biz/src/main/java/com/htyoudao/youdao/module/order/util/xingye/Config.java",
+    "youdao-module-order/youdao-module-order-biz/src/main/resources/application.yaml",
+    "youdao-module-promotion/youdao-module-promotion-biz/src/main/java/com/htyoudao/youdao/module/promotion/service/couponPackageShare/CouponPackageShareServiceImpl.java",
+    "youdao-module-promotion/youdao-module-promotion-biz/src/main/java/com/htyoudao/youdao/module/promotion/service/couponRedeem/DouyinCouponRedeemRecordServiceImpl.java",
+    "youdao-module-promotion/youdao-module-promotion-biz/src/main/java/com/htyoudao/youdao/module/promotion/service/douyin/DouyinProperties.java",
+    "youdao-module-promotion/youdao-module-promotion-biz/src/main/java/com/htyoudao/youdao/module/promotion/service/goodcoupon/GoodCouponServiceImpl.java",
+    "youdao-module-promotion/youdao-module-promotion-biz/src/main/java/com/htyoudao/youdao/module/promotion/service/market/SmsMarketServiceImpl.java",
+    "youdao-module-promotion/youdao-module-promotion-biz/src/main/java/com/htyoudao/youdao/module/promotion/util/WechatRedEnvelope/WXPayUtility.java",
+    "youdao-module-promotion/youdao-module-promotion-biz/src/main/java/com/htyoudao/youdao/module/promotion/util/wechatLink/GenerateUrlLink.java",
+    "youdao-module-promotion/youdao-module-promotion-biz/src/main/resources/application.yaml",
+    "youdao-module-promotion/youdao-module-promotion-biz/src/test/java/com/htyoudao/youdao/module/promotion/service/douyin/DouyinTokenManagerTest.java",
+    "youdao-module-promotion/youdao-module-promotion-biz/src/test/java/com/htyoudao/youdao/module/promotion/service/douyin/DyClientTest.java",
+    "youdao-module-system/youdao-module-system-biz/src/main/java/com/htyoudao/youdao/module/system/controller/admin/auth/AuthController.http",
+    "youdao-module-system/youdao-module-system-biz/src/main/java/com/htyoudao/youdao/module/system/controller/admin/dict/DictDataController.http",
+    "youdao-module-system/youdao-module-system-biz/src/main/java/com/htyoudao/youdao/module/system/controller/admin/ip/AreaController.http",
+    "youdao-module-system/youdao-module-system-biz/src/main/java/com/htyoudao/youdao/module/system/controller/admin/logger/OperateLogController.http",
+    "youdao-module-system/youdao-module-system-biz/src/main/java/com/htyoudao/youdao/module/system/controller/admin/mail/MailTemplateController.http",
+    "youdao-module-system/youdao-module-system-biz/src/main/java/com/htyoudao/youdao/module/system/controller/admin/oauth2/OAuth2ClientController.http",
+    "youdao-module-system/youdao-module-system-biz/src/main/java/com/htyoudao/youdao/module/system/controller/admin/oauth2/OAuth2OpenController.http",
+    "youdao-module-system/youdao-module-system-biz/src/main/java/com/htyoudao/youdao/module/system/controller/admin/oauth2/OAuth2UserController.http",
+    "youdao-module-system/youdao-module-system-biz/src/main/java/com/htyoudao/youdao/module/system/controller/admin/permission/MenuController.http",
+    "youdao-module-system/youdao-module-system-biz/src/main/java/com/htyoudao/youdao/module/system/controller/admin/permission/RoleController.http",
+    "youdao-module-system/youdao-module-system-biz/src/main/java/com/htyoudao/youdao/module/system/controller/admin/sms/SmsTemplateController.http",
+    "youdao-module-system/youdao-module-system-biz/src/main/java/com/htyoudao/youdao/module/system/controller/admin/socail/SocialClientController.http",
+    "youdao-module-system/youdao-module-system-biz/src/main/java/com/htyoudao/youdao/module/system/controller/admin/user/UserController.http",
+    "youdao-module-system/youdao-module-system-biz/src/main/java/com/htyoudao/youdao/module/system/controller/admin/user/UserProfileController.http",
+    "youdao-module-system/youdao-module-system-biz/src/main/java/com/htyoudao/youdao/module/system/service/store/SystemStoreInfoServiceImpl.java",
+    "youdao-module-system/youdao-module-system-biz/src/main/resources/application.yaml",
+    "youdao-module-version/youdao-module-version-biz/src/main/resources/application.yaml",
+    "youdao-sentinel-dashboard/src/main/resources/application.yml"
+  ],
+  "environment_variables": [
+    {
+      "file": "config/analysis-local.yaml",
+      "line": 9,
+      "key": "password",
+      "environment": "CLOUD_ANALYSIS_LOCAL_PASSWORD_L9"
+    },
+    {
+      "file": "config/analysis-local.yaml",
+      "line": 21,
+      "key": "password",
+      "environment": "CLOUD_ANALYSIS_LOCAL_PASSWORD_L21"
+    },
+    {
+      "file": "config/analysis-local.yaml",
+      "key": "embedded password",
+      "environment": "CLOUD_ANALYSIS_LOCAL_EMBEDDED_PASSWORD"
+    },
+    {
+      "file": "config/application-common-local.yaml",
+      "line": 72,
+      "key": "password",
+      "environment": "CLOUD_APPLICATION_COMMON_LOCAL_PASSWORD_L72"
+    },
+    {
+      "file": "config/application-common-local.yaml",
+      "line": 122,
+      "key": "accessToken",
+      "environment": "CLOUD_APPLICATION_COMMON_LOCAL_ACCESSTOKEN_L122"
+    },
+    {
+      "file": "config/application-common-local.yaml",
+      "line": 125,
+      "key": "password",
+      "environment": "CLOUD_APPLICATION_COMMON_LOCAL_PASSWORD_L125"
+    },
+    {
+      "file": "config/application-common-local.yaml",
+      "line": 220,
+      "key": "password",
+      "environment": "CLOUD_APPLICATION_COMMON_LOCAL_PASSWORD_L220"
+    },
+    {
+      "file": "config/application-common-local.yaml",
+      "line": 230,
+      "key": "password",
+      "environment": "CLOUD_APPLICATION_COMMON_LOCAL_PASSWORD_L230"
+    },
+    {
+      "file": "config/application-common-local.yaml",
+      "line": 240,
+      "key": "password",
+      "environment": "CLOUD_APPLICATION_COMMON_LOCAL_PASSWORD_L240"
+    },
+    {
+      "file": "config/application-common-local.yaml",
+      "line": 250,
+      "key": "password",
+      "environment": "CLOUD_APPLICATION_COMMON_LOCAL_PASSWORD_L250"
+    },
+    {
+      "file": "config/application-common-local.yaml",
+      "line": 260,
+      "key": "password",
+      "environment": "CLOUD_APPLICATION_COMMON_LOCAL_PASSWORD_L260"
+    },
+    {
+      "file": "config/commodity-local.yaml",
+      "line": 20,
+      "key": "password",
+      "environment": "CLOUD_COMMODITY_LOCAL_PASSWORD_L20"
+    },
+    {
+      "file": "config/dashboard-local.yml",
+      "line": 2,
+      "key": "password",
+      "environment": "CLOUD_DASHBOARD_LOCAL_PASSWORD_L2"
+    },
+    {
+      "file": "config/datasource-local.yaml",
+      "line": 40,
+      "key": "password",
+      "environment": "CLOUD_DATASOURCE_LOCAL_PASSWORD_L40"
+    },
+    {
+      "file": "config/datasource-local.yaml",
+      "line": 44,
+      "key": "password",
+      "environment": "CLOUD_DATASOURCE_LOCAL_PASSWORD_L44"
+    },
+    {
+      "file": "config/datasource-local.yaml",
+      "line": 59,
+      "key": "password",
+      "environment": "CLOUD_DATASOURCE_LOCAL_PASSWORD_L59"
+    },
+    {
+      "file": "config/dubbo.yaml",
+      "line": 29,
+      "key": "password",
+      "environment": "CLOUD_DUBBO_PASSWORD_L29"
+    },
+    {
+      "file": "config/dubbo.yaml",
+      "line": 38,
+      "key": "password",
+      "environment": "CLOUD_DUBBO_PASSWORD_L38"
+    },
+    {
+      "file": "config/gateway-local.yaml",
+      "line": 243,
+      "key": "password",
+      "environment": "CLOUD_GATEWAY_LOCAL_PASSWORD_L243"
+    },
+    {
+      "file": "config/gateway-local.yaml",
+      "line": 274,
+      "key": "password",
+      "environment": "CLOUD_GATEWAY_LOCAL_PASSWORD_L274"
+    },
+    {
+      "file": "config/gateway-local.yaml",
+      "line": 284,
+      "key": "password",
+      "environment": "CLOUD_GATEWAY_LOCAL_PASSWORD_L284"
+    },
+    {
+      "file": "config/gateway-local.yaml",
+      "line": 294,
+      "key": "password",
+      "environment": "CLOUD_GATEWAY_LOCAL_PASSWORD_L294"
+    },
+    {
+      "file": "config/gateway-local.yaml",
+      "line": 304,
+      "key": "password",
+      "environment": "CLOUD_GATEWAY_LOCAL_PASSWORD_L304"
+    },
+    {
+      "file": "config/gateway-local.yaml",
+      "line": 313,
+      "key": "password",
+      "environment": "CLOUD_GATEWAY_LOCAL_PASSWORD_L313"
+    },
+    {
+      "file": "config/gateway-local.yaml",
+      "line": 388,
+      "key": "secret",
+      "environment": "CLOUD_GATEWAY_LOCAL_SECRET_L388"
+    },
+    {
+      "file": "config/infra-local.yaml",
+      "line": 28,
+      "key": "access-key-id",
+      "environment": "CLOUD_INFRA_LOCAL_ACCESS_KEY_ID_L28"
+    },
+    {
+      "file": "config/infra-local.yaml",
+      "line": 29,
+      "key": "access-key-secret",
+      "environment": "CLOUD_INFRA_LOCAL_ACCESS_KEY_SECRET_L29"
+    },
+    {
+      "file": "config/member-local.yaml",
+      "line": 21,
+      "key": "password",
+      "environment": "CLOUD_MEMBER_LOCAL_PASSWORD_L21"
+    },
+    {
+      "file": "config/member-local.yaml",
+      "line": 67,
+      "key": "privateKey",
+      "environment": "CLOUD_MEMBER_LOCAL_PRIVATEKEY_L67"
+    },
+    {
+      "file": "config/member-local.yaml",
+      "line": 73,
+      "key": "privateKey",
+      "environment": "CLOUD_MEMBER_LOCAL_PRIVATEKEY_L73"
+    },
+    {
+      "file": "config/member-local.yaml",
+      "line": 79,
+      "key": "privateKey",
+      "environment": "CLOUD_MEMBER_LOCAL_PRIVATEKEY_L79"
+    },
+    {
+      "file": "config/member-local.yaml",
+      "line": 85,
+      "key": "privateKey",
+      "environment": "CLOUD_MEMBER_LOCAL_PRIVATEKEY_L85"
+    },
+    {
+      "file": "config/member-local.yaml",
+      "line": 91,
+      "key": "privateKey",
+      "environment": "CLOUD_MEMBER_LOCAL_PRIVATEKEY_L91"
+    },
+    {
+      "file": "config/member-local.yaml",
+      "line": 97,
+      "key": "privateKey",
+      "environment": "CLOUD_MEMBER_LOCAL_PRIVATEKEY_L97"
+    },
+    {
+      "file": "config/member-local.yaml",
+      "line": 103,
+      "key": "privateKey",
+      "environment": "CLOUD_MEMBER_LOCAL_PRIVATEKEY_L103"
+    },
+    {
+      "file": "config/member-local.yaml",
+      "line": 112,
+      "key": "token",
+      "environment": "CLOUD_MEMBER_LOCAL_TOKEN_L112"
+    },
+    {
+      "file": "config/member-local.yaml",
+      "line": 113,
+      "key": "encodingAESKey",
+      "environment": "CLOUD_MEMBER_LOCAL_ENCODINGAESKEY_L113"
+    },
+    {
+      "file": "config/member-local.yaml",
+      "line": 114,
+      "key": "corpSecret",
+      "environment": "CLOUD_MEMBER_LOCAL_CORPSECRET_L114"
+    },
+    {
+      "file": "config/member-local.yaml",
+      "key": "embedded password",
+      "environment": "CLOUD_MEMBER_LOCAL_EMBEDDED_PASSWORD"
+    },
+    {
+      "file": "config/member-local.yaml",
+      "key": "embedded password",
+      "environment": "CLOUD_MEMBER_LOCAL_EMBEDDED_PASSWORD"
+    },
+    {
+      "file": "config/order-local.yaml",
+      "line": 9,
+      "key": "password",
+      "environment": "CLOUD_ORDER_LOCAL_PASSWORD_L9"
+    },
+    {
+      "file": "config/order-local.yaml",
+      "line": 38,
+      "key": "key",
+      "environment": "CLOUD_ORDER_LOCAL_KEY_L38"
+    },
+    {
+      "file": "config/order-local.yaml",
+      "line": 56,
+      "key": "private-key",
+      "environment": "CLOUD_ORDER_LOCAL_PRIVATE_KEY_L56"
+    },
+    {
+      "file": "config/order-local.yaml",
+      "line": 74,
+      "key": "sign-key",
+      "environment": "CLOUD_ORDER_LOCAL_SIGN_KEY_L74"
+    },
+    {
+      "file": "config/order-local.yaml",
+      "line": 100,
+      "key": "password",
+      "environment": "CLOUD_ORDER_LOCAL_PASSWORD_L100"
+    },
+    {
+      "file": "config/order-local.yaml",
+      "line": 155,
+      "key": "secret",
+      "environment": "CLOUD_ORDER_LOCAL_SECRET_L155"
+    },
+    {
+      "file": "config/order-local.yaml",
+      "line": 191,
+      "key": "clientKey",
+      "environment": "CLOUD_ORDER_LOCAL_CLIENTKEY_L191"
+    },
+    {
+      "file": "config/order-local.yaml",
+      "line": 192,
+      "key": "clientSecret",
+      "environment": "CLOUD_ORDER_LOCAL_CLIENTSECRET_L192"
+    },
+    {
+      "file": "config/order-local.yaml",
+      "key": "embedded password",
+      "environment": "CLOUD_ORDER_LOCAL_EMBEDDED_PASSWORD"
+    },
+    {
+      "file": "config/order-local.yaml",
+      "key": "embedded password",
+      "environment": "CLOUD_ORDER_LOCAL_EMBEDDED_PASSWORD"
+    },
+    {
+      "file": "config/promotion-local.yaml",
+      "line": 22,
+      "key": "password",
+      "environment": "CLOUD_PROMOTION_LOCAL_PASSWORD_L22"
+    },
+    {
+      "file": "config/promotion-local.yaml",
+      "line": 44,
+      "key": "apiKey",
+      "environment": "CLOUD_PROMOTION_LOCAL_APIKEY_L44"
+    },
+    {
+      "file": "config/promotion-local.yaml",
+      "line": 63,
+      "key": "secret",
+      "environment": "CLOUD_PROMOTION_LOCAL_SECRET_L63"
+    },
+    {
+      "file": "config/promotion-local.yaml",
+      "line": 82,
+      "key": "api-V3-key",
+      "environment": "CLOUD_PROMOTION_LOCAL_API_V3_KEY_L82"
+    },
+    {
+      "file": "config/promotion-local.yaml",
+      "line": 85,
+      "key": "access-key-id",
+      "environment": "CLOUD_PROMOTION_LOCAL_ACCESS_KEY_ID_L85"
+    },
+    {
+      "file": "config/promotion-local.yaml",
+      "line": 86,
+      "key": "access-key-secret",
+      "environment": "CLOUD_PROMOTION_LOCAL_ACCESS_KEY_SECRET_L86"
+    },
+    {
+      "file": "config/promotion-local.yaml",
+      "line": 169,
+      "key": "password",
+      "environment": "CLOUD_PROMOTION_LOCAL_PASSWORD_L169"
+    },
+    {
+      "file": "config/promotion-local.yaml",
+      "key": "embedded password",
+      "environment": "CLOUD_PROMOTION_LOCAL_EMBEDDED_PASSWORD"
+    },
+    {
+      "file": "config/promotion-local.yaml",
+      "key": "embedded password",
+      "environment": "CLOUD_PROMOTION_LOCAL_EMBEDDED_PASSWORD"
+    },
+    {
+      "file": "config/sharding-local.yaml",
+      "line": 7,
+      "key": "password",
+      "environment": "CLOUD_SHARDING_LOCAL_PASSWORD_L7"
+    },
+    {
+      "file": "config/system-local.yaml",
+      "line": 41,
+      "key": "secret",
+      "environment": "CLOUD_SYSTEM_LOCAL_SECRET_L41"
+    },
+    {
+      "file": "config/system-local.yaml",
+      "line": 43,
+      "key": "secret",
+      "environment": "CLOUD_SYSTEM_LOCAL_SECRET_L43"
+    },
+    {
+      "file": "config/system-local.yaml",
+      "line": 51,
+      "key": "secret",
+      "environment": "CLOUD_SYSTEM_LOCAL_SECRET_L51"
+    },
+    {
+      "file": "config/system-local.yaml",
+      "line": 53,
+      "key": "secret",
+      "environment": "CLOUD_SYSTEM_LOCAL_SECRET_L53"
+    },
+    {
+      "file": "config/system-local.yaml",
+      "line": 65,
+      "key": "client-secret",
+      "environment": "CLOUD_SYSTEM_LOCAL_CLIENT_SECRET_L65"
+    },
+    {
+      "file": "config/system-local.yaml",
+      "line": 69,
+      "key": "client-secret",
+      "environment": "CLOUD_SYSTEM_LOCAL_CLIENT_SECRET_L69"
+    },
+    {
+      "file": "config/system-local.yaml",
+      "line": 75,
+      "key": "client-secret",
+      "environment": "CLOUD_SYSTEM_LOCAL_CLIENT_SECRET_L75"
+    },
+    {
+      "file": "config/system-local.yaml",
+      "line": 80,
+      "key": "client-secret",
+      "environment": "CLOUD_SYSTEM_LOCAL_CLIENT_SECRET_L80"
+    },
+    {
+      "file": "config/system-local.yaml",
+      "line": 93,
+      "key": "password",
+      "environment": "CLOUD_SYSTEM_LOCAL_PASSWORD_L93"
+    },
+    {
+      "file": "youdao-gateway/src/main/resources/application.yaml",
+      "line": 27,
+      "key": "password",
+      "environment": "CLOUD_APPLICATION_PASSWORD_L27"
+    },
+    {
+      "file": "youdao-gateway/src/main/resources/application.yaml",
+      "line": 33,
+      "key": "password",
+      "environment": "CLOUD_APPLICATION_PASSWORD_L33"
+    },
+    {
+      "file": "youdao-module-analysis/youdao-module-analysis-biz/src/main/resources/application.yaml",
+      "line": 31,
+      "key": "password",
+      "environment": "CLOUD_APPLICATION_PASSWORD_L31"
+    },
+    {
+      "file": "youdao-module-analysis/youdao-module-analysis-biz/src/main/resources/application.yaml",
+      "line": 37,
+      "key": "password",
+      "environment": "CLOUD_APPLICATION_PASSWORD_L37"
+    },
+    {
+      "file": "youdao-module-bpm/youdao-module-bpm-biz/src/main/resources/application.yaml",
+      "line": 31,
+      "key": "password",
+      "environment": "CLOUD_APPLICATION_PASSWORD_L31"
+    },
+    {
+      "file": "youdao-module-bpm/youdao-module-bpm-biz/src/main/resources/application.yaml",
+      "line": 37,
+      "key": "password",
+      "environment": "CLOUD_APPLICATION_PASSWORD_L37"
+    },
+    {
+      "file": "youdao-module-commodity/youdao-module-commodity-biz/src/main/resources/application.yaml",
+      "line": 35,
+      "key": "password",
+      "environment": "CLOUD_APPLICATION_PASSWORD_L35"
+    },
+    {
+      "file": "youdao-module-commodity/youdao-module-commodity-biz/src/main/resources/application.yaml",
+      "line": 41,
+      "key": "password",
+      "environment": "CLOUD_APPLICATION_PASSWORD_L41"
+    },
+    {
+      "file": "youdao-module-demo/youdao-module-demo-biz/src/main/resources/application.yaml",
+      "line": 31,
+      "key": "password",
+      "environment": "CLOUD_APPLICATION_PASSWORD_L31"
+    },
+    {
+      "file": "youdao-module-demo/youdao-module-demo-biz/src/main/resources/application.yaml",
+      "line": 37,
+      "key": "password",
+      "environment": "CLOUD_APPLICATION_PASSWORD_L37"
+    },
+    {
+      "file": "youdao-module-errand/youdao-module-errand-biz/src/main/resources/application.yaml",
+      "line": 31,
+      "key": "password",
+      "environment": "CLOUD_APPLICATION_PASSWORD_L31"
+    },
+    {
+      "file": "youdao-module-errand/youdao-module-errand-biz/src/main/resources/application.yaml",
+      "line": 37,
+      "key": "password",
+      "environment": "CLOUD_APPLICATION_PASSWORD_L37"
+    },
+    {
+      "file": "youdao-module-infra/youdao-module-infra-biz/src/main/resources/application.yaml",
+      "line": 31,
+      "key": "password",
+      "environment": "CLOUD_APPLICATION_PASSWORD_L31"
+    },
+    {
+      "file": "youdao-module-infra/youdao-module-infra-biz/src/main/resources/application.yaml",
+      "line": 37,
+      "key": "password",
+      "environment": "CLOUD_APPLICATION_PASSWORD_L37"
+    },
+    {
+      "file": "youdao-module-member/youdao-module-member-biz/src/main/resources/application.yaml",
+      "line": 31,
+      "key": "password",
+      "environment": "CLOUD_APPLICATION_PASSWORD_L31"
+    },
+    {
+      "file": "youdao-module-member/youdao-module-member-biz/src/main/resources/application.yaml",
+      "line": 37,
+      "key": "password",
+      "environment": "CLOUD_APPLICATION_PASSWORD_L37"
+    },
+    {
+      "file": "youdao-module-order/youdao-module-order-biz/src/main/resources/application.yaml",
+      "line": 30,
+      "key": "password",
+      "environment": "CLOUD_APPLICATION_PASSWORD_L30"
+    },
+    {
+      "file": "youdao-module-order/youdao-module-order-biz/src/main/resources/application.yaml",
+      "line": 36,
+      "key": "password",
+      "environment": "CLOUD_APPLICATION_PASSWORD_L36"
+    },
+    {
+      "file": "youdao-module-promotion/youdao-module-promotion-biz/src/main/resources/application.yaml",
+      "line": 31,
+      "key": "password",
+      "environment": "CLOUD_APPLICATION_PASSWORD_L31"
+    },
+    {
+      "file": "youdao-module-promotion/youdao-module-promotion-biz/src/main/resources/application.yaml",
+      "line": 37,
+      "key": "password",
+      "environment": "CLOUD_APPLICATION_PASSWORD_L37"
+    },
+    {
+      "file": "youdao-module-promotion/youdao-module-promotion-biz/src/main/resources/application.yaml",
+      "line": 56,
+      "key": "api-V3-key",
+      "environment": "CLOUD_APPLICATION_API_V3_KEY_L56"
+    },
+    {
+      "file": "youdao-module-system/youdao-module-system-biz/src/main/resources/application.yaml",
+      "line": 31,
+      "key": "password",
+      "environment": "CLOUD_APPLICATION_PASSWORD_L31"
+    },
+    {
+      "file": "youdao-module-system/youdao-module-system-biz/src/main/resources/application.yaml",
+      "line": 37,
+      "key": "password",
+      "environment": "CLOUD_APPLICATION_PASSWORD_L37"
+    },
+    {
+      "file": "youdao-module-version/youdao-module-version-biz/src/main/resources/application.yaml",
+      "line": 31,
+      "key": "password",
+      "environment": "CLOUD_APPLICATION_PASSWORD_L31"
+    },
+    {
+      "file": "youdao-module-version/youdao-module-version-biz/src/main/resources/application.yaml",
+      "line": 37,
+      "key": "password",
+      "environment": "CLOUD_APPLICATION_PASSWORD_L37"
+    },
+    {
+      "file": "youdao-sentinel-dashboard/src/main/resources/application.yml",
+      "line": 5,
+      "key": "password",
+      "environment": "CLOUD_APPLICATION_PASSWORD_L5"
+    },
+    {
+      "file": "youdao-sentinel-dashboard/src/main/resources/application.yml",
+      "line": 51,
+      "key": "password",
+      "environment": "CLOUD_APPLICATION_PASSWORD_L51"
+    },
+    {
+      "file": "youdao-sentinel-dashboard/src/main/resources/application.yml",
+      "line": 57,
+      "key": "password",
+      "environment": "CLOUD_APPLICATION_PASSWORD_L57"
+    }
+  ]
+}

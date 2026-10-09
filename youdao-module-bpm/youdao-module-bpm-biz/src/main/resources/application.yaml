@@ -1,0 +1,43 @@
+server:
+  port: 48087
+
+spring:
+  application:
+    name: bpm-server
+
+  profiles:
+    active: @activated.profile@
+
+  main:
+    allow-circular-references: true # 允许循环依赖，因为项目是三层架构，无法避免这个情况。
+    allow-bean-definition-overriding: true # 允许 Bean 覆盖，例如说 Feign 等会存在重复定义的服务
+
+  config:
+    import:
+      #      - optional:classpath:application-${spring.profiles.active}.yaml # 加载【本地】配置
+      - optional:nacos:application-common.yaml # 加载【Nacos】的配置
+      - optional:nacos:datasource.yaml # 加载【Nacos】的配置
+      - optional:nacos:dubbo.yaml # 加载【Nacos】的配置
+      - optional:nacos:${spring.application.name}.yaml # 加载【Nacos】的配置
+
+--- #################### 注册中心 + 配置中心相关配置 ####################
+
+spring:
+  cloud:
+    nacos:
+      discovery: # 【配置中心】配置项
+        server-addr: @nacos.discovery.server@ # Nacos 服务器地址
+        username: @nacos.discovery.username@ # Nacos 账号
+        password: ${CLOUD_APPLICATION_PASSWORD_L31:}
+        namespace: @nacos.discovery.namespace@ # 命名空间。这里使用 dev 开发环境
+        group: DEFAULT_GROUP # 使用的 Nacos 配置分组，默认为 DEFAULT_GROUP
+      config: # 【注册中心】配置项
+        server-addr: @nacos.config.server@ # Nacos 服务器地址
+        username: @nacos.config.username@ # Nacos 账号
+        password: ${CLOUD_APPLICATION_PASSWORD_L37:}
+        namespace: @nacos.config.namespace@ # 命名空间。这里使用 dev 开发环境
+        group: DEFAULT_GROUP # 使用的 Nacos 配置分组，默认为 DEFAULT_GROUP
+
+logging:
+  file:
+    name: ${user.home}/logs/${spring.application.name}.log # 日志文件名，全路径

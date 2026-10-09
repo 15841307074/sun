@@ -1,0 +1,416 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.htyoudao.youdao.module.order.dal.mysql.BzOrderProductMapper">
+  <resultMap id="BaseResultMap" type="com.htyoudao.youdao.module.order.dal.dataobject.order.BzOrderProductDO">
+    <id column="order_product_id" jdbcType="BIGINT" property="orderProductId" />
+    <result column="order_sn" jdbcType="VARCHAR" property="orderSn" />
+    <result column="store_id" jdbcType="BIGINT" property="storeId" />
+    <result column="store_name" jdbcType="VARCHAR" property="storeName" />
+    <result column="member_id" jdbcType="INTEGER" property="memberId" />
+    <result column="goods_id" jdbcType="VARCHAR" property="goodsId" />
+    <result column="goods_name" jdbcType="VARCHAR" property="goodsName" />
+    <result column="goods_image" jdbcType="VARCHAR" property="goodsImage" />
+    <result column="spec_values" jdbcType="VARCHAR" property="specValues" />
+    <result column="goods_show_price" jdbcType="DECIMAL" property="goodsShowPrice" />
+    <result column="goods_num" jdbcType="INTEGER" property="goodsNum" />
+    <result column="activity_discount_amount" jdbcType="DECIMAL" property="activityDiscountAmount" />
+    <result column="platform_activity_amount" jdbcType="DECIMAL" property="platformActivityAmount" />
+    <result column="platform_voucher_amount" jdbcType="DECIMAL" property="platformVoucherAmount" />
+    <result column="money_amount" jdbcType="DECIMAL" property="moneyAmount" />
+    <result column="commission_rate" jdbcType="DECIMAL" property="commissionRate" />
+    <result column="commission_amount" jdbcType="DECIMAL" property="commissionAmount" />
+    <result column="attach_commission_amount" jdbcType="DECIMAL" property="attachCommissionAmount" />
+    <result column="spell_team_id" jdbcType="INTEGER" property="spellTeamId" />
+    <result column="is_gift" jdbcType="BIT" property="isGift" />
+    <result column="gift_id" jdbcType="INTEGER" property="giftId" />
+    <result column="return_number" jdbcType="INTEGER" property="returnNumber" />
+    <result column="is_comment" jdbcType="BIT" property="isComment" />
+    <result column="comment_time" jdbcType="TIMESTAMP" property="commentTime" />
+    <result column="send_integral" jdbcType="INTEGER" property="sendIntegral" />
+    <result column="is_single" jdbcType="INTEGER" property="isSingle" />
+    <result column="flavor_name" jdbcType="VARCHAR" property="flavorName" />
+    <result column="flavor_value" jdbcType="VARCHAR" property="flavorValue" />
+    <result column="category_id" jdbcType="BIGINT" property="categoryId" />
+    <result column="category_name" jdbcType="VARCHAR" property="categoryName" />
+  </resultMap>
+
+  <sql id="Example_Where_Clause">
+    <where>
+      <foreach collection="oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Update_By_Example_Where_Clause">
+    <where>
+      <foreach collection="example.oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Base_Column_List">
+    order_product_id, order_sn, store_id, store_name, member_id, goods_id, goods_name,
+    goods_image, spec_values, goods_show_price, goods_num, activity_discount_amount,
+    platform_activity_amount, platform_voucher_amount, money_amount, commission_rate,
+    commission_amount, attach_commission_amount, spell_team_id, is_gift, gift_id, return_number,
+    is_comment, comment_time, send_integral, is_single, flavor_name, flavor_value, category_id,
+    category_name, commodity_id
+  </sql>
+  <sql id="Blob_Column_List">
+    activity_discount_detail
+  </sql>
+  <insert id="insertSingle" parameterType="com.htyoudao.youdao.module.order.dal.dataobject.order.BzOrderProductDO" useGeneratedKeys="true" keyProperty="r.order_product_id">
+    insert into bz_order_product (order_product_id, order_sn, store_id,
+      store_name, member_id, goods_id,
+      goods_name, goods_image, spec_values,
+      goods_show_price, goods_num, activity_discount_amount,
+      platform_activity_amount, platform_voucher_amount,
+      money_amount, commission_rate, commission_amount,
+      attach_commission_amount, spell_team_id, is_gift,
+      gift_id, return_number, is_comment,
+      comment_time, send_integral, is_single,
+      flavor_name, flavor_value, category_id,
+      category_name, activity_discount_detail, commodity_id, project_owner_ship
+      )
+    values (#{r.orderProductId,jdbcType=BIGINT}, #{r.orderSn,jdbcType=VARCHAR}, #{r.storeId,jdbcType=BIGINT},
+      #{r.storeName,jdbcType=VARCHAR}, IFNULL(#{r.memberId,jdbcType=INTEGER},0), #{r.goodsId,jdbcType=VARCHAR},
+      #{r.goodsName,jdbcType=VARCHAR}, #{r.goodsImage,jdbcType=VARCHAR}, #{r.specValues,jdbcType=VARCHAR},
+      #{r.goodsShowPrice,jdbcType=DECIMAL}, #{r.goodsNum,jdbcType=INTEGER}, #{r.activityDiscountAmount,jdbcType=DECIMAL},
+      IFNULL(#{r.platformActivityAmount,jdbcType=DECIMAL},0.00), IFNULL(#{r.platformVoucherAmount,jdbcType=DECIMAL},0.00),
+      IFNULL(#{r.moneyAmount,jdbcType=DECIMAL},0.00), IFNULL(#{r.commissionRate,jdbcType=DECIMAL},0.00), IFNULL(#{r.commissionAmount,jdbcType=DECIMAL},0.00),
+      IFNULL(#{r.attachCommissionAmount,jdbcType=DECIMAL},0.00), IFNULL(#{r.spellTeamId,jdbcType=BIGINT},0), IFNULL(#{r.isGift,jdbcType=BIT},0),
+      IFNULL(#{r.giftId,jdbcType=INTEGER},0), IFNULL(#{r.returnNumber,jdbcType=INTEGER},0), IFNULL(#{r.isComment,jdbcType=BIT},0),
+      #{r.commentTime,jdbcType=TIMESTAMP}, IFNULL(#{r.sendIntegral,jdbcType=INTEGER},0), IFNULL(#{r.isSingle,jdbcType=INTEGER},1),
+      #{r.flavorName,jdbcType=VARCHAR}, #{r.flavorValue,jdbcType=VARCHAR}, #{r.categoryId,jdbcType=BIGINT},
+      #{r.categoryName,jdbcType=VARCHAR}, #{r.activityDiscountDetail,jdbcType=LONGVARCHAR}, #{r.commodityId,jdbcType=BIGINT}, #{r.projectOwnerShip,jdbcType=BIGINT}
+      )
+  </insert>
+  <update id="updateByExampleSelective" parameterType="map">
+    update bz_order_product
+    <set>
+      <if test="record.orderProductId != null">
+        order_product_id = #{record.orderProductId,jdbcType=BIGINT},
+      </if>
+      <if test="record.orderSn != null">
+        order_sn = #{record.orderSn,jdbcType=VARCHAR},
+      </if>
+      <if test="record.storeId != null">
+        store_id = #{record.storeId,jdbcType=BIGINT},
+      </if>
+      <if test="record.storeName != null">
+        store_name = #{record.storeName,jdbcType=VARCHAR},
+      </if>
+      <if test="record.memberId != null">
+        member_id = #{record.memberId,jdbcType=INTEGER},
+      </if>
+      <if test="record.goodsId != null">
+        goods_id = #{record.goodsId,jdbcType=VARCHAR},
+      </if>
+      <if test="record.goodsName != null">
+        goods_name = #{record.goodsName,jdbcType=VARCHAR},
+      </if>
+      <if test="record.goodsImage != null">
+        goods_image = #{record.goodsImage,jdbcType=VARCHAR},
+      </if>
+      <if test="record.specValues != null">
+        spec_values = #{record.specValues,jdbcType=VARCHAR},
+      </if>
+      <if test="record.goodsShowPrice != null">
+        goods_show_price = #{record.goodsShowPrice,jdbcType=DECIMAL},
+      </if>
+      <if test="record.goodsNum != null">
+        goods_num = #{record.goodsNum,jdbcType=INTEGER},
+      </if>
+      <if test="record.activityDiscountAmount != null">
+        activity_discount_amount = #{record.activityDiscountAmount,jdbcType=DECIMAL},
+      </if>
+      <if test="record.platformActivityAmount != null">
+        platform_activity_amount = #{record.platformActivityAmount,jdbcType=DECIMAL},
+      </if>
+      <if test="record.platformVoucherAmount != null">
+        platform_voucher_amount = #{record.platformVoucherAmount,jdbcType=DECIMAL},
+      </if>
+      <if test="record.moneyAmount != null">
+        money_amount = #{record.moneyAmount,jdbcType=DECIMAL},
+      </if>
+      <if test="record.commissionRate != null">
+        commission_rate = #{record.commissionRate,jdbcType=DECIMAL},
+      </if>
+      <if test="record.commissionAmount != null">
+        commission_amount = #{record.commissionAmount,jdbcType=DECIMAL},
+      </if>
+      <if test="record.attachCommissionAmount != null">
+        attach_commission_amount = #{record.attachCommissionAmount,jdbcType=DECIMAL},
+      </if>
+      <if test="record.spellTeamId != null">
+        spell_team_id = #{record.spellTeamId,jdbcType=BIGINT},
+      </if>
+      <if test="record.isGift != null">
+        is_gift = #{record.isGift,jdbcType=BIT},
+      </if>
+      <if test="record.giftId != null">
+        gift_id = #{record.giftId,jdbcType=INTEGER},
+      </if>
+      <if test="record.returnNumber != null">
+        return_number = #{record.returnNumber,jdbcType=INTEGER},
+      </if>
+      <if test="record.isComment != null">
+        is_comment = #{record.isComment,jdbcType=BIT},
+      </if>
+      <if test="record.commentTime != null">
+        comment_time = #{record.commentTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="record.sendIntegral != null">
+        send_integral = #{record.sendIntegral,jdbcType=INTEGER},
+      </if>
+      <if test="record.isSingle != null">
+        is_single = #{record.isSingle,jdbcType=INTEGER},
+      </if>
+      <if test="record.flavorName != null">
+        flavor_name = #{record.flavorName,jdbcType=VARCHAR},
+      </if>
+      <if test="record.flavorValue != null">
+        flavor_value = #{record.flavorValue,jdbcType=VARCHAR},
+      </if>
+      <if test="record.categoryId != null">
+        category_id = #{record.categoryId,jdbcType=BIGINT},
+      </if>
+      <if test="record.categoryName != null">
+        category_name = #{record.categoryName,jdbcType=VARCHAR},
+      </if>
+      <if test="record.commodityId != null">
+        commodity_id = #{record.commodityId,jdbcType=BIGINT},
+      </if>
+      <if test="record.activityDiscountDetail != null">
+        activity_discount_detail = #{record.activityDiscountDetail,jdbcType=LONGVARCHAR},
+      </if>
+    </set>
+    <if test="_parameter != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+
+  <sql id="selectBzOrderProductVo">
+        SELECT order_product_id,
+               order_sn,
+               store_id,
+               store_name,
+               member_id,
+               goods_id,
+               goods_name,
+               goods_image,
+               spec_values,
+               goods_show_price,
+               goods_num,
+               activity_discount_amount,
+               activity_discount_detail,
+               platform_activity_amount,
+               platform_voucher_amount,
+               money_amount,
+               commission_rate,
+               commission_amount,
+               attach_commission_amount,
+               spell_team_id,
+               is_gift,
+               gift_id,
+               return_number,
+               is_comment,
+               comment_time,
+               send_integral,
+               is_single,
+               flavor_name,
+               flavor_value,
+               category_id,
+               category_name,
+               commodity_id
+        FROM bz_order_product
+    </sql>
+
+  <select id="getAllOrderProductList" resultType="com.htyoudao.youdao.module.order.controller.admin.order.vo.OrderProductInfoVO">
+        SELECT
+            o.order_id,
+            o.member_id,
+            o.pay_amount,
+            o.member_id,
+            p.store_id,
+            p.goods_show_price,
+            p.money_amount,
+            p.goods_id,
+            p.goods_name,
+            p.goods_num,
+            p.goods_image,
+            p.category_id,
+            p.category_name,
+            o.order_from
+        FROM
+            bz_order_product p
+        LEFT JOIN bz_order o ON o.order_sn = p.order_sn
+        WHERE
+        o.create_time &gt;= #{startTime}
+        AND o.create_time &lt;= #{endTime}
+        AND o.order_state != 0
+        AND o.order_state != 70
+        AND o.order_state != 10
+	    AND o.order_state != 90
+	    AND o.order_state != -10
+
+    </select>
+  <select id="getOrderProductList" parameterType="com.htyoudao.youdao.module.order.controller.admin.order.vo.BzOrderProductVO" resultType="com.htyoudao.youdao.module.order.controller.admin.order.vo.BzOrderProductVO">
+
+      SELECT
+        order_product_id orderProductId,
+        order_sn orderSn,
+        goods_id goodsId,
+        goods_name goodsName,
+        goods_image goodsImage,
+        activity_id activityId,
+        activity_name activityName,
+        activity_type activityType,
+        coupon_id couponId,
+        user_coupon_id userCouponId,
+        couponName couponName,
+        spec_values specValues,
+        goods_show_price goodsShowPrice,
+        activity_discount_amount activityDiscountAmount,
+        promotion_discount_amount promotionDiscountAmount,
+        goods_num goodsNum,
+        is_single isSingle,
+        flavor_name flavorName,
+        flavor_value flavorValue,
+        commodity_id commodityId,
+        category_name categoryName,
+        send_integral sendIntegral
+      FROM bz_order_product
+      <where>
+        <if test="record.orderSn != null  and record.orderSn != ''">
+          AND order_sn = #{record.orderSn}
+        </if>
+        <if test="record.orderSnList != null  and record.orderSnList != ''">
+          AND order_sn in
+          <foreach collection="record.orderSnList" item="orderSn" open="(" separator="," close=")">
+            #{orderSn}
+          </foreach>
+        </if>
+        <if test="record.storeId != null ">
+          AND store_id = #{record.storeId}
+        </if>
+        <if test="record.storeName != null  and record.storeName != ''">
+          AND store_name like concat('%', #{record.storeName}, '%')
+        </if>
+        <if test="record.memberId != null ">
+          AND member_id = #{record.memberId}
+        </if>
+        <if test="record.goodsId != null ">
+          AND goods_id = #{record.goodsId}
+        </if>
+        <if test="record.goodsName != null  and record.goodsName != ''">
+          and goods_name like concat('%', #{record.goodsName}, '%')
+        </if>
+        <if test="record.goodsImage != null  and record.goodsImage != ''">
+          and goods_image = #{record.goodsImage}
+        </if>
+        <if test="record.specValues != null  and record.specValues != ''">
+          and spec_values = #{record.specValues}
+        </if>
+        <if test="record.goodsShowPrice != null ">
+          and goods_show_price = #{record.goodsShowPrice}
+        </if>
+        <if test="record.goodsNum != null ">
+          and goods_num = #{record.goodsNum}
+        </if>
+        <if test="record.activityDiscountAmount != null ">
+          and activity_discount_amount = #{record.activityDiscountAmount}
+        </if>
+        <if test="record.activityDiscountDetail != null  and record.activityDiscountDetail != ''">
+          and activity_discount_detail = #{record.activityDiscountDetail}
+        </if>
+        <if test="record.platformActivityAmount != null ">
+          and platform_activity_amount = #{record.platformActivityAmount}
+        </if>
+        <if test="record.platformVoucherAmount != null ">
+          and platform_voucher_amount = #{record.platformVoucherAmount}
+        </if>
+        <if test="record.moneyAmount != null ">
+          and money_amount = #{record.moneyAmount}
+        </if>
+        <if test="record.commissionRate != null ">
+          and commission_rate = #{record.commissionRate}
+        </if>
+        <if test="record.commissionAmount != null ">
+          and commission_amount = #{record.commissionAmount}
+        </if>
+        <if test="record.attachCommissionAmount != null ">
+          and attach_commission_amount = #{record.attachCommissionAmount}
+        </if>
+        <if test="record.spellTeamId != null ">
+          and spell_team_id = #{record.spellTeamId}
+        </if>
+        <if test="record.isGift != null ">
+          and is_gift = #{record.isGift}
+        </if>
+        <if test="record.giftId != null ">
+          and gift_id = #{record.giftId}
+        </if>
+        <if test="record.returnNumber != null ">
+          and return_number = #{record.returnNumber}
+        </if>
+        <if test="record.isComment != null ">
+          and is_comment = #{record.isComment}
+        </if>
+        <if test="record.commentTime != null ">
+          and comment_time = #{record.commentTime}
+        </if>
+        <if test="record.sendIntegral != null ">
+          and send_integral = #{record.sendIntegral}
+        </if>
+      </where>
+  </select>
+
+  <select id="selectSimulationList" resultType="com.htyoudao.youdao.module.order.dal.dataobject.order.BzOrderProductDO">
+    SELECT * FROM bz_order_product${tableFix} WHERE order_sn = #{orderSn} AND deleted = 0
+  </select>
+</mapper>

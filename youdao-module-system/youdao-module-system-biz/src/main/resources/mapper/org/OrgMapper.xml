@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.htyoudao.youdao.module.system.dal.mysql.org.OrgMapper">
+
+
+    <!--
+        一般情况下，尽可能使用 Mapper 进行 CRUD 增删改查即可。
+        无法满足的场景，例如说多表关联查询，才使用 XML 编写 SQL。
+        代码生成器暂时只生成 Mapper XML 文件本身，更多推荐 MybatisX 快速开发插件来生成查询。
+        文档可见：https://www.iocoder.cn/MyBatis/x-plugins/
+     -->
+    <update id="updateParentAndAncestors">
+        UPDATE system_org SET parent_id = #{newOrgId}, ancestors = #{newAncestorPrefix},sort = #{maxSort} WHERE id = #{id}
+    </update>
+
+    <update id="batchUpdateChildrenAncestors">
+        UPDATE system_org
+        SET ancestors = CONCAT(#{newAncestorPrefix}, SUBSTRING(ancestors, LENGTH(#{oldAncestorPrefix})+1))
+        WHERE id IN
+        <foreach item="id" collection="allOrgIds" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        AND ancestors LIKE CONCAT(#{oldAncestorPrefix}, '%')
+        AND deleted = 0
+    </update>
+    <delete id="deleteByAnce">
+       DELETE FROM system_org WHERE ancestors LIKE CONCAT(#{ancestors},'%')
+    </delete>
+
+
+    <select id="selectAccOrgList"
+            resultType="com.htyoudao.youdao.module.system.controller.admin.org.vo.OrgTreeRespVO">
+
+
+
+    </select>
+    <select id="selectChildByIds" resultType="com.htyoudao.youdao.module.system.dal.dataobject.org.OrgDO">
+        SELECT DISTINCT child.*
+        FROM system_org parent
+        JOIN system_org child ON FIND_IN_SET(parent.id, child.ancestors) > 0
+        WHERE
+          parent.deleted = b'0'
+          AND child.deleted = b'0'
+          AND parent.id IN
+          <foreach collection="allOrgIds" item="id" open="(" separator="," close=")">
+            #{id}
+          </foreach>
+    </select>
+    <select id="selectSelfAndChildrenByIds" resultType="com.htyoudao.youdao.module.system.dal.dataobject.org.OrgDO">
+        SELECT DISTINCT child.*
+        FROM system_org parent
+        JOIN system_org child
+          ON child.id = parent.id
+          OR FIND_IN_SET(parent.id, child.ancestors) > 0
+        WHERE parent.deleted = b'0'
+          AND child.deleted = b'0'
+          AND parent.id IN
+          <foreach collection="allOrgIds" item="id" open="(" separator="," close=")">
+            #{id}
+          </foreach>
+    </select>
+    <select id="selectSelfAndChildrenIdsByIds" resultType="java.lang.Long">
+        SELECT DISTINCT child.id
+        FROM system_org parent
+        JOIN system_org child
+          ON child.id = parent.id
+          OR FIND_IN_SET(parent.id, child.ancestors) > 0
+        WHERE parent.deleted = b'0'
+          AND child.deleted = b'0'
+          AND parent.id IN
+          <foreach collection="allOrgIds" item="id" open="(" separator="," close=")">
+            #{id}
+          </foreach>
+    </select>
+    <select id="getOrgNameByUserIds"
+            resultType="com.htyoudao.youdao.module.system.controller.admin.org.vo.OrgUserVO">
+        SELECT
+          ou.user_id AS userId,
+          GROUP_CONCAT(o.name) AS orgNames
+        FROM system_org_user ou
+        JOIN system_org o ON ou.org_id = o.id and o.deleted = b'0' and ou.deleted = b'0'
+        WHERE ou.user_id IN
+          <foreach collection="userIds" item="id" open="(" separator="," close=")">
+            #{id}
+          </foreach>
+       GROUP BY ou.user_id
+    </select>
+    <select id="hasChildOrg" resultType="java.lang.Long">
+        select distinct * from system_org where deleted =b'0' and FIND_IN_SET(#{id}, ancestors) > 0 and id != #{id}
+    </select>
+</mapper>

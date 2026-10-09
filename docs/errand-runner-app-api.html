@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>App - 骑手入驻接口文档</title>
+  <style>
+    :root { --bg:#f6f8fa; --card:#fff; --text:#24292f; --muted:#57606a; --border:#d0d7de; --green:#1a7f37; --blue:#0969da; --orange:#bc4c00; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--bg); color:var(--text); font:14px/1.65 "Microsoft YaHei","PingFang SC","Segoe UI",sans-serif; }
+    header { background:#24292f; color:#fff; padding:28px 40px; }
+    header h1 { margin:0 0 8px; font-size:28px; }
+    header p { margin:0; color:#d8dee4; }
+    main { max-width:1120px; margin:24px auto 56px; padding:0 20px; }
+    section { background:var(--card); border:1px solid var(--border); border-radius:10px; margin-bottom:18px; overflow:hidden; box-shadow:0 8px 24px rgba(140,149,159,.15); }
+    .section-head { padding:16px 20px; border-bottom:1px solid var(--border); background:#f6f8fa; }
+    h2, h3 { margin:0; }
+    .endpoint { padding:18px 20px; border-top:1px solid var(--border); }
+    .endpoint:first-of-type { border-top:0; }
+    .method { display:inline-block; min-width:58px; padding:2px 9px; border-radius:4px; color:#fff; text-align:center; font-weight:700; margin-right:8px; }
+    .post { background:var(--green); }
+    .get { background:var(--blue); }
+    .put { background:var(--orange); }
+    code { background:#afb8c133; padding:2px 6px; border-radius:4px; font-family:Consolas,"Liberation Mono",monospace; }
+    table { width:100%; border-collapse:collapse; margin:12px 0 6px; }
+    th, td { border:1px solid var(--border); padding:9px 10px; text-align:left; vertical-align:top; }
+    th { background:#f6f8fa; }
+    pre { background:#0d1117; color:#e6edf3; border-radius:8px; padding:14px 16px; overflow:auto; }
+    .muted { color:var(--muted); }
+    .tag { display:inline-block; border:1px solid var(--border); border-radius:999px; padding:2px 10px; margin-right:8px; color:var(--muted); background:#fff; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>App - 骑手入驻接口文档</h1>
+  <p>模块：<code>com.htyoudao.youdao.module.errand.controller.app.errandRunner</code></p>
+</header>
+<main>
+  <section>
+    <div class="section-head"><h2>基础信息</h2></div>
+    <div class="endpoint">
+      <p><span class="tag">Base Path</span><code>/errand/runner</code></p>
+      <p><span class="tag">接口范围</span>本文档覆盖骑手入驻三个接口：提交申请、查询详情、修改申请。</p>
+      <p><span class="tag">会员 ID</span>三个接口均通过 <code>SecurityFrameworkUtils.getLoginUserId()</code> 获取当前登录会员 ID，前端无需传 <code>memberId</code>。</p>
+      <p><span class="tag">门店</span>入驻资料使用 <code>storeId</code> 保存门店 ID；详情接口额外返回 <code>storeName</code>。</p>
+      <p><span class="tag">审核状态</span><code>auditStatus</code>：0 待审核，1 通过，2 失败。</p>
+      <p><span class="tag">封禁状态</span><code>banStatus</code>：0 正常，1 封禁。</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head"><h2>接口列表</h2></div>
+
+    <div class="endpoint">
+      <h3><span class="method post">POST</span><code>/apply</code> 提交骑手入驻申请</h3>
+      <p class="muted">首次申请新增跑腿员资料；如果已存在待审核申请，不允许重复提交。</p>
+      <h4>请求体</h4>
+      <table>
+        <thead><tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr></thead>
+        <tbody>
+        <tr><td>storeId</td><td>long/string</td><td>是</td><td>门店 ID</td></tr>
+        <tr><td>name</td><td>string</td><td>是</td><td>姓名</td></tr>
+        <tr><td>phone</td><td>string</td><td>是</td><td>手机号，需符合大陆手机号格式，且不能被其他会员占用</td></tr>
+        <tr><td>studentNo</td><td>string</td><td>是</td><td>学号</td></tr>
+        <tr><td>idCardNo</td><td>string</td><td>是</td><td>身份证号，不能被其他会员占用</td></tr>
+        <tr><td>gender</td><td>integer</td><td>是</td><td>性别，仅允许 2=女</td></tr>
+        <tr><td>idCardFront</td><td>string</td><td>是</td><td>身份证正面图片地址</td></tr>
+        <tr><td>idCardBack</td><td>string</td><td>是</td><td>身份证反面图片地址</td></tr>
+        <tr><td>studentCardImg</td><td>string</td><td>是</td><td>学生证照片地址</td></tr>
+        </tbody>
+      </table>
+      <h4>请求示例</h4>
+      <pre>{
+  "storeId": "2056265154128035842",
+  "name": "张三",
+  "phone": "18888888888",
+  "studentNo": "20260001",
+  "idCardNo": "341200200001010022",
+  "gender": 2,
+  "idCardFront": "https://example.com/id-front.jpg",
+  "idCardBack": "https://example.com/id-back.jpg",
+  "studentCardImg": "https://example.com/student-card.jpg"
+}</pre>
+      <h4>响应示例</h4>
+      <pre>{ "code": 0, "data": "2057000000000000001", "msg": "" }</pre>
+    </div>
+
+    <div class="endpoint">
+      <h3><span class="method get">GET</span><code>/apply-info</code> 查询当前会员入驻详情</h3>
+      <p class="muted">根据登录会员查询跑腿员资料，并根据 <code>storeId</code> 回填 <code>storeName</code>。</p>
+      <h4>响应字段</h4>
+      <table>
+        <thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead>
+        <tbody>
+        <tr><td>id/memberId</td><td>long/string</td><td>跑腿员 ID、会员 ID</td></tr>
+        <tr><td>storeId</td><td>long/string</td><td>门店 ID</td></tr>
+        <tr><td>storeName</td><td>string</td><td>门店名称，根据门店 ID 查询</td></tr>
+        <tr><td>name/phone/studentNo/idCardNo/gender</td><td>string/integer</td><td>申请基础信息</td></tr>
+        <tr><td>idCardFront/idCardBack/studentCardImg</td><td>string</td><td>证件图片地址</td></tr>
+        <tr><td>auditStatus/auditReason/auditTime</td><td>integer/string/date</td><td>审核信息</td></tr>
+        <tr><td>banStatus/banReason</td><td>integer/string</td><td>封禁信息</td></tr>
+        <tr><td>balance/frozenBalance</td><td>decimal</td><td>余额信息</td></tr>
+        <tr><td>tranPasswordStatus</td><td>integer</td><td>交易密码设置状态：0 未设置，1 已设置</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="endpoint">
+      <h3><span class="method put">PUT</span><code>/apply</code> 修改骑手入驻申请</h3>
+      <p class="muted">审核中不可修改；审核通过或审核失败时允许修改。修改成功后 <code>auditStatus</code> 重置为 0，不清空审核原因、审核时间、审核人。</p>
+      <p class="muted">变更记录仅记录非图片字段：<code>storeId</code>、<code>name</code>、<code>phone</code>、<code>studentNo</code>、<code>idCardNo</code>、<code>gender</code>。图片字段变更会更新主表，但不写入变更记录。</p>
+      <h4>请求体</h4>
+      <p>同 <code>POST /apply</code>。</p>
+      <h4>响应示例</h4>
+      <pre>{ "code": 0, "data": true, "msg": "" }</pre>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head"><h2>异常校验</h2></div>
+    <div class="endpoint">
+      <table>
+        <thead><tr><th>场景</th><th>返回文案</th></tr></thead>
+        <tbody>
+        <tr><td>未登录</td><td>请先登录后再申请骑手入驻</td></tr>
+        <tr><td>待审核重复提交或修改</td><td>骑手入驻申请审核中，请勿重复提交 / 骑手入驻申请审核中，不可修改</td></tr>
+        <tr><td>审核通过后再次提交新增</td><td>骑手入驻申请已通过，不可重复提交</td></tr>
+        <tr><td>修改资料无变化</td><td>申请资料未发生变化，无需修改</td></tr>
+        <tr><td>手机号被其他会员占用</td><td>手机号已被其他骑手占用</td></tr>
+        <tr><td>身份证号被其他会员占用</td><td>该身份证号已提交骑手入驻申请</td></tr>
+        <tr><td>性别不是女</td><td>当前仅支持女生申请骑手入驻</td></tr>
+        <tr><td>证件图片缺失</td><td>请上传身份证正反面和学生证照片</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
+</body>
+</html>

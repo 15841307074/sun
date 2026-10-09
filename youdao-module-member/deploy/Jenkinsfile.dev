@@ -1,0 +1,201 @@
+pipeline {
+  environment {
+    APP_ENV = 'dev'
+    TO_ENV = 'testing'
+    PROFILES_ENV = 'test'
+    REPLICAS = 1
+    NODE_SELECTOR_NAME = 'saas'
+    HARBOR_NAMESPACE_PREFIX = 'htyd_'
+    SERVICE_NAME = 'youdao-module-member'
+    K8S_NAMESPACE_PREFIX = 'dev-htyd-'
+    REQUESTS_MEMORY = '5Gi'
+    LIMITS_MEMORY = '7Gi'
+    JAVA_OPTS = """-Xmx4g -XX:+UseZGC -XX:MaxDirectMemorySize=2g -XX:MaxMetaspaceSize=512m -XX:ZUncommitDelay=60 -XX:+UseDynamicNumberOfGCThreads -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmpfile/heap-dumps/prod-youdao-module-promotion.hprof -XX:+ExitOnOutOfMemoryError
+                -Djava.security.egd=file:/dev/./urandom
+                -javaagent:/opt/skywalking-agent/skywalking-agent.jar
+                -Dskywalking.agent.service_name=dev-saas::dev-youdao-member
+                -Dskywalking.collector.backend_service=skywalking-oap.skywalking:11800
+                -Dskywalking.trace.ignore_path=GET:/health-check,Redisson/PING,Redisson/INFO,Redisson/CLUSTER,GET:/actuator/health/readiness,GET:/actuator/health/liveness
+                -Dspring.profiles.active=devt"""
+    REGISTRY = 'images.htyoudao.com'
+    GITLAB_CREDENTIAL_ID = 'gitlab'
+    HARBOR_CREDENTIAL_ID = 'harbor'
+    KUBECONFIG_CREDENTIAL_ID = 'dev-kubeconfig'
+  }
+  agent {
+    node {
+      label 'maven'
+    }
+  }
+  stages {
+    stage('克隆代码') {
+      steps {
+        container('maven') {
+          checkout([
+            $class: 'GitSCM',
+            branches:[[name: "*/${BRANCH_NAME}"]],
+            doGenerateSubmoduleConfigurations: false,
+            extensions: [[$class: 'SubmoduleOption',
+            disableSubmodules: false,
+            parentCredentials: true,
+            recursiveSubmodules: true,
+            reference: '',
+            timeout: 300,
+            trackingSubmodules: true],
+            [$class: 'CloneOption', noTags: false, reference: '', shallow: false, timeout: 540]], submoduleCfg: [], userRemoteConfigs: [[credentialsId:  "$GITLAB_CREDENTIAL_ID", url: "$GIT_URL"]]])
+          }
+        }
+      }
+
+      stage('构建jar包') {
+        steps {
+          container('maven') {
+            sh 'mvn clean package -Dmaven.test.skip=true -P devt'
+          }
+        }
+      }
+
+      stage('构建镜像') {
+        agent none
+        steps {
+          container('maven') {
+            withCredentials([usernamePassword(credentialsId: 'harbor', passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USERNAME')]) {
+              sh 'docker build -f ./deploy/Dockerfile --build-arg APP_NAME=$SERVICE_NAME -t $REGISTRY/$HARBOR_NAMESPACE_PREFIX$NODE_SELECTOR_NAME/$APP_ENV-$BRANCH_NAME-$SERVICE_NAME:v$BUILD_NUMBER .'
+              sh 'echo "$DOCKER_PASSWORD" | docker login $REGISTRY -u "$DOCKER_USERNAME" --password-stdin'
+              sh 'docker push  $REGISTRY/$HARBOR_NAMESPACE_PREFIX$NODE_SELECTOR_NAME/$APP_ENV-$BRANCH_NAME-$SERVICE_NAME:v$BUILD_NUMBER'
+            }
+
+          }
+        }
+      }
+
+      stage('部署测试环境') {
+        agent none
+        steps {
+          container('maven') {
+            withCredentials([kubeconfigContent(credentialsId: "$KUBECONFIG_CREDENTIAL_ID", variable: 'KUBECONFIG_CONFIG')]) {
+              sh '''
+mkdir -p ~/.kube/
+echo "$KUBECONFIG_CONFIG" > ~/.kube/config
+cat > ./deploy.yml <<EOF
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: $APP_ENV-$SERVICE_NAME
+  namespace: $K8S_NAMESPACE_PREFIX$NODE_SELECTOR_NAME
+  labels:
+    app: $APP_ENV-$SERVICE_NAME
+spec:
+  replicas: $REPLICAS
+  selector:
+    matchLabels:
+      app: $APP_ENV-$SERVICE_NAME
+  template:
+    metadata:
+      labels:
+        app: $APP_ENV-$SERVICE_NAME
+    spec:
+      containers:
+      - name: $APP_ENV-$SERVICE_NAME
+        image: $REGISTRY/$HARBOR_NAMESPACE_PREFIX$NODE_SELECTOR_NAME/$APP_ENV-$BRANCH_NAME-$SERVICE_NAME:v$BUILD_NUMBER
+        ports:
+        - containerPort: 8080
+        - containerPort: 11111
+        - containerPort: 9999
+        env:
+        - name: ENV
+          value: $APP_ENV
+        - name: JAVA_OPTS
+          value: $JAVA_OPTS
+        resources:
+          requests:
+            memory: $REQUESTS_MEMORY
+          limits:
+            memory: $LIMITS_MEMORY
+        readinessProbe: # Readiness probe configuration
+          httpGet:
+            path: /actuator/health/readiness
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 5
+        livenessProbe:
+          httpGet:
+            path: /actuator/health/liveness
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 30
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 5
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/bash", "-c", "sleep 20"]
+      terminationGracePeriodSeconds: 60
+      tolerations:
+      - key: "env"
+        operator: "Equal"
+        value: $TO_ENV
+        effect: "NoSchedule"
+      nodeSelector:
+        dev: $NODE_SELECTOR_NAME
+      imagePullSecrets:
+        - name: $HARBOR_CREDENTIAL_ID          
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: $APP_ENV-$SERVICE_NAME-service
+  namespace: $K8S_NAMESPACE_PREFIX$NODE_SELECTOR_NAME
+  labels:
+    app: $APP_ENV-$SERVICE_NAME
+spec:
+  selector:
+    app: $APP_ENV-$SERVICE_NAME
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 8080
+    - name: jmx
+      protocol: TCP
+      port: 11111
+      targetPort: 11111
+    - name: job
+      protocol: TCP
+      port: 9999
+      targetPort: 9999
+  type: ClusterIP
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: $APP_ENV-$SERVICE_NAME
+  labels:
+    release: prometheus-operator
+  namespace: kubesphere-monitoring-system
+spec:
+  selector:
+    matchLabels:
+      app: $APP_ENV-$SERVICE_NAME
+  jobLabel: app
+  namespaceSelector:
+    matchNames:
+    - $K8S_NAMESPACE_PREFIX$NODE_SELECTOR_NAME
+  endpoints:
+    - port: jmx
+      path: /metrics
+      interval: 15s
+
+EOF
+kubectl apply -f ./deploy.yml
+'''
+          }
+        }
+      }
+    }
+  }
+}

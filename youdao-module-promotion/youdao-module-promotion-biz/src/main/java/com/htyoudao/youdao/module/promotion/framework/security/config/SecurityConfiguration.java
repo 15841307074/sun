@@ -1,0 +1,46 @@
+package com.htyoudao.youdao.module.promotion.framework.security.config;
+
+import com.htyoudao.youdao.framework.security.config.AuthorizeRequestsCustomizer;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AuthorizeHttpRequestsConfigurer;
+
+/**
+ * order 模块的 Security 配置
+ */
+@Configuration(proxyBeanMethods = false, value = "promotionSecurityConfiguration")
+public class SecurityConfiguration {
+
+    @Bean("promotionAuthorizeRequestsCustomizer")
+    public AuthorizeRequestsCustomizer authorizeRequestsCustomizer() {
+        return new AuthorizeRequestsCustomizer() {
+
+            @Override
+            public void customize(AuthorizeHttpRequestsConfigurer<HttpSecurity>.AuthorizationManagerRequestMatcherRegistry registry) {
+                // TODO 0090：这个每个项目都需要重复配置，得捉摸有没通用的方案
+                // Swagger 接口文档
+                registry.requestMatchers("/v3/api-docs/**").permitAll()
+                        .requestMatchers("/webjars/**").permitAll()
+                        .requestMatchers("/swagger-ui").permitAll()
+                        .requestMatchers("/swagger-ui/**").permitAll();
+                // Druid 监控
+                registry.requestMatchers("/druid/**").permitAll();
+                // Spring Boot Actuator 的安全配置
+                registry.requestMatchers("/actuator").permitAll()
+                        .requestMatchers("/actuator/**").permitAll();
+
+                // 优惠券相关接口
+                registry.requestMatchers("/app-api/promotion/app-user-coupon/getCountNum").permitAll()
+                        .requestMatchers("/app-api/promotion/app-coupon-package/getPackageById").permitAll()
+                        .requestMatchers("/app-api/promotion/app-user-coupon/getAppCouponById").permitAll()
+                        .requestMatchers("/app-api/promotion/app-user-coupon/judgmentTime").permitAll()
+                        .requestMatchers("/app-api/promotion/wechatJump/jump").permitAll();
+
+
+            }
+
+        };
+    }
+
+}

@@ -1,0 +1,4 @@
+com.htyoudao.youdao.framework.datasource.config.YoudaoDataSourceAutoConfiguration
+com.htyoudao.youdao.framework.mybatis.config.YoudaoMybatisAutoConfiguration
+com.htyoudao.youdao.framework.translate.config.YoudaoTranslateAutoConfiguration
+com.htyoudao.youdao.framework.mybatis.config.SnowflakeConfig

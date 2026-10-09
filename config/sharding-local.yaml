@@ -1,0 +1,320 @@
+databaseName: sharding
+dataSources:
+  db_master:
+    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
+    jdbcUrl: jdbc:mysql://192.168.31.141:3307/cloud_0090_test?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8&rewriteBatchedStatements=true
+    username: root
+    password: ${CLOUD_SHARDING_LOCAL_PASSWORD_L7:}
+    keepaliveTime: 30000
+    maximumPoolSize: 100
+    minimumIdle: 20
+    connectionTimeout: 5000
+    idleTimeout: 300000
+    maxLifetime: 600000
+
+rules:
+  - !SHARDING
+    tables:
+      wx_member:
+        actualDataNodes: db_master.wx_member_${0..9}
+        tableStrategy:
+          standard:
+            shardingColumn: sharding_value
+            shardingAlgorithmName: member_inline
+      sys_pay_record:
+        actualDataNodes: db_master.sys_pay_record_${2024..2028}0${1..9},db_master.sys_pay_record_${2024..2028}1${0..2}
+        tableStrategy:
+          complex:
+            shardingColumns: create_time,order_sn
+            shardingAlgorithmName: smart-time-sharding
+      user_coupon:
+        actualDataNodes: db_master.user_coupon_${0..9}
+        tableStrategy:
+          standard:
+            shardingColumn: user_id
+            shardingAlgorithmName: user-coupon-inline
+      user_coupon_package:
+        actualDataNodes: db_master.user_coupon_package_${0..9}
+        tableStrategy:
+          standard:
+            shardingColumn: user_id
+            shardingAlgorithmName: user-coupon-package-inline
+      points_log:
+        actualDataNodes: db_master.points_log_${0..9}
+        tableStrategy:
+          standard:
+            shardingColumn: sharding_value
+            shardingAlgorithmName: points_inline
+      lottery_log:
+        actualDataNodes: db_master.lottery_log_${0..9}
+        tableStrategy:
+          standard:
+            shardingColumn: member_id
+            shardingAlgorithmName: lottery-log-inline
+      activity_card_log:
+        actualDataNodes: db_master.activity_card_log_${0..9}
+        tableStrategy:
+          standard:
+            shardingColumn: member_id
+            shardingAlgorithmName: activity-card-log-inline
+      activity_jk_help:
+        actualDataNodes: db_master.activity_jk_help_${0..9}
+        tableStrategy:
+          standard:
+            shardingColumn: inviter_member_id
+            shardingAlgorithmName: activity-jk-help-inline
+      activity_jk_task:
+        actualDataNodes: db_master.activity_jk_task_${0..9}
+        tableStrategy:
+          standard:
+            shardingColumn: member_id
+            shardingAlgorithmName: activity-jk-task-inline
+      lottery_help:
+        actualDataNodes: db_master.lottery_help_${0..9}
+        tableStrategy:
+          standard:
+            shardingColumn: inviter_member_id
+            shardingAlgorithmName: lottery-help-inline
+      lottery_task:
+        actualDataNodes: db_master.lottery_task_${0..9}
+        tableStrategy:
+          standard:
+            shardingColumn: member_id
+            shardingAlgorithmName: lottery-task-inline
+      bz_order:
+        actualDataNodes: db_master.bz_order_${2024..2028}0${1..9},db_master.bz_order_${2024..2028}1${0..2}
+        tableStrategy:
+          complex:
+            shardingColumns: create_time,order_sn
+            shardingAlgorithmName: smart-time-sharding
+      bz_order_condiments:
+        actualDataNodes: db_master.bz_order_condiments_${2024..2028}0${1..9},db_master.bz_order_condiments_${2024..2028}1${0..2}
+        tableStrategy:
+          complex:
+            shardingColumns: create_time,order_sn
+            shardingAlgorithmName: smart-time-sharding
+      bz_order_log:
+        actualDataNodes: db_master.bz_order_log_${2024..2028}0${1..9},db_master.bz_order_log_${2024..2028}1${0..2}
+        tableStrategy:
+          complex:
+            shardingColumns: create_time,order_sn
+            shardingAlgorithmName: smart-time-sharding
+      bz_order_pay:
+        actualDataNodes: db_master.bz_order_pay_${2024..2028}0${1..9},db_master.bz_order_pay_${2024..2028}1${0..2}
+        tableStrategy:
+          complex:
+            shardingColumns: create_time,order_sn
+            shardingAlgorithmName: smart-time-sharding
+      bz_order_product:
+        actualDataNodes: db_master.bz_order_product_${2024..2028}0${1..9},db_master.bz_order_product_${2024..2028}1${0..2}
+        tableStrategy:
+          complex:
+            shardingColumns: create_time,order_sn
+            shardingAlgorithmName: smart-time-sharding
+      bz_order_product_son:
+        actualDataNodes: db_master.bz_order_product_son_${2024..2028}0${1..9},db_master.bz_order_product_son_${2024..2028}1${0..2}
+        tableStrategy:
+          complex:
+            shardingColumns: create_time,order_sn
+            shardingAlgorithmName: smart-time-sharding
+      bz_order_purchase:
+        actualDataNodes: db_master.bz_order_purchase_${2024..2028}0${1..9},db_master.bz_order_purchase_${2024..2028}1${0..2}
+        tableStrategy:
+          complex:
+            shardingColumns: create_time,order_sn
+            shardingAlgorithmName: smart-time-sharding
+      #抽签 str
+      activity_cq_join:
+        actualDataNodes: db_master.activity_cq_join_${0..9}
+        tableStrategy:
+          standard:
+            shardingColumn: member_id
+            shardingAlgorithmName: activity-cq-join-inline
+      activity_help:
+        actualDataNodes: db_master.activity_help_${0..9}
+        tableStrategy:
+          standard:
+            shardingColumn: inviter_member_id
+            shardingAlgorithmName: activity-help-inline
+      activity_task:
+        actualDataNodes: db_master.activity_task_${0..9}
+        tableStrategy:
+          standard:
+            shardingColumn: member_id
+            shardingAlgorithmName: activity-task-inline
+      activity_cq_log:
+        actualDataNodes: db_master.activity_cq_log_${0..9}
+        tableStrategy:
+          standard:
+            shardingColumn: member_id
+            shardingAlgorithmName: activity-cq-log-inline
+      #抽签 end
+      #有奖问答 str
+      activity_answer_record:
+        actualDataNodes: db_master.activity_answer_record_${0..9}
+        tableStrategy:
+          standard:
+            shardingColumn: member_mobile
+            shardingAlgorithmName: activity-answer-record-inline
+      activity_answer_record_detail:
+        actualDataNodes: db_master.activity_answer_record_detail_${0..9}
+        tableStrategy:
+          standard:
+            shardingColumn: member_mobile
+            shardingAlgorithmName: activity-answer-record-detail-inline
+      activity_answer_reward_log:
+        actualDataNodes: db_master.activity_answer_reward_log_${0..9}
+        tableStrategy:
+          standard:
+            shardingColumn: member_mobile
+            shardingAlgorithmName: activity-answer-reward-log-inline
+      activity_answer_task:
+        actualDataNodes: db_master.activity_answer_task_${0..9}
+        tableStrategy:
+          standard:
+            shardingColumn: member_mobile
+            shardingAlgorithmName: activity-answer-task-inline
+      #有奖问答 end
+      #抖音在线点单 str
+      douyin_order:
+        actualDataNodes: db_master.douyin_order_${2026..2028}0${1..9},db_master.douyin_order_${2026..2028}1${0..2}
+        tableStrategy:
+          complex:
+            shardingColumns: create_time
+            shardingAlgorithmName: smart-time-sharding
+      douyin_order_item:
+        actualDataNodes: db_master.douyin_order_item_${2026..2028}0${1..9},db_master.douyin_order_item_${2026..2028}1${0..2}
+        tableStrategy:
+          complex:
+            shardingColumns: create_time
+            shardingAlgorithmName: smart-time-sharding
+      douyin_order_refund:
+        actualDataNodes: db_master.douyin_order_refund_${2026..2028}0${1..9},db_master.douyin_order_refund_${2026..2028}1${0..2}
+        tableStrategy:
+          complex:
+            shardingColumns: create_time
+            shardingAlgorithmName: smart-time-sharding
+      douyin_order_event:
+        actualDataNodes: db_master.douyin_order_event_${2026..2028}0${1..9},db_master.douyin_order_event_${2026..2028}1${0..2}
+        tableStrategy:
+          complex:
+            shardingColumns: create_time
+            shardingAlgorithmName: smart-time-sharding
+      douyin_order_status_log:
+        actualDataNodes: db_master.douyin_order_status_log_${2026..2028}0${1..9},db_master.douyin_order_status_log_${2026..2028}1${0..2}
+        tableStrategy:
+          complex:
+            shardingColumns: create_time
+            shardingAlgorithmName: smart-time-sharding
+
+      #抖音在线点单 end
+      #投票
+      activity_vote_reward_log:
+        actualDataNodes: db_master.activity_vote_reward_log_${0..9}
+        tableStrategy:
+          standard:
+            shardingColumn: member_mobile
+            shardingAlgorithmName: activity-vote-reward-log-inline
+      activity_vote_log:
+        actualDataNodes: db_master.activity_vote_log_${0..9}
+        tableStrategy:
+          standard:
+            shardingColumn: member_mobile
+            shardingAlgorithmName: activity-vote-log-inline
+
+    shardingAlgorithms:
+      member_inline:
+        type: INLINE
+        props:
+          algorithm-expression: wx_member_${sharding_value}
+      user-coupon-inline:
+        type: INLINE
+        props:
+          algorithm-expression: user_coupon_${user_id % 10}
+      user-coupon-package-inline:
+        type: INLINE
+        props:
+          algorithm-expression: user_coupon_package_${user_id % 10}
+      points_inline:
+        type: INLINE
+        props:
+          algorithm-expression: points_log_${sharding_value}
+      lottery-log-inline:
+        type: INLINE
+        props:
+          algorithm-expression: lottery_log_${member_id % 10}
+      activity-card-log-inline:
+        type: INLINE
+        props:
+          algorithm-expression: activity_card_log_${member_id % 10}
+      activity-jk-help-inline:
+        type: INLINE
+        props:
+          algorithm-expression: activity_jk_help_${inviter_member_id % 10}
+      activity-jk-task-inline:
+        type: INLINE
+        props:
+          algorithm-expression: activity_jk_task_${member_id % 10}
+      lottery-task-inline:
+        type: INLINE
+        props:
+          algorithm-expression: lottery_task_${member_id % 10}
+      lottery-help-inline:
+        type: INLINE
+        props:
+          algorithm-expression: lottery_help_${inviter_member_id % 10}
+
+      #抽签 str
+      activity-help-inline:
+        type: INLINE
+        props:
+          algorithm-expression: activity_help_${inviter_member_id % 10}
+      activity-task-inline:
+        type: INLINE
+        props:
+          algorithm-expression: activity_task_${member_id % 10}
+      activity-cq-join-inline:
+        type: INLINE
+        props:
+          algorithm-expression: activity_cq_join_${member_id % 10}
+      activity-cq-log-inline:
+        type: INLINE
+        props:
+          algorithm-expression: activity_cq_log_${member_id % 10}
+      #抽签 end
+      #有奖问答 str
+      activity-answer-record-inline:
+        type: INLINE
+        props:
+          algorithm-expression: activity_answer_record_${member_mobile % 10}
+      activity-answer-record-detail-inline:
+        type: INLINE
+        props:
+          algorithm-expression: activity_answer_record_detail_${member_mobile % 10}
+      activity-answer-reward-log-inline:
+        type: INLINE
+        props:
+          algorithm-expression: activity_answer_reward_log_${member_mobile % 10}
+      activity-answer-task-inline:
+        type: INLINE
+        props:
+          algorithm-expression: activity_answer_task_${member_mobile % 10}
+      #有奖问答 end
+      #投票
+      activity-vote-reward-log-inline:
+        type: INLINE
+        props:
+          algorithm-expression: activity_vote_reward_log_${member_mobile % 10}
+      activity-vote-log-inline:
+        type: INLINE
+        props:
+          algorithm-expression: activity_vote_log_${member_mobile % 10}
+      #投票 end
+      smart-time-sharding:
+        props:
+          strategy: complex
+          algorithmClassName: com.htyoudao.youdao.framework.sharding.core.alg.SmartTimeShardingAlgorithm
+        type: CLASS_BASED
+  - !SINGLE
+    tables:
+      - "*.*"

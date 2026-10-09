@@ -1,0 +1,60 @@
+--- #################### RPC 远程调用相关配置 ####################
+
+dubbo:
+  protocol:
+    heartbeat: 1000
+    payload: 16777216
+    port: -1
+    threadpool: cached
+    threads: 400
+    corethreads: 33
+    queues: 0
+  application:
+    shutwait: 30000
+    logger: slf4j
+    metadata-type: remote
+    # 暂时用不到，先禁用
+    qos-enable: true
+    # 可选值 interface、instance、all，默认是 all，即接口级地址、应用级地址都注册
+    register-mode: instance
+    auto-trust-serialize-class: true
+    trust-serialize-class-level: 3
+    # 注册中心配置
+  registry:
+    enable-empty-protection: true
+    address: nacos://${spring.cloud.nacos.discovery.server-addr}
+    group: DUBBO_GROUP
+    cluster: true
+    username: ${spring.cloud.nacos.discovery.username}
+    password: ${CLOUD_DUBBO_PASSWORD_L29:}
+    parameters:
+      namespace: ${spring.cloud.nacos.discovery.namespace}
+    # 消费者相关配置
+  metadata-report:  # 明确指定元数据配置中心为 Nacos
+    address: nacos://${spring.cloud.nacos.config.server-addr}
+    group: DUBBO_GROUP
+    cluster: true
+    username: ${spring.cloud.nacos.config.username}
+    password: ${CLOUD_DUBBO_PASSWORD_L38:}
+    parameters:
+      namespace: ${spring.cloud.nacos.discovery.namespace}
+  consumer:
+    # 支持校验注解
+    #validation: jvalidationNew
+    # 会有数据不一致问题 建议在注解局部开启
+    cache: false
+    # 调用重试 不包括第一次 0为不需要重试
+    retries: 0
+    # 初始化检查
+    check: false
+    parameters:
+      timeout: 3000
+  provider:
+    wait: 30000
+    filter: -exception
+    payload: 16777216
+  custom:
+    # 全局请求log
+    request-log: true
+    # info 基础信息 param 参数信息 full 全部
+    log-level: info

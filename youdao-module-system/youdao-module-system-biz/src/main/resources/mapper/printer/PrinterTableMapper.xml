@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.htyoudao.youdao.module.system.dal.mysql.printer.PrinterTableMapper">
+
+    <resultMap type="PrinterTable" id="PrinterTableResult">
+        <result property="printerTableId"    column="printer_table_id"    />
+        <result property="storeId"    column="store_id"    />
+        <result property="printerName"    column="printer_name"    />
+        <result property="printerType"    column="printer_type"    />
+        <result property="printerBrand"    column="printer_brand"    />
+        <result property="usbPort"    column="usb_port"    />
+        <result property="paperWidth"    column="paper_width"    />
+        <result property="printerSerialNumber"    column="printer_serial_number"    />
+        <result property="printerSerialKey"    column="printer_serial_key"    />
+        <result property="bindDeviceNumber"    column="bind_device_number"    />
+        <result property="printerSettingIds"    column="printer_setting_ids"    />
+        <result property="printerLocation"    column="printer_location"    />
+
+    </resultMap>
+
+    <sql id="selectPrinterTableVo">
+        select printer_table_id, store_id, printer_name, printer_type, printer_brand, usb_port, paper_width, printer_serial_number, printer_serial_key, bind_device_number, printer_setting_ids,printer_location,status from printer_table
+    </sql>
+
+
+    <select id="selectPrinterTableListPage" parameterType="PrinterTable" resultMap="PrinterTableResult">
+        <include refid="selectPrinterTableVo"/>
+        <where>
+            <if test="printerTable.storeId != null "> and store_id = #{printerTable.storeId}</if>
+            <if test="printerTable.printerName != null  and printerTable.printerName != ''"> and printer_name like concat('%', #{printerTable.printerName}, '%')</if>
+            <if test="printerTable.printerType != null "> and printer_type = #{printerTable.printerType}</if>
+            <if test="printerTable.printerBrand != null  and printerTable.printerBrand != ''"> and printer_brand = #{printerTable.printerBrand}</if>
+            <if test="printerTable.usbPort != null  and printerTable.usbPort != ''"> and usb_port = #{printerTable.usbPort}</if>
+            <if test="printerTable.bindDeviceNumber != null  and printerTable.bindDeviceNumber != ''"> and bind_device_number = #{printerTable.bindDeviceNumber}</if>
+            <if test="printerTable.paperWidth != null "> and paper_width = #{printerTable.paperWidth}</if>
+            <if test="printerTable.printerSerialNumber != null  and printerTable.printerSerialNumber != ''"> and printer_serial_number = #{printerTable.printerSerialNumber}</if>
+            <if test="printerTable.printerSettingIds != null  and printerTable.printerSettingIds != ''"> and printer_setting_ids = #{printerTable.printerSettingIds}</if>
+            <if test="printerTable.businessId != null "> and business_id = #{printerTable.businessId}</if>
+        </where>
+    </select>
+    <select id="selectPrinterTableList" parameterType="PrinterTable" resultMap="PrinterTableResult">
+        <include refid="selectPrinterTableVo"/>
+        <where>
+            <if test="printerTable.storeId != null "> and store_id = #{printerTable.storeId}</if>
+            <if test="printerTable.businessId != null "> and business_id = #{printerTable.businessId}</if>
+            <if test="printerTable.printerName != null  and printerTable.printerName != ''"> and printer_name like concat('%', #{printerTable.printerName}, '%')</if>
+            <if test="printerTable.printerType != null "> and printer_type = #{printerTable.printerType}</if>
+            <if test="printerTable.printerBrand != null  and printerTable.printerBrand != ''"> and printer_brand = #{printerTable.printerBrand}</if>
+            <if test="printerTable.usbPort != null  and printerTable.usbPort != ''"> and usb_port = #{printerTable.usbPort}</if>
+            <if test="printerTable.bindDeviceNumber != null  and printerTable.bindDeviceNumber != ''"> and bind_device_number = #{printerTable.bindDeviceNumber}</if>
+            <if test="printerTable.paperWidth != null "> and paper_width = #{printerTable.paperWidth}</if>
+            <if test="printerTable.status != null "> and status = #{printerTable.status}</if>
+            <if test="printerTable.printerSerialNumber != null  and printerTable.printerSerialNumber != ''"> and printer_serial_number = #{printerTable.printerSerialNumber}</if>
+            <if test="printerTable.printerSettingIds != null  and printerTable.printerSettingIds != ''"> and printer_setting_ids = #{printerTable.printerSettingIds}</if>
+        </where>
+    </select>
+
+
+    <update id="updatePrinterTable" parameterType="PrinterTable">
+        update printer_table
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="printerTable.storeId != null">store_id = #{printerTable.storeId},</if>
+            <if test="printerTable.printerName != null">printer_name = #{printerTable.printerName},</if>
+            <if test="printerTable.printerType != null">printer_type = #{printerTable.printerType},</if>
+            <if test="printerTable.printerBrand != null">printer_brand = #{printerTable.printerBrand},</if>
+            <if test="printerTable.usbPort != null">usb_port = #{printerTable.usbPort},</if>
+            <if test="printerTable.paperWidth != null">paper_width = #{printerTable.paperWidth},</if>
+            <if test="printerTable.printerSerialNumber != null">printer_serial_number = #{printerTable.printerSerialNumber},</if>
+            <if test="printerTable.printerSerialKey != null">printer_serial_key = #{printerTable.printerSerialKey},</if>
+            <if test="printerTable.bindDeviceNumber != null">bind_device_number = #{printerTable.bindDeviceNumber},</if>
+            printer_setting_ids = #{printerTable.printerSettingIds},
+            <if test="printerTable.printerLocation != null">printer_location = #{printerTable.printerLocation},</if>
+            <if test="printerTable.status != null">status = #{printerTable.status},</if>
+
+        </trim>
+        where printer_table_id = #{printerTable.printerTableId}
+    </update>
+
+    <select id="selectPrinterTableByPrinterTableId" parameterType="Long" resultMap="PrinterTableResult">
+        <include refid="selectPrinterTableVo"/>
+        where printer_table_id = #{printerTableId}
+    </select>
+
+    <delete id="deletePrinterTableByPrinterTableId" parameterType="Long">
+        delete from printer_table where printer_table_id = #{printerTableId}
+    </delete>
+
+    <insert id="insertPrinterTable" parameterType="PrinterTable" useGeneratedKeys="true" keyProperty="printerTableId">
+        insert into printer_table
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="printerTable.storeId != null">store_id,</if>
+            <if test="printerTable.printerName != null">printer_name,</if>
+            <if test="printerTable.printerType != null">printer_type,</if>
+            <if test="printerTable.printerBrand != null">printer_brand,</if>
+            <if test="printerTable.usbPort != null">usb_port,</if>
+            <if test="printerTable.paperWidth != null">paper_width,</if>
+            <if test="printerTable.printerSerialNumber != null">printer_serial_number,</if>
+            <if test="printerTable.printerSerialKey != null">printer_serial_key,</if>
+            <if test="printerTable.bindDeviceNumber != null">bind_device_number,</if>
+            <if test="printerTable.printerSettingIds != null">printer_setting_ids,</if>
+            <if test="printerTable.printerLocation != null">printer_location,</if>
+            <if test="printerTable.status != null">status,</if>
+            <if test="printerTable.businessId != null">business_id,</if>
+
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="printerTable.storeId != null">#{printerTable.storeId},</if>
+            <if test="printerTable.printerName != null">#{printerTable.printerName},</if>
+            <if test="printerTable.printerType != null">#{printerTable.printerType},</if>
+            <if test="printerTable.printerBrand != null">#{printerTable.printerBrand},</if>
+            <if test="printerTable.usbPort != null">#{printerTable.usbPort},</if>
+            <if test="printerTable.paperWidth != null">#{printerTable.paperWidth},</if>
+            <if test="printerTable.printerSerialNumber != null">#{printerTable.printerSerialNumber},</if>
+            <if test="printerTable.printerSerialKey != null">#{printerTable.printerSerialKey},</if>
+            <if test="printerTable.bindDeviceNumber != null">#{printerTable.bindDeviceNumber},</if>
+            <if test="printerTable.printerSettingIds != null">#{printerTable.printerSettingIds},</if>
+            <if test="printerTable.printerLocation != null">#{printerTable.printerLocation},</if>
+            <if test="printerTable.status != null">#{printerTable.status},</if>
+            <if test="printerTable.businessId != null">#{printerTable.businessId},</if>
+        </trim>
+    </insert>
+
+
+</mapper>

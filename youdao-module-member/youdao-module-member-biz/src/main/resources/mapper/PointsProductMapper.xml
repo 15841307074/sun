@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.htyoudao.youdao.module.member.dal.mysql.pointsProduct.PointsProductMapper">
+    <resultMap type="PointsProductDO" id="PointsProductResult">
+        <result property="productId" column="product_id"/>
+        <result property="productThumbnail" column="product_thumbnail"/>
+        <result property="productName" column="product_name"/>
+        <result property="productSort" column="product_sort"/>
+        <result property="productType" column="product_type"/>
+        <result property="productPrice" column="product_price"/>
+        <result property="isAvailable" column="is_available"/>
+        <result property="productDescription" column="product_description"/>
+        <result property="productHeaderImage" column="product_header_image"/>
+        <result property="productHeaderAttachmentsJson" column="product_header_attachments"/>
+        <result property="productDetailImages" column="product_detail_images"/>
+        <result property="productDetailAttachmentsJson" column="product_detail_attachments"/>
+        <result property="couponImageUrl" column="coupon_image_url"/>
+        <result property="couponCode" column="coupon_code"/>
+        <result property="couponTypeName" column="coupon_type_name"/>
+        <result property="couponName" column="coupon_name"/>
+        <result property="requiresShipping" column="requires_shipping"/>
+        <result property="productStatus" column="product_status"/>
+        <result property="productInventory" column="product_inventory"/>
+        <result property="productCategoryId" column="product_category_id"/>
+        <result property="createTime" column="create_time"/>
+        <result property="creator" column="creator"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="updater" column="updater"/>
+        <result property="deleted" column="deleted"/>
+    </resultMap>
+    <sql id="selectPointsProductVo">
+        select product_id,
+               product_thumbnail,
+               product_name,
+               coupon_name,
+               coupon_type_name,
+               product_sort,
+               coupon_image_url,
+               product_type,
+               product_price,
+               is_available,
+               product_description,
+               product_header_image,
+               product_header_attachments,
+               product_detail_images,
+               product_detail_attachments,
+               coupon_code,
+               requires_shipping,
+               product_status,
+               product_inventory,
+               product_category_id,
+               create_time,
+               creator,
+               update_time,
+               updater,
+               deleted
+        from points_product
+    </sql>
+
+
+
+    <update id="updatePointsProduct" parameterType="PointsProductDO">
+        update points_product
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="productThumbnail != null">
+                product_thumbnail = #{productThumbnail},
+            </if>
+            <if test="productName != null">
+                product_name = #{productName},
+            </if>
+            <if test="productSort != null">
+                product_sort = #{productSort},
+            </if>
+            <if test="productType != null">
+                product_type = #{productType},
+            </if>
+            <if test="productPrice != null">
+                product_price = #{productPrice},
+            </if>
+            <if test="isAvailable != null">
+                is_available = #{isAvailable},
+            </if>
+            <if test="productDescription != null">
+                product_description = #{productDescription},
+            </if>
+            <if test="productHeaderImage != null">
+                product_header_image = #{productHeaderImage},
+            </if>
+            <if test="productHeaderAttachmentsJson != null">
+                product_header_attachments = #{productHeaderAttachmentsJson},
+            </if>
+            <if test="productDetailImages != null">
+                product_detail_images = #{productDetailImages},
+            </if>
+            <if test="productDetailAttachmentsJson != null">
+                product_detail_attachments = #{productDetailAttachmentsJson},
+            </if>
+            <if test="couponCode != null">
+                coupon_code = #{couponCode},
+            </if>
+            <if test="couponImageUrl != null">
+                coupon_image_url = #{couponImageUrl},
+            </if>
+            <if test="couponName != null">
+                coupon_name =#{couponName},
+            </if>
+            <if test="couponTypeName != null">
+                coupon_type_name =#{couponTypeName},
+            </if>
+            <if test="requiresShipping != null">
+                requires_shipping = #{requiresShipping},
+            </if>
+            <if test="productStatus != null">
+                product_status = #{productStatus},
+            </if>
+            <if test="productInventory != null">
+                product_inventory = #{productInventory},
+            </if>
+            <if test="productCategoryId != null">
+                product_category_id = #{productCategoryId},
+            </if>
+            <if test="updater != null">
+                updater = #{updater},
+            </if>
+            <if test="deleted != null">
+                deleted = #{deleted},
+            </if>
+            update_time = sysdate()
+        </trim>
+        where product_id = #{productId}
+    </update>
+
+    <delete id="deletePointsProductByProductId" parameterType="Long">
+        update points_product
+        set deleted = 1
+        where product_id = #{productId}
+    </delete>
+
+
+
+    <select id="selectPointsProductList" parameterType="PointsProductDO" resultMap="PointsProductResult">
+        <include refid="selectPointsProductVo"/>
+        where deleted = 0
+        <if test="productThumbnail != null  and productThumbnail != ''">
+            and product_thumbnail = #{productThumbnail}
+        </if>
+        <if test="productName != null  and productName != ''">
+            and product_name like concat('%', #{productName}, '%')
+        </if>
+        <if test="productSort != null ">
+            and product_sort = #{productSort}
+        </if>
+        <if test="productType != null  and productType != ''">
+            and product_type = #{productType}
+        </if>
+        <if test="productPrice != null ">
+            and product_price = #{productPrice}
+        </if>
+        <if test="isAvailable != null ">
+            and is_available = #{isAvailable}
+        </if>
+        <if test="productDescription != null  and productDescription != ''">
+            and product_description = #{productDescription}
+        </if>
+        <if test="productHeaderImage != null  and productHeaderImage != ''">
+            and product_header_image = #{productHeaderImage}
+        </if>
+        <if test="productDetailImages != null  and productDetailImages != ''">
+            and product_detail_images = #{productDetailImages}
+        </if>
+        <if test="couponCode != null  and couponCode != ''">
+            and coupon_code = #{couponCode}
+        </if>
+        <if test="requiresShipping != null ">
+            and requires_shipping = #{requiresShipping}
+        </if>
+        <if test="productStatus != null ">
+            and product_status = #{productStatus}
+        </if>
+        <if test="productInventory != null and productInventory != 0">
+            and product_inventory = #{productInventory}
+        </if>
+        <if test="productCategoryId != null ">
+            and product_category_id = #{productCategoryId}
+        </if>
+        <if test="createTime != null ">
+            and create_time = #{createTime}
+        </if>
+        <if test="creator != null  and creator != ''">
+            and creator = #{creator}
+        </if>
+        <if test="businessId != null  and businessId != ''">
+            and business_id = #{businessId}
+        </if>
+        order by product_sort asc, create_time desc
+    </select>
+
+
+
+
+
+</mapper>

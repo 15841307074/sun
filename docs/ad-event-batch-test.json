@@ -1,0 +1,125 @@
+{
+  "广告埋点批量曝光测试 - JSON 请求示例": {
+    "说明": "以下是广告埋点批量曝光接口的测试 JSON，可直接复制到 Postman/ApiFox 的 Body 中使用",
+    "接口": "POST /app-api/analysis/event/ad-add",
+    "鉴权": "无需登录，@PermitAll"
+  },
+
+  "1_批量曝光_一次上报多个广告": {
+    "from": 1,
+    "eventType": "ad_exposure",
+    "storeId": 1001,
+    "memberId": 2001,
+    "exposureList": [
+      {
+        "adId": 3001,
+        "adName": "首页弹屏广告-夏季促销",
+        "adInfoPosition": 1
+      },
+      {
+        "adId": 3002,
+        "adName": "首页轮播图-新品上线",
+        "adInfoPosition": 2
+      },
+      {
+        "adId": 3003,
+        "adName": "首页底部banner-会员日",
+        "adInfoPosition": 3
+      },
+      {
+        "adId": 3004,
+        "adName": "点餐页弹屏-限时折扣",
+        "adInfoPosition": 5
+      },
+      {
+        "adId": 3005,
+        "adName": "点餐页轮播图-套餐优惠",
+        "adInfoPosition": 6
+      }
+    ]
+  },
+
+  "2_批量曝光_覆盖全部14个位置": {
+    "from": 1,
+    "eventType": "ad_exposure",
+    "storeId": 1001,
+    "memberId": 2002,
+    "exposureList": [
+      { "adId": 4001, "adName": "首页弹屏", "adInfoPosition": 1 },
+      { "adId": 4002, "adName": "首页轮播图", "adInfoPosition": 2 },
+      { "adId": 4003, "adName": "首页底部banner", "adInfoPosition": 3 },
+      { "adId": 4004, "adName": "首页活动", "adInfoPosition": 4 },
+      { "adId": 4005, "adName": "点餐页弹屏", "adInfoPosition": 5 },
+      { "adId": 4006, "adName": "点餐页轮播图", "adInfoPosition": 6 },
+      { "adId": 4007, "adName": "点餐页全局轮播banner", "adInfoPosition": 7 },
+      { "adId": 4008, "adName": "结算页广告", "adInfoPosition": 8 },
+      { "adId": 4009, "adName": "订单详情页广告", "adInfoPosition": 9 },
+      { "adId": 4010, "adName": "订单列表页banner", "adInfoPosition": 10 },
+      { "adId": 4011, "adName": "开屏广告", "adInfoPosition": 11 },
+      { "adId": 4012, "adName": "浮窗广告", "adInfoPosition": 12 },
+      { "adId": 4013, "adName": "订单详情弹窗", "adInfoPosition": 13 },
+      { "adId": 4014, "adName": "点餐页分组轮播", "adInfoPosition": 14 }
+    ]
+  },
+
+  "3_批量曝光_多用户多门店": {
+    "from": 1,
+    "eventType": "ad_exposure",
+    "storeId": 1002,
+    "memberId": 2003,
+    "exposureList": [
+      { "adId": 5001, "adName": "门店B首页弹屏", "adInfoPosition": 1 },
+      { "adId": 5002, "adName": "门店B轮播图", "adInfoPosition": 2 }
+    ]
+  },
+
+  "4_单条曝光_兼容原有逻辑": {
+    "from": 1,
+    "eventType": "ad_exposure",
+    "storeId": 1001,
+    "memberId": 2001,
+    "adId": 3001,
+    "adName": "单条曝光广告",
+    "adInfoPosition": 1
+  },
+
+  "5_广告点击_单条": {
+    "from": 1,
+    "eventType": "ad_click",
+    "storeId": 1001,
+    "memberId": 2001,
+    "adId": 3001,
+    "adName": "首页弹屏广告",
+    "adInfoPosition": 1
+  },
+
+  "6_广告离开_带停留时长": {
+    "from": 1,
+    "eventType": "ad_leave",
+    "storeId": 1001,
+    "memberId": 2001,
+    "adId": 3001,
+    "adName": "首页弹屏广告",
+    "adInfoPosition": 1,
+    "stayMs": 2600
+  },
+
+  "字段说明": {
+    "eventType": "事件类型：ad_exposure(曝光) / ad_click(点击) / ad_leave(离开)",
+    "exposureList": "批量曝光列表，仅 ad_exposure 事件使用。每个元素包含 adId/adName/adInfoPosition",
+    "adInfoPosition": "广告详细位置 1-14：1.首页弹屏 2.首页轮播图 3.首页底部banner 4.首页活动 5.点餐页弹屏 6.点餐页轮播图 7.点餐页全局轮播banner 8.结算页广告 9.订单详情页广告 10.订单列表页banner 11.开屏 12.浮窗 13.订单详情弹窗 14.点餐页分组轮播",
+    "stayMs": "停留时长(毫秒)，仅 ad_leave 事件携带",
+    "from": "来源：1=微信小程序，2=支付宝",
+    "channel": "渠道，为空时服务端默认补 1000000002",
+    "timestamp": "发生时间，为空时服务端默认补当前时间",
+    "businessId": "项目ID，服务端从 BusinessContextHolder 自动获取"
+  },
+
+  "测试步骤": {
+    "1_批量曝光写入": "发送示例1或示例2，等待30秒让BulkIngester刷新到ES",
+    "2_查询验证": "调用 POST /admin-api/analysis/ad/overview 查看数据",
+    "3_趋势验证": "调用 POST /admin-api/analysis/ad/trend 查看每日趋势",
+    "4_按位置分组": "调用 POST /admin-api/analysis/ad/by-position 查看各位置数据",
+    "5_按广告分组": "调用 POST /admin-api/analysis/ad/by-ad 查看各广告数据"
+  }
+}

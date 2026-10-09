@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.htyoudao.youdao.module.system.dal.mysql.orguser.OrgUserMapper">
+
+
+    <delete id="deleteBatchOrgUser">
+        delete from system_org_user where user_id in
+        <foreach collection="orgMoveReqVO.userIds" item="userId" open="(" separator="," close=")">
+            #{userId}
+        </foreach>
+        and org_id = #{orgMoveReqVO.oldOrgId}
+    </delete>
+
+    <!--
+        一般情况下，尽可能使用 Mapper 进行 CRUD 增删改查即可。
+        无法满足的场景，例如说多表关联查询，才使用 XML 编写 SQL。
+        代码生成器暂时只生成 Mapper XML 文件本身，更多推荐 MybatisX 快速开发插件来生成查询。
+        文档可见：https://www.iocoder.cn/MyBatis/x-plugins/
+     -->
+
+    <select id="selectUserOrgIds" resultType="java.lang.Long">
+        SELECT
+            distinct o.id
+        FROM system_org_user  ou
+        LEFT JOIN system_org o on ou.org_id = o.id and o.deleted = b'0'
+        WHERE user_id = #{userId}
+        AND ou.deleted = b'0'
+    </select>
+    <select id="getUserListByOrgId"
+            resultType="com.htyoudao.youdao.module.system.controller.admin.org.vo.OrgUserPageRespVO">
+        select
+            u.id,
+            bu.nickname as nickname,
+            u.nickname as username,
+            ou.id orgUserId,
+            ou.type,
+            ou.visible
+        from system_users u
+        inner join system_org_user ou on u.id = ou.user_id and ou.deleted = b'0' and ou.org_id = #{pageReqVO.orgId}
+        LEFT JOIN system_business_user bu ON bu.user_id = u.id and bu.deleted = b'0' and bu.business_id = ou.business_id
+        where
+            u.deleted = b'0'
+        <if test="pageReqVO.nickname != null and pageReqVO.nickname != '' ">
+            and (u.nickname like concat('%', #{pageReqVO.nickname}, '%') or u.username like concat('%', #{pageReqVO.nickname}, '%'))
+        </if>
+        order by ou.type desc, u.create_time asc
+    </select>
+    <select id="getUserListByUpdate"
+            resultType="com.htyoudao.youdao.module.system.controller.admin.org.vo.OrgUserRespVO">
+        select
+            u.id as userId,
+            bu.nickname as nickname
+        from system_users u
+        inner join system_org_user ou on u.id = ou.user_id and ou.deleted = b'0' and ou.org_id = #{orgId}
+        LEFT JOIN system_business_user bu ON bu.user_id = u.id and bu.deleted = b'0' and bu.business_id = ou.business_id
+        where u.deleted = b'0'
+        order by ou.type desc, u.create_time asc
+    </select>
+    <select id="getNodeUserNum"
+            resultType="com.htyoudao.youdao.module.system.controller.admin.org.vo.OrgUserNum">
+        select
+            ifnull(count(su.id),0) as userNum,
+            org_id as orgId
+        from system_users  su
+        left join  system_org_user sou on sou.user_id = su.id and sou.deleted = b'0'
+        where su.deleted = b'0'
+<!--        and su.user_type = '00'-->
+        and sou.org_id in
+        <foreach collection="unionIds" item="unionId" open="(" separator="," close=")">
+            #{unionId}
+        </foreach>
+        group by org_id
+
+    </select>
+    <select id="selectUserOrgIdsByBusinessId" resultType="java.lang.Long">
+        SELECT org_id
+        FROM system_org_user
+        WHERE user_id = #{userId}
+          <if test="businessId != null">
+            and business_id = #{businessId}
+          </if>
+          and deleted = b'0'
+    </select>
+
+
+</mapper>

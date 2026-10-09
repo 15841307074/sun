@@ -1,0 +1,4 @@
+com.htyoudao.youdao.framework.idempotent.config.YoudaoIdempotentConfiguration
+com.htyoudao.youdao.framework.lock4j.config.YoudaoLock4jConfiguration
+com.htyoudao.youdao.framework.ratelimiter.config.YoudaoRateLimiterConfiguration
+com.htyoudao.youdao.framework.signature.config.YoudaoApiSignatureAutoConfiguration

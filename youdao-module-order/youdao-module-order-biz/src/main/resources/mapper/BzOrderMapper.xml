@@ -1,0 +1,687 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.htyoudao.youdao.module.order.dal.mysql.BzOrderMapper">
+    <resultMap id="BaseResultMap" type="com.htyoudao.youdao.module.order.dal.dataobject.order.BzOrderDO">
+        <id column="order_id" jdbcType="BIGINT" property="orderId"/>
+        <result column="order_sn" jdbcType="VARCHAR" property="orderSn"/>
+        <result column="pay_sn" jdbcType="VARCHAR" property="paySn"/>
+        <result column="store_id" jdbcType="BIGINT" property="storeId"/>
+        <result column="store_name" jdbcType="VARCHAR" property="storeName"/>
+        <result column="member_name" jdbcType="VARCHAR" property="memberName"/>
+        <result column="member_avatar" jdbcType="VARCHAR" property="memberAvatar"/>
+        <result column="member_id" jdbcType="BIGINT" property="memberId"/>
+        <result column="pay_time" jdbcType="TIMESTAMP" property="payTime"/>
+        <result column="create_time" jdbcType="TIMESTAMP" property="createTime"/>
+        <result column="finish_time" jdbcType="TIMESTAMP" property="finishTime"/>
+        <result column="order_state" jdbcType="INTEGER" property="orderState"/>
+        <result column="payment_name" jdbcType="VARCHAR" property="paymentName"/>
+        <result column="payment_code" jdbcType="VARCHAR" property="paymentCode"/>
+        <result column="goods_amount" jdbcType="DECIMAL" property="goodsAmount"/>
+        <result column="express_fee" jdbcType="DECIMAL" property="expressFee"/>
+        <result column="activity_discount_amount" jdbcType="DECIMAL" property="activityDiscountAmount"/>
+        <result column="order_amount" jdbcType="DECIMAL" property="orderAmount"/>
+        <result column="balance_amount" jdbcType="DECIMAL" property="balanceAmount"/>
+        <result column="pay_amount" jdbcType="DECIMAL" property="payAmount"/>
+        <result column="refund_amount" jdbcType="DECIMAL" property="refundAmount"/>
+        <result column="receiver_name" jdbcType="VARCHAR" property="receiverName"/>
+        <result column="receiver_area_info" jdbcType="VARCHAR" property="receiverAreaInfo"/>
+        <result column="receiver_address" jdbcType="VARCHAR" property="receiverAddress"/>
+        <result column="receiver_mobile" jdbcType="VARCHAR" property="receiverMobile"/>
+        <result column="delay_days" jdbcType="INTEGER" property="delayDays"/>
+        <result column="express_id" jdbcType="INTEGER" property="expressId"/>
+        <result column="express_code" jdbcType="VARCHAR" property="expressCode"/>
+        <result column="express_name" jdbcType="VARCHAR" property="expressName"/>
+        <result column="express_number" jdbcType="VARCHAR" property="expressNumber"/>
+        <result column="evaluate_state" jdbcType="BIT" property="evaluateState"/>
+        <result column="order_type" jdbcType="TINYINT" property="orderType"/>
+        <result column="order_from" jdbcType="TINYINT" property="orderFrom"/>
+        <result column="lock_state" jdbcType="TINYINT" property="lockState"/>
+        <result column="refuse_reason" jdbcType="VARCHAR" property="refuseReason"/>
+        <result column="refuse_remark" jdbcType="VARCHAR" property="refuseRemark"/>
+        <result column="is_settlement" jdbcType="TINYINT" property="isSettlement"/>
+        <result column="is_generate_facesheet" jdbcType="TINYINT" property="isGenerateFacesheet"/>
+        <result column="is_virtual_goods" jdbcType="TINYINT" property="isVirtualGoods"/>
+        <result column="star" jdbcType="INTEGER" property="star"/>
+        <result column="store_remark" jdbcType="VARCHAR" property="storeRemark"/>
+        <result column="take_away_name" jdbcType="VARCHAR" property="takeAwayName"/>
+        <result column="take_away_tel" jdbcType="VARCHAR" property="takeAwayTel"/>
+        <result column="pick_up_num" jdbcType="VARCHAR" property="pickUpNum"/>
+        <result column="take_away_address" jdbcType="VARCHAR" property="takeAwayAddress"/>
+        <result column="store_phone" jdbcType="CHAR" property="storePhone"/>
+        <result column="minimum_delivery_fee" jdbcType="DECIMAL" property="minimumDeliveryFee"/>
+        <result column="packing_charge" jdbcType="DECIMAL" property="packingCharge"/>
+        <result column="table_ware_num" jdbcType="INTEGER" property="tableWareNum"/>
+        <result column="open_id" jdbcType="VARCHAR" property="openId"/>
+        <result column="delivery_phone" jdbcType="VARCHAR" property="deliveryPhone"/>
+        <result column="delivery_name" jdbcType="VARCHAR" property="deliveryName"/>
+        <result column="delivery_id" jdbcType="BIGINT" property="deliveryId"/>
+        <result column="errand_status" jdbcType="TINYINT" property="errandStatus"/>
+        <result column="errand_reward_amount" jdbcType="DECIMAL" property="errandRewardAmount"/>
+        <result column="errand_store_subsidy_amount" jdbcType="DECIMAL" property="errandStoreSubsidyAmount"/>
+        <result column="errand_gender_limit" jdbcType="TINYINT" property="errandGenderLimit"/>
+        <result column="errand_delivery_images" jdbcType="VARCHAR" property="errandDeliveryImages"/>
+        <result column="appointment_time" jdbcType="TIMESTAMP" property="appointmentTime"/>
+        <result column="user_coupon_id" jdbcType="BIGINT" property="userCouponId"/>
+    </resultMap>
+
+    <select id="selectByOrderSnByTable" resultType="com.htyoudao.youdao.module.order.dal.dataobject.order.BzOrderDO">
+        SELECT
+        *
+        FROM bz_order${tableFix}
+        WHERE order_sn = #{orderSn}
+        LIMIT 1
+    </select>
+
+    <select id="selectValidListByStoreIdAndCreateTime"
+            resultType="com.htyoudao.youdao.module.order.dal.dataobject.order.BzOrderDO">
+        SELECT
+        *
+        FROM bz_order${tableFix}
+        WHERE store_id = #{storeId}
+          AND create_time &gt;= #{startTime}
+          AND create_time &lt; #{endTime}
+          AND order_state NOT IN (0, 10, 70, 100)
+        ORDER BY create_time ASC
+    </select>
+
+    <select id="selectWaitingAcceptErrandOrders" resultType="com.htyoudao.youdao.module.order.dal.dataobject.order.BzOrderDO">
+        SELECT
+        *
+        FROM bz_order
+        WHERE order_type = 3
+          AND order_state = 110
+          AND delivery_id IS NULL
+          AND create_time &gt;= #{startTime}
+          AND create_time &lt;= #{endTime}
+    </select>
+
+    <select id="selectAcceptedErrandOrders" resultType="com.htyoudao.youdao.module.order.dal.dataobject.order.BzOrderDO">
+        SELECT
+        *
+        FROM bz_order
+        WHERE order_type = 3
+          AND (order_state = 120 OR order_state = 50)
+          AND delivery_id IS NOT NULL
+          AND create_time &gt;= #{startTime}
+          AND create_time &lt;= #{endTime}
+    </select>
+
+    <update id="updateByOrderId" parameterType="map">
+        update bz_order${tableFix}
+        <set>
+            <if test="record.orderId != null">
+                order_id = #{record.orderId,jdbcType=BIGINT},
+            </if>
+            <if test="record.orderSn != null">
+                order_sn = #{record.orderSn,jdbcType=VARCHAR},
+            </if>
+            <if test="record.paySn != null">
+                pay_sn = #{record.paySn,jdbcType=VARCHAR},
+            </if>
+            <if test="record.storeId != null">
+                store_id = #{record.storeId,jdbcType=BIGINT},
+            </if>
+            <if test="record.storeName != null">
+                store_name = #{record.storeName,jdbcType=VARCHAR},
+            </if>
+            <if test="record.memberName != null">
+                member_name = #{record.memberName,jdbcType=VARCHAR},
+            </if>
+            <if test="record.memberAvatar != null">
+                member_avatar = #{record.memberAvatar,jdbcType=VARCHAR},
+            </if>
+            <if test="record.memberId != null">
+                member_id = #{record.memberId,jdbcType=BIGINT},
+            </if>
+            <if test="record.payTime != null">
+                pay_time = #{record.payTime,jdbcType=TIMESTAMP},
+            </if>
+            <if test="record.createTime != null">
+                create_time = #{record.createTime,jdbcType=TIMESTAMP},
+            </if>
+            <if test="record.finishTime != null">
+                finish_time = #{record.finishTime,jdbcType=TIMESTAMP},
+            </if>
+            <if test="record.orderState != null">
+                order_state = #{record.orderState,jdbcType=INTEGER},
+            </if>
+            <if test="record.paymentName != null">
+                payment_name = #{record.paymentName,jdbcType=VARCHAR},
+            </if>
+            <if test="record.paymentCode != null">
+                payment_code = #{record.paymentCode,jdbcType=VARCHAR},
+            </if>
+            <if test="record.goodsAmount != null">
+                goods_amount = #{record.goodsAmount,jdbcType=DECIMAL},
+            </if>
+            <if test="record.expressFee != null">
+                express_fee = #{record.expressFee,jdbcType=DECIMAL},
+            </if>
+            <if test="record.activityDiscountAmount != null">
+                activity_discount_amount = #{record.activityDiscountAmount,jdbcType=DECIMAL},
+            </if>
+            <if test="record.orderAmount != null">
+                order_amount = #{record.orderAmount,jdbcType=DECIMAL},
+            </if>
+            <if test="record.balanceAmount != null">
+                balance_amount = #{record.balanceAmount,jdbcType=DECIMAL},
+            </if>
+            <if test="record.payAmount != null">
+                pay_amount = #{record.payAmount,jdbcType=DECIMAL},
+            </if>
+            <if test="record.refundAmount != null">
+                refund_amount = #{record.refundAmount,jdbcType=DECIMAL},
+            </if>
+            <if test="record.receiverName != null">
+                receiver_name = #{record.receiverName,jdbcType=VARCHAR},
+            </if>
+            <if test="record.receiverAreaInfo != null">
+                receiver_area_info = #{record.receiverAreaInfo,jdbcType=VARCHAR},
+            </if>
+            <if test="record.receiverAddress != null">
+                receiver_address = #{record.receiverAddress,jdbcType=VARCHAR},
+            </if>
+            <if test="record.receiverMobile != null">
+                receiver_mobile = #{record.receiverMobile,jdbcType=VARCHAR},
+            </if>
+            <if test="record.delayDays != null">
+                delay_days = #{record.delayDays,jdbcType=INTEGER},
+            </if>
+            <if test="record.expressId != null">
+                express_id = #{record.expressId,jdbcType=INTEGER},
+            </if>
+            <if test="record.expressCode != null">
+                express_code = #{record.expressCode,jdbcType=VARCHAR},
+            </if>
+            <if test="record.expressName != null">
+                express_name = #{record.expressName,jdbcType=VARCHAR},
+            </if>
+            <if test="record.expressNumber != null">
+                express_number = #{record.expressNumber,jdbcType=VARCHAR},
+            </if>
+            <if test="record.evaluateState != null">
+                evaluate_state = #{record.evaluateState,jdbcType=BIT},
+            </if>
+            <if test="record.orderType != null">
+                order_type = #{record.orderType,jdbcType=TINYINT},
+            </if>
+            <if test="record.orderFrom != null">
+                order_from = #{record.orderFrom,jdbcType=TINYINT},
+            </if>
+            <if test="record.lockState != null">
+                lock_state = #{record.lockState,jdbcType=TINYINT},
+            </if>
+            <if test="record.refuseReason != null">
+                refuse_reason = #{record.refuseReason,jdbcType=VARCHAR},
+            </if>
+            <if test="record.refuseRemark != null">
+                refuse_remark = #{record.refuseRemark,jdbcType=VARCHAR},
+            </if>
+            <if test="record.isSettlement != null">
+                is_settlement = #{record.isSettlement,jdbcType=TINYINT},
+            </if>
+            <if test="record.isGenerateFacesheet != null">
+                is_generate_facesheet = #{record.isGenerateFacesheet,jdbcType=TINYINT},
+            </if>
+            <if test="record.isVirtualGoods != null">
+                is_virtual_goods = #{record.isVirtualGoods,jdbcType=TINYINT},
+            </if>
+            <if test="record.star != null">
+                star = #{record.star,jdbcType=INTEGER},
+            </if>
+            <if test="record.storeRemark != null">
+                store_remark = #{record.storeRemark,jdbcType=VARCHAR},
+            </if>
+            <if test="record.takeAwayName != null">
+                take_away_name = #{record.takeAwayName,jdbcType=VARCHAR},
+            </if>
+            <if test="record.takeAwayTel != null">
+                take_away_tel = #{record.takeAwayTel,jdbcType=VARCHAR},
+            </if>
+            <if test="record.pickUpNum != null">
+                pick_up_num = #{record.pickUpNum,jdbcType=VARCHAR},
+            </if>
+            <if test="record.takeAwayAddress != null">
+                take_away_address = #{record.takeAwayAddress,jdbcType=VARCHAR},
+            </if>
+            <if test="record.storePhone != null">
+                store_phone = #{record.storePhone,jdbcType=CHAR},
+            </if>
+            <if test="record.minimumDeliveryFee != null">
+                minimum_delivery_fee = #{record.minimumDeliveryFee,jdbcType=DECIMAL},
+            </if>
+            <if test="record.packingCharge != null">
+                packing_charge = #{record.packingCharge,jdbcType=DECIMAL},
+            </if>
+            <if test="record.tableWareNum != null">
+                table_ware_num = #{record.tableWareNum,jdbcType=INTEGER},
+            </if>
+            <if test="record.openId != null">
+                open_id = #{record.openId,jdbcType=VARCHAR},
+            </if>
+            <if test="record.deliveryPhone != null">
+                delivery_phone = #{record.deliveryPhone,jdbcType=VARCHAR},
+            </if>
+            <if test="record.deliveryName != null">
+                delivery_name = #{record.deliveryName,jdbcType=VARCHAR},
+            </if>
+            <if test="record.deliveryId != null">
+                delivery_id = #{record.deliveryId,jdbcType=BIGINT},
+            </if>
+            <if test="record.errandRewardAmount != null">
+                errand_reward_amount = #{record.errandRewardAmount,jdbcType=DECIMAL},
+            </if>
+            <if test="record.errandStoreSubsidyAmount != null">
+                errand_store_subsidy_amount = #{record.errandStoreSubsidyAmount,jdbcType=DECIMAL},
+            </if>
+            <if test="record.errandGenderLimit != null">
+                errand_gender_limit = #{record.errandGenderLimit,jdbcType=TINYINT},
+            </if>
+            <if test="record.errandDeliveryImages != null">
+                errand_delivery_images = #{record.errandDeliveryImages,jdbcType=VARCHAR},
+            </if>
+            <if test="record.appointmentTime != null">
+                appointment_time = #{record.appointmentTime,jdbcType=TIMESTAMP},
+            </if>
+            <if test="record.userCouponId != null">
+                user_coupon_id = #{record.userCouponId,jdbcType=BIGINT},
+            </if>
+        </set>
+        where order_id = #{record.orderId,jdbcType=BIGINT}
+    </update>
+
+    <select id="orderPage" resultMap="BaseResultMap">
+            SELECT a.order_sn,a.order_state, a.pay_sn, a.payment_code,a.order_type,a.create_time,a.pick_up_num, a.open_id,
+            a.activity_discount_amount,a.order_amount,a.balance_amount,a.pay_amount,a.refund_amount,a.store_id,a.store_name,
+            a.order_from,a.order_id, a.store_phone, a.appointment_time,a.user_coupon_id,a.order_remark,a.take_away_tel,
+            a.receiver_mobile,a.delivery_phone,a.delivery_name,
+            a.errand_reward_amount,a.errand_store_subsidy_amount
+            FROM bz_order a
+            WHERE 1=1
+            <if test="record.storeId != null and record.storeId != ''">
+                AND a.store_id = #{record.storeId}
+            </if>
+            <if test="record.storeIdList != null and record.storeIdList.size > 0">
+                AND a.store_id in
+                <foreach collection="record.storeIdList" item="storeId" open="(" separator="," close=")">
+                    #{storeId}
+                </foreach>
+            </if>
+            <choose>
+                <when test="record.orderState == 300">
+                    AND a.order_state != 0 and a.order_state != 10 and a.order_state != 100
+                    AND NOT (a.order_type = 3 AND a.order_state = 110)
+                </when>
+                <when test="record.orderState == 80 and record.includeAcceptedErrandWhenMaking == true">
+                    AND (a.order_state = #{record.orderState}
+                        OR (a.order_type = 3 AND a.order_state = 120))
+                </when>
+                <otherwise>
+                    <if test="record.orderState != null">
+                        AND a.order_state = #{record.orderState}
+                    </if>
+                </otherwise>
+            </choose>
+            <if test="record.orderState == null and (record.openId == null or record.openId == '')">
+                AND NOT (a.order_type = 3 AND a.order_state IN (10, 110))
+            </if>
+            <if test="record.memberId != null and record.memberId != ''">
+                AND a.member_id = #{record.memberId}
+            </if>
+            <if test="record.openId != null and record.openId != ''">
+                AND a.open_id = #{record.openId}
+            </if>
+            <if test="record.expressNumber != null and record.expressNumber != ''">
+                AND a.express_number like CONCAT('%',#{record.expressNumber},'%')
+            </if>
+            <if test="record.paymentCode != null and record.paymentCode != ''">
+                AND a.payment_code = #{record.paymentCode}
+            </if>
+            <if test="record.orderFrom != null and record.orderFrom != ''">
+                AND a.order_from = #{record.orderFrom}
+            </if>
+            <if test="record.orderSn != null and record.orderSn != ''">
+                AND a.order_sn like concat('%', #{record.orderSn}, '%')
+            </if>
+            <if test="record.createTime != null and record.createTime != ''">
+                AND a.create_time BETWEEN #{record.createTime[0]} AND #{record.createTime[1]}
+            </if>
+            <if test="record.orderPcType != null">
+                AND a.order_type = #{record.orderPcType}
+            </if>
+            <if test="record.orderType == 0">
+                AND a.order_type IN (0, 1, 3)
+            </if>
+            <if test="record.orderType == 2">
+                AND a.order_type = 2
+            </if>
+            ORDER BY a.create_time DESC
+    </select>
+
+    <select id="orderList" parameterType="com.htyoudao.youdao.module.order.dal.dataobject.order.BzOrderDO"
+            resultMap="BaseResultMap">
+        <foreach item="tableFix" collection="tableFixs" open=" " separator=" union all " close=" ">
+            SELECT a.order_sn,a.order_state, a.pay_sn, a.payment_code,a.order_type,a.create_time,a.pick_up_num,
+            a.activity_discount_amount,a.order_amount,a.balance_amount,a.pay_amount,a.refund_amount,a.store_id,a.store_name,
+            a.order_from,c.order_remark,a.order_id, a.store_phone, a.appointment_time,a.user_coupon_id
+            FROM bz_order${tableFix} a
+            LEFT JOIN bz_order_extend${tableFix} c ON a.order_sn = c.order_sn AND a.store_id = c.store_id
+            WHERE 1=1
+            <if test="record.storeId != null and record.storeId != ''">
+                AND a.store_id = #{record.storeId}
+            </if>
+            <if test="record.storeIdList != null and record.storeIdList.size > 0">
+                AND a.store_id in
+                <foreach collection="record.storeIdList" item="storeId" open="(" separator="," close=")">
+                    #{storeId}
+                </foreach>
+            </if>
+            <choose>
+                <when test="record.orderState == 300">
+                    AND a.order_state != 0 and a.order_state != 10 and a.order_state != 100
+                </when>
+                <when test="record.orderState == 80 and record.includeAcceptedErrandWhenMaking == true">
+                    AND (a.order_state = #{record.orderState}
+                        OR (a.order_type = 3 AND a.order_state = 120))
+                </when>
+                <otherwise>
+                    <if test="record.orderState != null">
+                        AND a.order_state = #{record.orderState}
+                    </if>
+                </otherwise>
+            </choose>
+            <if test="record.orderStateHistory == 1 ">
+                AND (a.order_state = 10 or a.order_state = 50 or a.order_state = 40 or a.order_state = 100 or
+                a.order_state = 200 or a.order_state = 80)
+            </if>
+            <if test="record.memberId != null and record.memberId != ''">
+                AND a.member_id = #{record.memberId}
+            </if>
+            <if test="record.goodsName != null and record.goodsName != ''">
+                AND b.record.goods_name like CONCAT('%',#{record.goodsName},'%')
+            </if>
+            <if test="record.expressNumber != null and record.expressNumber != ''">
+                AND a.express_number like CONCAT('%',#{record.expressNumber},'%')
+            </if>
+            <if test="record.paymentCode != null and record.paymentCode != ''">
+                AND a.payment_code = #{record.paymentCode}
+            </if>
+            <if test="record.orderFrom != null and record.orderFrom != ''">
+                AND a.order_from = #{record.orderFrom}
+            </if>
+            <if test="record.orderSn != null and record.orderSn != ''">
+                AND a.order_sn like concat('%', #{record.orderSn}, '%')
+            </if>
+            <if test="record.beginTime != null  and record.endTime != null ">
+                AND a.create_time BETWEEN #{record.beginTime} AND #{record.endTime}
+            </if>
+            <if test="record.startOrderTime != null and record.startOrderTime != ''">
+                AND a.create_time &gt;= #{record.startOrderTime}
+            </if>
+            <if test="record.endOrderTime != null and record.endOrderTime != ''">
+                AND a.create_time &lt;= #{record.endOrderTime}
+            </if>
+            <if test="record.orderPcType != null">
+                AND a.order_type = #{record.orderPcType}
+            </if>
+            <if test="record.orderType == 0">
+                AND a.order_type IN (0, 1, 3)
+            </if>
+            <if test="record.orderType == 2">
+                AND a.order_type = 2
+            </if>
+            <if test="record.projectOwnerShip != null">
+                AND a.project_owner_ship = #{record.projectOwnerShip}
+            </if>
+        </foreach>
+        ORDER BY create_time DESC
+    </select>
+
+    <select id="selectOrderByMemberIdAndTrhDay" resultType="java.lang.String">
+
+        <foreach item="tableFix" collection="tableFixs" open=" " separator=" union all " close=" ">
+            SELECT
+            order_sn
+            FROM bz_order${tableFix}
+            WHERE 1=1
+            <if test="memberId != null and memberId != ''">
+                AND member_id = #{memberId}
+            </if>
+            <if test="storeId != null and storeId != ''">
+                AND store_id = #{storeId}
+            </if>
+            <if test="startOrderTime != null and startOrderTime != ''">
+                AND create_time &gt;= #{startOrderTime}
+            </if>
+            <if test="endOrderTime != null and endOrderTime != ''">
+                AND create_time &lt; #{endOrderTime}
+            </if>
+        </foreach>
+    </select>
+
+    <select id="selectPageByRange" resultType="com.htyoudao.youdao.module.order.dal.dataobject.order.BzOrderDO">
+        select
+        *
+        from
+        (
+        <foreach item="tableFix" collection="tableFixs" open=" " separator=" union all " close=" ">
+            SELECT
+            *
+            FROM bz_order${tableFix}
+            WHERE 1=1
+            <if test="record.startOrderTime != null and record.startOrderTime != ''">
+                AND create_time &gt;= #{record.startOrderTime}
+            </if>
+            <if test="record.endOrderTime != null and record.endOrderTime != ''">
+                AND create_time &lt;= #{record.endOrderTime}
+            </if>
+        </foreach>
+        ) k order by order_id asc limit #{startIndex},#{endIndex}
+    </select>
+
+    <update id="updateOrderState" parameterType="com.htyoudao.youdao.module.order.dal.dataobject.order.BzOrderDO">
+        UPDATE bz_order
+        <set>
+            <if test="r.orderState != null">
+                order_state = #{r.orderState},
+            </if>
+            <if test="r.pickUpNum != null and r.pickUpNum != ''">
+                pick_up_num = #{r.pickUpNum},
+            </if>
+            <if test="r.expressNumber != null and r.expressNumber != ''">
+                express_number = #{r.expressNumber},
+            </if>
+            <if test="r.expressId != null and r.expressId != ''">
+                express_id = #{r.expressId},
+            </if>
+            <if test="r.delayDays != null and r.delayDays != ''">
+                delay_days = #{r.delayDays},
+            </if>
+            <if test="r.isSettlement != null and r.isSettlement != ''">
+                is_settlement = #{r.isSettlement},
+            </if>
+            <if test="r.finishTime != null">
+                finish_time = #{r.finishTime},
+            </if>
+            <if test="r.payTime != null">
+                pay_time = #{r.payTime},
+            </if>
+            <if test="r.balanceAmount != null and r.balanceAmount != ''">
+                balance_amount = #{r.balanceAmount},
+            </if>
+            <if test="r.deliveryId != null">
+                delivery_id = #{r.deliveryId},
+            </if>
+            <if test="r.deliveryName != null and r.deliveryName != ''">
+                delivery_name = #{r.deliveryName},
+            </if>
+            <if test="r.deliveryPhone != null and r.deliveryPhone != ''">
+                delivery_phone = #{r.deliveryPhone},
+            </if>
+            <if test="r.errandDeliveryImages != null and r.errandDeliveryImages != ''">
+                errand_delivery_images = #{r.errandDeliveryImages},
+            </if>
+            <if test="r.errandStatus != null">
+                errand_status = #{r.errandStatus},
+            </if>
+        </set>
+        WHERE
+        order_sn = #{r.orderSn}
+        AND create_time = #{r.createTime}
+    </update>
+
+    <update id="acceptErrandOrder">
+        UPDATE bz_order
+        SET delivery_id = #{record.deliveryId},
+            delivery_name = #{record.deliveryName},
+            delivery_phone = #{record.deliveryPhone},
+            order_state = #{record.orderState},
+            making_time = #{record.makingTime}
+        WHERE order_id = #{record.orderId}
+          AND order_sn = #{record.orderSn}
+          AND create_time = #{record.createTime}
+          AND order_type = 3
+          AND order_state = #{waitingAcceptOrderState}
+          AND delivery_id IS NULL
+    </update>
+
+    <update id="refundWaitingAcceptErrandOrder">
+        UPDATE bz_order
+        SET order_state = #{record.orderState}
+        WHERE order_id = #{record.orderId}
+          AND order_sn = #{record.orderSn}
+          AND create_time = #{record.createTime}
+          AND order_type = 3
+          AND order_state = #{waitingAcceptOrderState}
+          AND delivery_id IS NULL
+    </update>
+
+    <update id="updateErrandOrderStatus">
+        UPDATE bz_order
+        <set>
+            <if test="record.orderState != null">
+                order_state = #{record.orderState},
+            </if>
+            <if test="record.waitingTime != null">
+                waiting_time = #{record.waitingTime},
+            </if>
+            <if test="record.finishTime != null">
+                finish_time = #{record.finishTime},
+            </if>
+            <if test="record.errandDeliveryImages != null and record.errandDeliveryImages != ''">
+                errand_delivery_images = #{record.errandDeliveryImages},
+            </if>
+        </set>
+        WHERE order_id = #{record.orderId}
+          AND order_sn = #{record.orderSn}
+          AND create_time = #{record.createTime}
+          AND order_type = 3
+          AND delivery_id = #{deliveryId}
+          AND order_state = #{expectedOrderState}
+    </update>
+
+    <select id="selectCountByOrderType" parameterType="com.htyoudao.youdao.module.order.controller.admin.order.vo.BzOrderReqVO"
+            resultType="com.htyoudao.youdao.module.order.controller.app.order.DTO.OrderCountByOrderTypeDTO">
+            SELECT
+                order_type orderType,
+                count(*) orderNum
+            FROM bz_order
+            WHERE store_id = #{record.storeId}
+            <if test="record.orderSn != null and record.orderSn != ''">
+                and order_sn like concat('%', #{record.orderSn}, '%')
+            </if>
+            <choose>
+                <when test="record.orderState == 300">
+                    AND order_state != 0 and order_state != 10 and order_state != 100
+                    AND NOT (order_type = 3 AND order_state = 110)
+                </when>
+                <when test="record.orderState == 80 and record.includeAcceptedErrandWhenMaking == true">
+                    AND (order_state = #{record.orderState}
+                        OR (order_type = 3 AND order_state = 120))
+                </when>
+                <otherwise>
+                    <if test="record.orderState != null">
+                        AND order_state = #{record.orderState}
+                    </if>
+                </otherwise>
+            </choose>
+            <if test="record.orderFrom != null and record.orderFrom != ''">
+                and order_from = #{record.orderFrom}
+            </if>
+            <if test="record.createTime != null and record.createTime != ''">
+                AND create_time BETWEEN #{record.createTime[0]} AND #{record.createTime[1]}
+            </if>
+            <if test="record.orderType == 0">
+                and order_type IN (0, 1, 3)
+            </if>
+            <if test="record.orderType == 2">
+                and order_type = 2
+            </if>
+        GROUP BY order_type
+    </select>
+
+    <select id="selectBzOrderStoreData" resultType="com.htyoudao.youdao.module.order.api.order.dto.BzOrderDTO">
+        select
+            member_id as memberId,
+            store_id as storeId,
+            create_time as createTime
+        from bz_order
+        where member_id != 0
+            <!--and order_state in (40,60,80,200)-->
+            AND create_time BETWEEN #{yesterdayStart} AND #{yesterdayEnd}
+    </select>
+
+    <select id="selectBzOrderData" resultType="com.htyoudao.youdao.module.order.api.order.dto.BzOrderDTO">
+        select
+            member_id as memberId,
+            count(order_id) as count,
+            sum(pay_amount) as sum
+        from bz_order
+        where member_id != 0
+          and order_state in (40,60,80,200)
+        and  create_time BETWEEN #{yesterdayStart} AND #{yesterdayEnd}
+      GROUP BY member_id
+    </select>
+
+    <select id="selectBzOrderData2" resultType="com.htyoudao.youdao.module.order.api.order.dto.BzOrderDTO">
+        select
+        member_id as memberId,
+        count(order_id) as count,
+        sum(pay_amount) as sum
+        from bz_order
+        where member_id != 0
+
+        <!-- and order_state in (40,60,80,200)-->
+        and  create_time BETWEEN #{yesterdayStart} AND #{yesterdayEnd}
+        GROUP BY member_id
+    </select>
+
+  <select id="getHisPhones" resultType="java.lang.Long">
+      SELECT
+      member_id AS member_id
+      FROM bz_order_${date}
+      WHERE member_id != 0
+      AND order_state IN (40, 60, 80, 200)
+      AND store_id IN
+      <foreach item="storeId" collection="storeIds" open="(" separator="," close=")">
+          #{storeId}
+      </foreach>
+      GROUP BY member_id
+  </select>
+
+  <select id="getWeekPhones" resultType="java.lang.Long">
+      SELECT
+      member_id AS member_id
+      FROM bz_order_${date}
+      WHERE member_id != 0
+      AND order_state IN (40,60,80,200)
+      AND DATE(create_time)  &lt;= #{localDate}
+      AND store_id IN
+      <foreach item='storeId' collection='storeIds' open='(' separator=',' close=')'>
+          #{storeId}
+      </foreach>
+      GROUP BY member_id
+  </select>
+</mapper>

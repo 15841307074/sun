@@ -1,0 +1,1029 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.htyoudao.youdao.module.bpm.dal.mysql.definition.BpmProcessBusinessQueryMapper">
+
+    <select id="selectTaskListCopyByPage" resultType="com.htyoudao.youdao.module.bpm.dal.dataobject.business.BpmBusinessQueryDO">
+        SELECT
+        distinct
+        bk.task_id
+        ,bk.dept_id
+        ,bk.dept_name
+        ,bk.store_id
+        ,bk.store_name
+        ,bk.applicant
+        ,bk.applicant_id
+        ,bk.applicant_name
+        ,bk.task_type
+        ,bk.handle_dept_id
+        ,bk.handle_dept_name
+        ,bk.flow_id
+        ,bk.flow_name
+        ,bk.task_name
+        ,bk.store_type
+        ,bk.priority
+        ,bk.completion_time
+        ,bk.task_completion_time
+        ,bk.task_desc
+        ,bk.proc_inst_id
+        ,bk.file_urls
+        ,bk.parent_proc_inst_id
+        ,bk.business_id
+        ,bk.creator
+        ,bk.create_time
+        ,bk.updater
+        ,bk.update_time
+        ,bk.deleted
+        ,bk.task_state
+        ,bk.business_key
+        ,bk.executor_user_id
+        ,bk.executor_dept_id
+        ,bk.executor_user_name
+        ,bk.executor_dept_name
+        ,IFNULL(bty.copy_flag, 0) AS copy_flag
+        ,bk.icon_url
+        ,bk.oa_project_id
+        FROM
+            business_task bk
+        left join
+            business_task_copy bty
+        on (
+            bk.proc_inst_id = bty.proc_inst_id
+            and bty.copy_user_id = #{userId}
+        )
+        where bk.deleted = b'0'
+        <if test="queryVO.proInstIdList != null and queryVO.proInstIdList.size() > 0">
+            AND bk.proc_inst_id IN
+            <foreach collection="queryVO.proInstIdList" item="procInstId" open="(" separator="," close=")">
+                #{procInstId}  <!-- 用 #{...} 防SQL注入，若集合是String类型无需额外处理 -->
+            </foreach>
+        </if>
+        <if test="queryVO.applicantId != null and queryVO.applicantId != '' ">
+            AND bk.applicant_id = #{queryVO.applicantId}
+        </if>
+        <if test="queryVO.taskContent != null and queryVO.taskContent != '' ">
+            AND (
+            bk.task_name like CONCAT('%', #{queryVO.taskContent}, '%') or
+            bk.task_desc like CONCAT('%', #{queryVO.taskContent}, '%')
+            )
+        </if>
+
+        <if test="queryVO.applicantIdList != null and queryVO.applicantIdList.size() > 0">
+            AND bk.applicant_id IN
+            <foreach collection="queryVO.applicantIdList" item="applicantId" open="(" separator="," close=")">
+                #{applicantId}  <!-- 用 #{...} 防SQL注入，若集合是String类型无需额外处理 -->
+            </foreach>
+        </if>
+        <if test="queryVO.priority != null and queryVO.priority != '' ">
+            AND bk.priority = #{queryVO.priority}
+        </if>
+        <if test="queryVO.applicantDeptIdList != null and queryVO.applicantDeptIdList.size() > 0">
+            AND bk.DEPT_ID IN
+            <foreach collection="queryVO.applicantDeptIdList" item="deptId" open="(" separator="," close=")">
+                #{deptId}
+            </foreach>
+        </if>
+        <if test="queryVO.applicantStoreId != null and queryVO.applicantStoreId != '' ">
+            AND bk.store_id = #{queryVO.applicantStoreId}
+        </if>
+        <if test="queryVO.processDefinitionId != null and queryVO.processDefinitionId != '' ">
+            AND bk.flow_id = #{queryVO.processDefinitionId}
+        </if>
+        <if test="queryVO.taskState != null and queryVO.taskState != ''">
+            <if test="queryVO.taskState == 5 ">
+                AND bk.task_state != 6
+                AND bk.task_state != 4
+                AND sysdate() > bk.completion_time
+            </if>
+            <if test="queryVO.taskState != 5 ">
+                AND bk.task_state = #{queryVO.taskState}
+            </if>
+        </if>
+        <if test="queryVO.taskType != null ">
+            AND bk.task_type = #{queryVO.taskType}
+        </if>
+        <if test="queryVO.copyFlag != null and queryVO.copyFlag == 1">
+            AND bty.copy_flag = #{queryVO.copyFlag}
+        </if>
+        <if test="queryVO.oaProjectId != null and queryVO.oaProjectId != ''">
+            AND bk.oa_project_id = #{queryVO.oaProjectId}
+        </if>
+        <if test="queryVO.createTimeStart != null  and queryVO.createTimeEnd != null ">
+            AND bk.create_time <![CDATA[>=]]> #{queryVO.createTimeStart} and bk.create_time <![CDATA[<=]]> #{queryVO.createTimeEnd}
+        </if>
+        <if test="queryVO.taskCompletionTimeStart != null and queryVO.taskCompletionTimeEnd != null  ">
+            AND bk.completion_time <![CDATA[>=]]> #{queryVO.taskCompletionTimeStart} and bk.completion_time <![CDATA[<=]]> #{queryVO.taskCompletionTimeEnd}
+        </if>
+        <!--        <if test="queryVO.businessId != null and queryVO.businessId != ''">
+                    AND bk.business_Id = #{queryVO.businessId}
+                </if>-->
+        <!-- 动态排序：根据 sortField 和 sortOrder 拼接 ORDER BY -->
+        ORDER BY
+        <choose>
+            <!-- 1. 场景1：按 createTime 升序（sortField=createTime 且 sortOrder=asc） -->
+            <when test="queryVO.sortField != null and queryVO.sortField == 'createTime'
+                        and queryVO.sortOrder != null and queryVO.sortOrder.toLowerCase() == 'asc'">
+                bk.create_time ASC
+            </when>
+            <!-- 2. 场景2：按 createTime 降序（sortField=createTime 且 sortOrder=desc） -->
+            <when test="queryVO.sortField != null and queryVO.sortField == 'createTime'
+                        and queryVO.sortOrder != null and queryVO.sortOrder.toLowerCase() == 'desc'">
+                bk.create_time DESC
+            </when>
+            <!-- 3. 场景3：按 completionTime 升序（sortField=completionTime 且 sortOrder=asc） -->
+            <when test="queryVO.sortField != null and queryVO.sortField == 'completionTime'
+                        and queryVO.sortOrder != null and queryVO.sortOrder.toLowerCase() == 'asc'">
+                bk.completion_time ASC
+            </when>
+            <!-- 4. 场景4：按 completionTime 降序（sortField=completionTime 且 sortOrder=desc） -->
+            <when test="queryVO.sortField != null and queryVO.sortField == 'completionTime'
+                        and queryVO.sortOrder != null and queryVO.sortOrder.toLowerCase() == 'desc'">
+                bk.completion_time DESC
+            </when>
+            <!-- 默认场景：其他情况（字段/方向不匹配、参数为空），按 createTime 降序 -->
+            <otherwise>
+                bk.create_time DESC
+            </otherwise>
+        </choose>
+        <if test="page.pageSize != 0">
+            LIMIT #{page.pageSize} OFFSET ${(page.pageNo - 1) * page.pageSize}
+        </if>
+    </select>
+
+    <select id="selectTaskListCopyByPageTotal" >
+        SELECT
+        COUNT(bk.task_id)
+        FROM
+        business_task bk
+        left join
+        business_task_copy bty
+        on (
+        bk.proc_inst_id = bty.proc_inst_id
+        and bty.copy_user_id = #{userId}
+        )
+        where bk.deleted = b'0'
+        <if test="queryVO.proInstIdList != null and queryVO.proInstIdList.size() > 0">
+            AND bk.proc_inst_id IN
+            <foreach collection="queryVO.proInstIdList" item="procInstId" open="(" separator="," close=")">
+                #{procInstId}  <!-- 用 #{...} 防SQL注入，若集合是String类型无需额外处理 -->
+            </foreach>
+        </if>
+        <if test="queryVO.applicantId != null and queryVO.applicantId != '' ">
+            AND bk.applicant_id = #{queryVO.applicantId}
+        </if>
+        <if test="queryVO.taskContent != null and queryVO.taskContent != '' ">
+            AND (
+            bk.task_name like CONCAT('%', #{queryVO.taskContent}, '%') or
+            bk.task_desc like CONCAT('%', #{queryVO.taskContent}, '%')
+            )
+        </if>
+
+        <if test="queryVO.applicantIdList != null and queryVO.applicantIdList.size() > 0">
+            AND bk.applicant_id IN
+            <foreach collection="queryVO.applicantIdList" item="applicantId" open="(" separator="," close=")">
+                #{applicantId}  <!-- 用 #{...} 防SQL注入，若集合是String类型无需额外处理 -->
+            </foreach>
+        </if>
+        <if test="queryVO.priority != null and queryVO.priority != '' ">
+            AND bk.priority = #{queryVO.priority}
+        </if>
+        <if test="queryVO.applicantDeptIdList != null and queryVO.applicantDeptIdList.size() > 0">
+            AND bk.DEPT_ID IN
+            <foreach collection="queryVO.applicantDeptIdList" item="deptId" open="(" separator="," close=")">
+                #{deptId}
+            </foreach>
+        </if>
+        <if test="queryVO.applicantStoreId != null and queryVO.applicantStoreId != '' ">
+            AND bk.store_id = #{queryVO.applicantStoreId}
+        </if>
+        <if test="queryVO.processDefinitionId != null and queryVO.processDefinitionId != '' ">
+            AND bk.flow_id = #{queryVO.processDefinitionId}
+        </if>
+        <if test="queryVO.taskState != null and queryVO.taskState != ''">
+            <if test="queryVO.taskState == 5 ">
+                AND bk.task_state != 6
+                AND bk.task_state != 4
+                AND sysdate() > bk.completion_time
+            </if>
+            <if test="queryVO.taskState != 5 ">
+                AND bk.task_state = #{queryVO.taskState}
+            </if>
+        </if>
+        <if test="queryVO.taskType != null ">
+            AND bk.task_type = #{queryVO.taskType}
+        </if>
+        <if test="queryVO.copyFlag != null and queryVO.copyFlag == 1">
+            AND bty.copy_flag = #{queryVO.copyFlag}
+        </if>
+        <if test="queryVO.oaProjectId != null and queryVO.oaProjectId != ''">
+            AND bk.oa_project_id = #{queryVO.oaProjectId}
+        </if>
+        <if test="queryVO.createTimeStart != null  and queryVO.createTimeEnd != null ">
+            AND bk.create_time <![CDATA[>=]]> #{queryVO.createTimeStart} and bk.create_time <![CDATA[<=]]> #{queryVO.createTimeEnd}
+        </if>
+        <if test="queryVO.taskCompletionTimeStart != null and queryVO.taskCompletionTimeEnd != null  ">
+            AND bk.completion_time <![CDATA[>=]]> #{queryVO.taskCompletionTimeStart} and bk.completion_time <![CDATA[<=]]> #{queryVO.taskCompletionTimeEnd}
+        </if>
+
+    </select>
+
+    <select id="selectTaskListCopyReadTotal" >
+        SELECT
+        COUNT(bk.task_id)
+        FROM
+        business_task bk
+        left join
+        business_task_copy bty
+        on (
+        bk.proc_inst_id = bty.proc_inst_id
+        and bty.copy_user_id = #{userId}
+        )
+        where bk.deleted = b'0' and bty.copy_flag = 1
+        <if test="queryVO.proInstIdList != null and queryVO.proInstIdList.size() > 0">
+            AND bk.proc_inst_id IN
+            <foreach collection="queryVO.proInstIdList" item="procInstId" open="(" separator="," close=")">
+                #{procInstId}  <!-- 用 #{...} 防SQL注入，若集合是String类型无需额外处理 -->
+            </foreach>
+        </if>
+        <if test="queryVO.applicantId != null and queryVO.applicantId != '' ">
+            AND bk.applicant_id = #{queryVO.applicantId}
+        </if>
+        <if test="queryVO.taskContent != null and queryVO.taskContent != '' ">
+            AND (
+            bk.task_name like CONCAT('%', #{queryVO.taskContent}, '%') or
+            bk.task_desc like CONCAT('%', #{queryVO.taskContent}, '%')
+            )
+        </if>
+
+        <if test="queryVO.applicantIdList != null and queryVO.applicantIdList.size() > 0">
+            AND bk.applicant_id IN
+            <foreach collection="queryVO.applicantIdList" item="applicantId" open="(" separator="," close=")">
+                #{applicantId}  <!-- 用 #{...} 防SQL注入，若集合是String类型无需额外处理 -->
+            </foreach>
+        </if>
+        <if test="queryVO.priority != null and queryVO.priority != '' ">
+            AND bk.priority = #{queryVO.priority}
+        </if>
+        <if test="queryVO.applicantDeptIdList != null and queryVO.applicantDeptIdList.size() > 0">
+            AND bk.DEPT_ID IN
+            <foreach collection="queryVO.applicantDeptIdList" item="deptId" open="(" separator="," close=")">
+                #{deptId}
+            </foreach>
+        </if>
+        <if test="queryVO.applicantStoreId != null and queryVO.applicantStoreId != '' ">
+            AND bk.store_id = #{queryVO.applicantStoreId}
+        </if>
+        <if test="queryVO.processDefinitionId != null and queryVO.processDefinitionId != '' ">
+            AND bk.flow_id = #{queryVO.processDefinitionId}
+        </if>
+        <if test="queryVO.taskState != null and queryVO.taskState != ''">
+            <if test="queryVO.taskState == 5 ">
+                AND bk.task_state != 6
+                AND bk.task_state != 4
+                AND sysdate() > bk.completion_time
+            </if>
+            <if test="queryVO.taskState != 5 ">
+                AND bk.task_state = #{queryVO.taskState}
+            </if>
+        </if>
+        <if test="queryVO.taskType != null ">
+            AND bk.task_type = #{queryVO.taskType}
+        </if>
+        <if test="queryVO.copyFlag != null and queryVO.copyFlag == 1">
+            AND bty.copy_flag = #{queryVO.copyFlag}
+        </if>
+        <if test="queryVO.oaProjectId != null and queryVO.oaProjectId != ''">
+            AND bk.oa_project_id = #{queryVO.oaProjectId}
+        </if>
+        <if test="queryVO.createTimeStart != null  and queryVO.createTimeEnd != null ">
+            AND bk.create_time <![CDATA[>=]]> #{queryVO.createTimeStart} and bk.create_time <![CDATA[<=]]> #{queryVO.createTimeEnd}
+        </if>
+        <if test="queryVO.taskCompletionTimeStart != null and queryVO.taskCompletionTimeEnd != null  ">
+            AND bk.completion_time <![CDATA[>=]]> #{queryVO.taskCompletionTimeStart} and bk.completion_time <![CDATA[<=]]> #{queryVO.taskCompletionTimeEnd}
+        </if>
+
+    </select>
+
+    <select id="selectTaskListByPage" resultType="com.htyoudao.youdao.module.bpm.dal.dataobject.business.BpmBusinessQueryDO">
+        SELECT
+        distinct
+        bk.task_id
+        ,bk.dept_id
+        ,bk.dept_name
+        ,bk.store_id
+        ,bk.store_name
+        ,bk.applicant
+        ,bk.applicant_id
+        ,bk.applicant_name
+        ,bk.task_type
+        ,bk.handle_dept_id
+        ,bk.handle_dept_name
+        ,bk.flow_id
+        ,bk.flow_name
+        ,bk.task_name
+        ,bk.store_type
+        ,bk.priority
+        ,bk.completion_time
+        ,bk.task_completion_time
+        ,bk.task_desc
+        ,bk.proc_inst_id
+        ,bk.file_urls
+        ,bk.parent_proc_inst_id
+        ,bk.business_id
+        ,bk.creator
+        ,bk.create_time
+        ,bk.updater
+        ,bk.update_time
+        ,bk.deleted
+        ,bk.task_state
+        ,bk.business_key
+        ,bk.executor_user_id
+        ,bk.executor_dept_id
+        ,bk.executor_user_name
+        ,bk.executor_dept_name
+        ,bk.copy_flag
+        ,bk.icon_url
+        ,bk.oa_project_id
+        ,bk.create_time
+        FROM
+        business_task bk
+        where bk.deleted = b'0'
+        <if test="queryVO.proInstIdList != null and queryVO.proInstIdList.size() > 0">
+            AND bk.proc_inst_id IN
+            <foreach collection="queryVO.proInstIdList" item="procInstId" open="(" separator="," close=")">
+                #{procInstId}  <!-- 用 #{...} 防SQL注入，若集合是String类型无需额外处理 -->
+            </foreach>
+        </if>
+        <if test="queryVO.applicantId != null and queryVO.applicantId != '' ">
+            AND bk.applicant_id = #{queryVO.applicantId}
+        </if>
+        <if test="queryVO.taskContent != null and queryVO.taskContent != '' ">
+            AND (
+            bk.task_name like CONCAT('%', #{queryVO.taskContent}, '%') or
+            bk.task_desc like CONCAT('%', #{queryVO.taskContent}, '%')
+            )
+        </if>
+
+        <if test="queryVO.applicantIdList != null and queryVO.applicantIdList.size() > 0">
+            AND bk.applicant_id IN
+            <foreach collection="queryVO.applicantIdList" item="applicantId" open="(" separator="," close=")">
+                #{applicantId}  <!-- 用 #{...} 防SQL注入，若集合是String类型无需额外处理 -->
+            </foreach>
+        </if>
+        <if test="queryVO.priority != null and queryVO.priority != '' ">
+            AND bk.priority = #{queryVO.priority}
+        </if>
+        <if test="queryVO.applicantDeptIdList != null and queryVO.applicantDeptIdList.size() > 0">
+            AND bk.DEPT_ID IN
+            <foreach collection="queryVO.applicantDeptIdList" item="deptId" open="(" separator="," close=")">
+                #{deptId}
+            </foreach>
+        </if>
+        <if test="queryVO.applicantStoreId != null and queryVO.applicantStoreId != '' ">
+            AND bk.store_id = #{queryVO.applicantStoreId}
+        </if>
+        <if test="queryVO.processDefinitionId != null and queryVO.processDefinitionId != '' ">
+            AND bk.flow_id = #{queryVO.processDefinitionId}
+        </if>
+        <if test="queryVO.taskState != null and queryVO.taskState != ''">
+            <if test="queryVO.taskState == 5 ">
+                AND bk.task_state != 6
+                AND bk.task_state != 4
+                AND sysdate() > bk.completion_time
+            </if>
+            <if test="queryVO.taskState != 5 ">
+                AND bk.task_state = #{queryVO.taskState}
+            </if>
+        </if>
+        <if test="queryVO.taskType != null ">
+            AND bk.task_type = #{queryVO.taskType}
+        </if>
+        <if test="queryVO.copyFlag != null ">
+            AND bk.copy_flag = #{queryVO.copyFlag}
+        </if>
+        <if test="queryVO.oaProjectId != null and queryVO.oaProjectId != ''">
+            AND bk.oa_project_id = #{queryVO.oaProjectId}
+        </if>
+        <if test="queryVO.createTimeStart != null  and queryVO.createTimeEnd != null ">
+            AND bk.create_time <![CDATA[>=]]> #{queryVO.createTimeStart} and bk.create_time <![CDATA[<=]]> #{queryVO.createTimeEnd}
+        </if>
+        <if test="queryVO.taskCompletionTimeStart != null and queryVO.taskCompletionTimeEnd != null  ">
+            AND bk.completion_time <![CDATA[>=]]> #{queryVO.taskCompletionTimeStart} and bk.completion_time <![CDATA[<=]]> #{queryVO.taskCompletionTimeEnd}
+        </if>
+<!--        <if test="queryVO.businessId != null and queryVO.businessId != ''">
+            AND bk.business_Id = #{queryVO.businessId}
+        </if>-->
+        <!-- 动态排序：根据 sortField 和 sortOrder 拼接 ORDER BY -->
+        ORDER BY
+        <choose>
+            <!-- 1. 场景1：按 createTime 升序（sortField=createTime 且 sortOrder=asc） -->
+            <when test="queryVO.sortField != null and queryVO.sortField == 'createTime'
+                        and queryVO.sortOrder != null and queryVO.sortOrder.toLowerCase() == 'asc'">
+                bk.create_time ASC
+            </when>
+            <!-- 2. 场景2：按 createTime 降序（sortField=createTime 且 sortOrder=desc） -->
+            <when test="queryVO.sortField != null and queryVO.sortField == 'createTime'
+                        and queryVO.sortOrder != null and queryVO.sortOrder.toLowerCase() == 'desc'">
+                bk.create_time DESC
+            </when>
+            <!-- 3. 场景3：按 completionTime 升序（sortField=completionTime 且 sortOrder=asc） -->
+            <when test="queryVO.sortField != null and queryVO.sortField == 'completionTime'
+                        and queryVO.sortOrder != null and queryVO.sortOrder.toLowerCase() == 'asc'">
+                bk.completion_time ASC
+            </when>
+            <!-- 4. 场景4：按 completionTime 降序（sortField=completionTime 且 sortOrder=desc） -->
+            <when test="queryVO.sortField != null and queryVO.sortField == 'completionTime'
+                        and queryVO.sortOrder != null and queryVO.sortOrder.toLowerCase() == 'desc'">
+                bk.completion_time DESC
+            </when>
+            <!-- 默认场景：其他情况（字段/方向不匹配、参数为空），按 createTime 降序 -->
+            <otherwise>
+                bk.create_time DESC
+            </otherwise>
+        </choose>
+        <if test="page.pageSize != 0">
+            LIMIT #{page.pageSize} OFFSET ${(page.pageNo - 1) * page.pageSize}
+        </if>
+    </select>
+
+    <select id="selectTaskListTotal" resultType="java.lang.Long">
+        SELECT
+        COUNT(bk.task_id)
+        FROM
+        business_task bk
+        where bk.deleted = b'0'
+        <if test="queryVO.proInstIdList != null and queryVO.proInstIdList.size() > 0">
+            AND bk.proc_inst_id IN
+            <foreach collection="queryVO.proInstIdList" item="procInstId" open="(" separator="," close=")">
+                #{procInstId}  <!-- 用 #{...} 防SQL注入，若集合是String类型无需额外处理 -->
+            </foreach>
+        </if>
+        <if test="queryVO.applicantId != null and queryVO.applicantId != '' ">
+            AND bk.applicant_id = #{queryVO.applicantId}
+        </if>
+        <if test="queryVO.taskContent != null and queryVO.taskContent != '' ">
+            AND (
+            bk.task_name like CONCAT('%', #{queryVO.taskContent}, '%') or
+            bk.task_desc like CONCAT('%', #{queryVO.taskContent}, '%')
+            )
+        </if>
+
+        <if test="queryVO.applicantIdList != null and queryVO.applicantIdList.size() > 0">
+            AND bk.applicant_id IN
+            <foreach collection="queryVO.applicantIdList" item="applicantId" open="(" separator="," close=")">
+                #{applicantId}  <!-- 用 #{...} 防SQL注入，若集合是String类型无需额外处理 -->
+            </foreach>
+        </if>
+        <if test="queryVO.priority != null and queryVO.priority != '' ">
+            AND bk.priority = #{queryVO.priority}
+        </if>
+        <if test="queryVO.applicantDeptIdList != null and queryVO.applicantDeptIdList.size() > 0">
+            AND bk.DEPT_ID IN
+            <foreach collection="queryVO.applicantDeptIdList" item="deptId" open="(" separator="," close=")">
+                #{deptId}
+            </foreach>
+        </if>
+        <if test="queryVO.applicantStoreId != null and queryVO.applicantStoreId != '' ">
+            AND bk.store_id = #{queryVO.applicantStoreId}
+        </if>
+        <if test="queryVO.processDefinitionId != null and queryVO.processDefinitionId != '' ">
+            AND bk.flow_id = #{queryVO.processDefinitionId}
+        </if>
+        <if test="queryVO.taskState != null and queryVO.taskState != ''">
+            <if test="queryVO.taskState == 5 ">
+                AND bk.task_state != 6
+                AND bk.task_state != 4
+                AND sysdate() > bk.completion_time
+            </if>
+            <if test="queryVO.taskState != 5 ">
+                AND bk.task_state = #{queryVO.taskState}
+            </if>
+        </if>
+        <if test="queryVO.taskType != null ">
+            AND bk.task_type = #{queryVO.taskType}
+        </if>
+        <if test="queryVO.copyFlag != null ">
+            AND bk.copy_flag = #{queryVO.copyFlag}
+        </if>
+        <if test="queryVO.oaProjectId != null and queryVO.oaProjectId != ''">
+            AND bk.oa_project_id = #{queryVO.oaProjectId}
+        </if>
+        <if test="queryVO.createTimeStart != null  and queryVO.createTimeEnd != null ">
+            AND bk.create_time <![CDATA[>=]]> #{queryVO.createTimeStart} and bk.create_time <![CDATA[<=]]> #{queryVO.createTimeEnd}
+        </if>
+        <if test="queryVO.taskCompletionTimeStart != null and queryVO.taskCompletionTimeEnd != null  ">
+            AND bk.completion_time <![CDATA[>=]]> #{queryVO.taskCompletionTimeStart} and bk.completion_time <![CDATA[<=]]> #{queryVO.taskCompletionTimeEnd}
+        </if>
+    </select>
+
+    <select id="selectMainTaskListByPage" resultType="com.htyoudao.youdao.module.bpm.dal.dataobject.business.BpmBusinessQueryDO">
+        SELECT
+        distinct
+        bk.task_id
+        ,bk.dept_id
+        ,bk.dept_name
+        ,bk.store_id
+        ,bk.store_name
+        ,bk.applicant
+        ,bk.applicant_id
+        ,bk.applicant_name
+        ,bk.task_type
+        ,bk.handle_dept_id
+        ,bk.handle_dept_name
+        ,bk.flow_id
+        ,bk.flow_name
+        ,bk.task_name
+        ,bk.store_type
+        ,bk.priority
+        ,bk.completion_time
+        ,bk.task_completion_time
+        ,bk.task_desc
+        ,bk.proc_inst_id
+        ,bk.file_urls
+        ,bk.parent_proc_inst_id
+        ,bk.business_id
+        ,bk.creator
+        ,bk.create_time
+        ,bk.updater
+        ,bk.update_time
+        ,bk.deleted
+        ,bk.task_state
+        ,bk.business_key
+        ,bk.executor_user_id
+        ,bk.executor_dept_id
+        ,bk.executor_user_name
+        ,bk.executor_dept_name
+        ,bk.copy_flag
+        ,bk.icon_url
+        ,bk.oa_project_id
+        ,bk.create_time
+        FROM
+        business_task bk
+        where bk.deleted = b'0' and bk.parent_proc_inst_id is null
+        <if test="queryVO.proInstIdList != null and queryVO.proInstIdList.size() > 0">
+            AND bk.proc_inst_id IN
+            <foreach collection="queryVO.proInstIdList" item="procInstId" open="(" separator="," close=")">
+                #{procInstId}  <!-- 用 #{...} 防SQL注入，若集合是String类型无需额外处理 -->
+            </foreach>
+        </if>
+        <if test="queryVO.applicantId != null and queryVO.applicantId != '' ">
+            AND bk.applicant_id = #{queryVO.applicantId}
+        </if>
+        <if test="queryVO.taskContent != null and queryVO.taskContent != '' ">
+            AND (
+            bk.task_name like CONCAT('%', #{queryVO.taskContent}, '%') or
+            bk.task_desc like CONCAT('%', #{queryVO.taskContent}, '%')
+            )
+        </if>
+
+        <if test="queryVO.applicantIdList != null and queryVO.applicantIdList.size() > 0">
+            AND bk.applicant_id IN
+            <foreach collection="queryVO.applicantIdList" item="applicantId" open="(" separator="," close=")">
+                #{applicantId}  <!-- 用 #{...} 防SQL注入，若集合是String类型无需额外处理 -->
+            </foreach>
+        </if>
+        <if test="queryVO.priority != null and queryVO.priority != '' ">
+            AND bk.priority = #{queryVO.priority}
+        </if>
+        <if test="queryVO.applicantDeptIdList != null and queryVO.applicantDeptIdList.size() > 0">
+            AND bk.DEPT_ID IN
+            <foreach collection="queryVO.applicantDeptIdList" item="deptId" open="(" separator="," close=")">
+                #{deptId}
+            </foreach>
+        </if>
+        <if test="queryVO.applicantStoreId != null and queryVO.applicantStoreId != '' ">
+            AND bk.store_id = #{queryVO.applicantStoreId}
+        </if>
+        <if test="queryVO.processDefinitionId != null and queryVO.processDefinitionId != '' ">
+            AND bk.flow_id = #{queryVO.processDefinitionId}
+        </if>
+        <if test="queryVO.taskState != null and queryVO.taskState != ''">
+            <if test="queryVO.taskState == 5 ">
+                AND bk.task_state != 6
+                AND bk.task_state != 4
+                AND sysdate() > bk.completion_time
+            </if>
+            <if test="queryVO.taskState != 5 ">
+                AND bk.task_state = #{queryVO.taskState}
+            </if>
+        </if>
+        <if test="queryVO.taskType != null ">
+            AND bk.task_type = #{queryVO.taskType}
+        </if>
+        <if test="queryVO.copyFlag != null ">
+            AND bk.copy_flag = #{queryVO.copyFlag}
+        </if>
+        <if test="queryVO.oaProjectId != null and queryVO.oaProjectId != ''">
+            AND bk.oa_project_id = #{queryVO.oaProjectId}
+        </if>
+        <if test="queryVO.createTimeStart != null  and queryVO.createTimeEnd != null ">
+            AND bk.create_time <![CDATA[>=]]> #{queryVO.createTimeStart} and bk.create_time <![CDATA[<=]]> #{queryVO.createTimeEnd}
+        </if>
+        <if test="queryVO.taskCompletionTimeStart != null and queryVO.taskCompletionTimeEnd != null  ">
+            AND bk.completion_time <![CDATA[>=]]> #{queryVO.taskCompletionTimeStart} and bk.completion_time <![CDATA[<=]]> #{queryVO.taskCompletionTimeEnd}
+        </if>
+        <!--        <if test="queryVO.businessId != null and queryVO.businessId != ''">
+                    AND bk.business_Id = #{queryVO.businessId}
+                </if>-->
+        <!-- 动态排序：根据 sortField 和 sortOrder 拼接 ORDER BY -->
+        ORDER BY
+        <choose>
+            <!-- 1. 场景1：按 createTime 升序（sortField=createTime 且 sortOrder=asc） -->
+            <when test="queryVO.sortField != null and queryVO.sortField == 'createTime'
+                        and queryVO.sortOrder != null and queryVO.sortOrder.toLowerCase() == 'asc'">
+                bk.create_time ASC
+            </when>
+            <!-- 2. 场景2：按 createTime 降序（sortField=createTime 且 sortOrder=desc） -->
+            <when test="queryVO.sortField != null and queryVO.sortField == 'createTime'
+                        and queryVO.sortOrder != null and queryVO.sortOrder.toLowerCase() == 'desc'">
+                bk.create_time DESC
+            </when>
+            <!-- 3. 场景3：按 completionTime 升序（sortField=completionTime 且 sortOrder=asc） -->
+            <when test="queryVO.sortField != null and queryVO.sortField == 'completionTime'
+                        and queryVO.sortOrder != null and queryVO.sortOrder.toLowerCase() == 'asc'">
+                bk.completion_time ASC
+            </when>
+            <!-- 4. 场景4：按 completionTime 降序（sortField=completionTime 且 sortOrder=desc） -->
+            <when test="queryVO.sortField != null and queryVO.sortField == 'completionTime'
+                        and queryVO.sortOrder != null and queryVO.sortOrder.toLowerCase() == 'desc'">
+                bk.completion_time DESC
+            </when>
+            <!-- 默认场景：其他情况（字段/方向不匹配、参数为空），按 createTime 降序 -->
+            <otherwise>
+                bk.create_time DESC
+            </otherwise>
+        </choose>
+        <if test="page.pageSize != 0 ">
+            LIMIT #{page.pageSize} OFFSET ${(page.pageNo - 1) * page.pageSize}
+        </if>
+    </select>
+
+
+    <select id="selectMainTaskListTotal">
+        SELECT
+        COUNT(bk.task_id)
+        FROM
+        business_task bk
+        where bk.deleted = b'0' and bk.parent_proc_inst_id is null
+        <if test="queryVO.proInstIdList != null and queryVO.proInstIdList.size() > 0">
+            AND bk.proc_inst_id IN
+            <foreach collection="queryVO.proInstIdList" item="procInstId" open="(" separator="," close=")">
+                #{procInstId}  <!-- 用 #{...} 防SQL注入，若集合是String类型无需额外处理 -->
+            </foreach>
+        </if>
+        <if test="queryVO.applicantId != null and queryVO.applicantId != '' ">
+            AND bk.applicant_id = #{queryVO.applicantId}
+        </if>
+        <if test="queryVO.taskContent != null and queryVO.taskContent != '' ">
+            AND (
+            bk.task_name like CONCAT('%', #{queryVO.taskContent}, '%') or
+            bk.task_desc like CONCAT('%', #{queryVO.taskContent}, '%')
+            )
+        </if>
+
+        <if test="queryVO.applicantIdList != null and queryVO.applicantIdList.size() > 0">
+            AND bk.applicant_id IN
+            <foreach collection="queryVO.applicantIdList" item="applicantId" open="(" separator="," close=")">
+                #{applicantId}  <!-- 用 #{...} 防SQL注入，若集合是String类型无需额外处理 -->
+            </foreach>
+        </if>
+        <if test="queryVO.priority != null and queryVO.priority != '' ">
+            AND bk.priority = #{queryVO.priority}
+        </if>
+        <if test="queryVO.applicantDeptIdList != null and queryVO.applicantDeptIdList.size() > 0">
+            AND bk.DEPT_ID IN
+            <foreach collection="queryVO.applicantDeptIdList" item="deptId" open="(" separator="," close=")">
+                #{deptId}
+            </foreach>
+        </if>
+        <if test="queryVO.applicantStoreId != null and queryVO.applicantStoreId != '' ">
+            AND bk.store_id = #{queryVO.applicantStoreId}
+        </if>
+        <if test="queryVO.processDefinitionId != null and queryVO.processDefinitionId != '' ">
+            AND bk.flow_id = #{queryVO.processDefinitionId}
+        </if>
+        <if test="queryVO.taskState != null and queryVO.taskState != ''">
+            <if test="queryVO.taskState == 5 ">
+                AND bk.task_state != 6
+                AND bk.task_state != 4
+                AND sysdate() > bk.completion_time
+            </if>
+            <if test="queryVO.taskState != 5 ">
+                AND bk.task_state = #{queryVO.taskState}
+            </if>
+        </if>
+        <if test="queryVO.taskType != null ">
+            AND bk.task_type = #{queryVO.taskType}
+        </if>
+        <if test="queryVO.copyFlag != null ">
+            AND bk.copy_flag = #{queryVO.copyFlag}
+        </if>
+        <if test="queryVO.oaProjectId != null and queryVO.oaProjectId != ''">
+            AND bk.oa_project_id = #{queryVO.oaProjectId}
+        </if>
+        <if test="queryVO.createTimeStart != null  and queryVO.createTimeEnd != null ">
+            AND bk.create_time <![CDATA[>=]]> #{queryVO.createTimeStart} and bk.create_time <![CDATA[<=]]> #{queryVO.createTimeEnd}
+        </if>
+        <if test="queryVO.taskCompletionTimeStart != null and queryVO.taskCompletionTimeEnd != null  ">
+            AND bk.completion_time <![CDATA[>=]]> #{queryVO.taskCompletionTimeStart} and bk.completion_time <![CDATA[<=]]> #{queryVO.taskCompletionTimeEnd}
+        </if>
+    </select>
+
+
+    <select id="selectTaskListAll"
+            resultType="com.htyoudao.youdao.module.bpm.dal.dataobject.business.BpmBusinessQueryDO">
+        SELECT
+        distinct
+        bk.task_id
+        ,bk.dept_id
+        ,bk.dept_name
+        ,bk.store_id
+        ,bk.store_name
+        ,bk.applicant
+        ,bk.applicant_id
+        ,bk.applicant_name
+        ,bk.task_type
+        ,bk.handle_dept_id
+        ,bk.handle_dept_name
+        ,bk.flow_id
+        ,bk.flow_name
+        ,bk.task_name
+        ,bk.store_type
+        ,bk.priority
+        ,bk.completion_time
+        ,bk.task_completion_time
+        ,bk.task_desc
+        ,bk.proc_inst_id
+        ,bk.file_urls
+        ,bk.parent_proc_inst_id
+        ,bk.business_id
+        ,bk.creator
+        ,bk.create_time
+        ,bk.updater
+        ,bk.update_time
+        ,bk.deleted
+        ,bk.task_state
+        ,bk.business_key
+        ,bk.executor_user_id
+        ,bk.executor_dept_id
+        ,bk.executor_user_name
+        ,bk.executor_dept_name
+        ,bk.oa_project_id
+        ,bk.create_time
+        FROM
+        business_task bk
+        where parent_proc_inst_id is null
+        <if test="queryVO.proInstIdList != null and queryVO.proInstIdList.size() > 0">
+            AND bk.proc_inst_id IN
+            <foreach collection="queryVO.proInstIdList" item="procInstId" open="(" separator="," close=")">
+                #{procInstId}
+            </foreach>
+        </if>
+        <!--发起人 -->
+        <if test="queryVO.applicantId != null and queryVO.applicantId != '' ">
+            AND bk.applicant_id = #{queryVO.applicantId}
+        </if>
+
+        <if test="queryVO.applicantIdList != null and queryVO.applicantIdList.size() > 0">
+            AND bk.applicant_id IN
+            <foreach collection="queryVO.applicantIdList" item="applicantId" open="(" separator="," close=")">
+                #{applicantId}
+            </foreach>
+        </if>
+        <if test="queryVO.applicantDeptIdList != null and queryVO.applicantDeptIdList.size() > 0">
+            AND bk.DEPT_ID IN
+            <foreach collection="queryVO.applicantDeptIdList" item="deptId" open="(" separator="," close=")">
+                #{deptId}
+            </foreach>
+        </if>
+        <if test="queryVO.applicantStoreId != null and queryVO.applicantStoreId != '' ">
+            AND bk.store_id = #{queryVO.applicantStoreId}
+        </if>
+
+        <if test="queryVO.processDefinitionId != null and queryVO.processDefinitionId != '' ">
+            AND bk.flow_id = #{queryVO.processDefinitionId}
+        </if>
+
+        <if test="queryVO.executorUserId != null and queryVO.executorUserId.size() > 0">
+            AND bk.executor_user_id IN
+            <foreach collection="queryVO.executorUserId" item="executorUserId" open="(" separator="," close=")">
+                #{executorUserId}
+            </foreach>
+        </if>
+
+        <if test="queryVO.executorDeptId != null and queryVO.executorDeptId != '' ">
+            AND bk.executor_dept_Id = #{queryVO.executorDeptId}
+        </if>
+        <if test="queryVO.taskType != null and queryVO.taskType != '' ">
+            AND bk.task_type = #{queryVO.taskType}
+        </if>
+        <if test="queryVO.createTimeStart != null and queryVO.createTimeEnd != null">
+            AND bk.create_time <![CDATA[>=]]> #{queryVO.createTimeStart} and bk.create_time <![CDATA[<=]]> #{queryVO.createTimeEnd}
+        </if>
+
+
+    </select>
+
+    <select id="selectTaskListAllForNum"
+            resultType="com.htyoudao.youdao.module.bpm.dal.dataobject.business.BpmBusinessQueryDO">
+        SELECT
+        distinct
+        bk.task_id
+        ,bk.dept_id
+        ,bk.dept_name
+        ,bk.store_id
+        ,bk.store_name
+        ,bk.applicant
+        ,bk.applicant_id
+        ,bk.applicant_name
+        ,bk.task_type
+        ,bk.handle_dept_id
+        ,bk.handle_dept_name
+        ,bk.flow_id
+        ,bk.flow_name
+        ,bk.task_name
+        ,bk.store_type
+        ,bk.priority
+        ,bk.completion_time
+        ,bk.task_completion_time
+        ,bk.task_desc
+        ,bk.proc_inst_id
+        ,bk.file_urls
+        ,bk.parent_proc_inst_id
+        ,bk.business_id
+        ,bk.creator
+        ,bk.create_time
+        ,bk.updater
+        ,bk.update_time
+        ,bk.deleted
+        ,bk.task_state
+        ,bk.business_key
+        ,bk.executor_user_id
+        ,bk.executor_dept_id
+        ,bk.executor_user_name
+        ,bk.executor_dept_name
+        ,bk.oa_project_id
+        ,bk.create_time
+        FROM
+        business_task bk
+        where parent_proc_inst_id is null and task_state != 4
+        <if test="queryVO.proInstIdList != null and queryVO.proInstIdList.size() > 0">
+            AND bk.proc_inst_id IN
+            <foreach collection="queryVO.proInstIdList" item="procInstId" open="(" separator="," close=")">
+                #{procInstId}
+            </foreach>
+        </if>
+        <!--发起人 -->
+        <if test="queryVO.applicantId != null and queryVO.applicantId != '' ">
+            AND bk.applicant_id = #{queryVO.applicantId}
+        </if>
+        <!--发起人集合 -->
+<!--        <if test="queryVO.applicantIdList != null and queryVO.applicantIdList.size() > 0">-->
+<!--            AND bk.applicant_id IN-->
+<!--            <foreach collection="queryVO.applicantIdList" item="applicantId" open="(" separator="," close=")">-->
+<!--                #{applicantId}-->
+<!--            </foreach>-->
+<!--        </if>-->
+        <!--发起部门 -->
+        <if test="queryVO.applicantDeptIdList != null and queryVO.applicantDeptIdList.size() > 0">
+            AND bk.DEPT_ID IN
+            <foreach collection="queryVO.applicantDeptIdList" item="deptId" open="(" separator="," close=")">
+                #{deptId}
+            </foreach>
+        </if>
+        <!--发起门店 -->
+        <if test="queryVO.applicantStoreId != null and queryVO.applicantStoreId != '' ">
+            AND bk.store_id = #{queryVO.applicantStoreId}
+        </if>
+        <!--流程模板 -->
+        <if test="queryVO.processDefinitionId != null and queryVO.processDefinitionId != '' ">
+            AND bk.flow_id = #{queryVO.processDefinitionId}
+        </if>
+        <!--任务类型 -->
+        <if test="queryVO.taskType != null  ">
+            AND bk.task_type = #{queryVO.taskType}
+        </if>
+        <if test="queryVO.createTimeStart != null and queryVO.createTimeEnd != null">
+            AND bk.create_time <![CDATA[>=]]> #{queryVO.createTimeStart} and bk.create_time <![CDATA[<=]]> #{queryVO.createTimeEnd}
+        </if>
+
+
+    </select>
+    <select id="selectMainTaskList"
+            resultType="com.htyoudao.youdao.module.bpm.dal.dataobject.business.BpmBusinessQueryDO">
+        SELECT
+        distinct
+        bk.task_id
+        ,bk.dept_id
+        ,bk.dept_name
+        ,bk.store_id
+        ,bk.store_name
+        ,bk.applicant
+        ,bk.applicant_id
+        ,bk.applicant_name
+        ,bk.task_type
+        ,bk.handle_dept_id
+        ,bk.handle_dept_name
+        ,bk.flow_id
+        ,bk.flow_name
+        ,bk.task_name
+        ,bk.store_type
+        ,bk.priority
+        ,bk.completion_time
+        ,bk.task_completion_time
+        ,bk.task_desc
+        ,bk.proc_inst_id
+        ,bk.file_urls
+        ,bk.parent_proc_inst_id
+        ,bk.business_id
+        ,bk.creator
+        ,bk.create_time
+        ,bk.updater
+        ,bk.update_time
+        ,bk.deleted
+        ,bk.task_state
+        ,bk.business_key
+        ,bk.executor_user_id
+        ,bk.executor_dept_id
+        ,bk.executor_user_name
+        ,bk.executor_dept_name
+        ,bk.copy_flag
+        ,bk.icon_url
+        ,bk.oa_project_id
+        ,bk.create_time
+        FROM
+        business_task bk
+        where bk.deleted = b'0' and bk.parent_proc_inst_id is null
+          <!--查询不需要已撤销的-->
+        AND bk.task_state != 4
+        AND bk.oa_project_id = #{queryVO.oaProjectId}
+    </select>
+
+    <update id="updateBpmProcessInstanceCopyPageFlag" >
+        UPDATE
+        business_task bk
+        <set>
+            update_time = sysdate()
+            <if test="queryVO.copyFlag != null">
+                , bk.copy_flag = 1
+            </if>
+        </set>
+        where bk.deleted = b'0'
+        <if test="queryVO.proInstIdList != null and queryVO.proInstIdList.size() > 0">
+            AND bk.proc_inst_id IN
+            <foreach collection="queryVO.proInstIdList" item="procInstId" open="(" separator="," close=")">
+                #{procInstId}  <!-- 用 #{...} 防SQL注入，若集合是String类型无需额外处理 -->
+            </foreach>
+        </if>
+        <if test="queryVO.applicantId != null and queryVO.applicantId != '' ">
+            AND bk.applicant_id = #{queryVO.applicantId}
+        </if>
+        <if test="queryVO.taskContent != null and queryVO.taskContent != '' ">
+            AND (
+            bk.task_name like CONCAT('%', #{queryVO.taskContent}, '%') or
+            bk.task_desc like CONCAT('%', #{queryVO.taskContent}, '%')
+            )
+        </if>
+
+        <if test="queryVO.applicantIdList != null and queryVO.applicantIdList.size() > 0">
+            AND bk.applicant_id IN
+            <foreach collection="queryVO.applicantIdList" item="applicantId" open="(" separator="," close=")">
+                #{applicantId}  <!-- 用 #{...} 防SQL注入，若集合是String类型无需额外处理 -->
+            </foreach>
+        </if>
+        <if test="queryVO.priority != null and queryVO.priority != '' ">
+            AND bk.priority = #{queryVO.priority}
+        </if>
+        <if test="queryVO.applicantDeptId != null and queryVO.applicantDeptId != '' ">
+            AND bk.dept_id = #{queryVO.applicantDeptId}
+        </if>
+        <if test="queryVO.applicantStoreId != null and queryVO.applicantStoreId != '' ">
+            AND bk.store_id = #{queryVO.applicantStoreId}
+        </if>
+        <if test="queryVO.processDefinitionId != null and queryVO.processDefinitionId != '' ">
+            AND bk.flow_id = #{queryVO.processDefinitionId}
+        </if>
+        <if test="queryVO.taskState != null and queryVO.taskState != ''">
+            <if test="queryVO.taskState == 5 ">
+                AND bk.task_state != 6
+                AND bk.task_state != 4
+                AND sysdate() > bk.completion_time
+            </if>
+            <if test="queryVO.taskState != 5 ">
+                AND bk.task_state = #{queryVO.taskState}
+            </if>
+        </if>
+        <if test="queryVO.taskType != null ">
+            AND bk.task_type = #{queryVO.taskType}
+        </if>
+        <if test="queryVO.oaProjectId != null and queryVO.oaProjectId != ''">
+            AND bk.oa_project_id = #{queryVO.oaProjectId}
+        </if>
+        <if test="queryVO.createTimeStart != null  and queryVO.createTimeEnd != null ">
+            AND bk.create_time <![CDATA[>=]]> #{queryVO.createTimeStart} and bk.create_time <![CDATA[<=]]> #{queryVO.createTimeEnd}
+        </if>
+        <if test="queryVO.taskCompletionTimeStart != null and queryVO.taskCompletionTimeEnd != null  ">
+            AND bk.completion_time <![CDATA[>=]]> #{queryVO.taskCompletionTimeStart} and bk.completion_time <![CDATA[<=]]> #{queryVO.taskCompletionTimeEnd}
+        </if>
+    </update>
+
+</mapper>

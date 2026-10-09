@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.htyoudao.youdao.module.system.dal.mysql.printer.PrinterInterfaceMapper">
+
+    <resultMap type="PrinterInterface" id="PrinterInterfaceResult">
+        <result property="printerInterfaceId"    column="printer_interface_id"    />
+        <result property="printerBrandId"    column="printer_brand_id"    />
+        <result property="printerInterfaceAbility"    column="printer_interface_ability"    />
+        <result property="printerInterfaceMethod"    column="printer_interface_method"    />
+        <result property="printerInterfaceValue"    column="printer_interface_value"    />
+    </resultMap>
+
+    <sql id="selectPrinterInterfaceVo">
+        select printer_interface_id, printer_brand_id, printer_interface_ability, printer_interface_method, printer_interface_value from printer_interface
+    </sql>
+
+    <select id="selectPrinterInterfaceList" parameterType="PrinterInterface" resultMap="PrinterInterfaceResult">
+        <include refid="selectPrinterInterfaceVo"/>
+        <where>
+            <if test="printerInterface.printerBrandId != null "> and printer_brand_id = #{printerInterface.printerBrandId}</if>
+            <if test="printerInterface.printerInterfaceAbility != null "> and printer_interface_ability = #{printerInterface.printerInterfaceAbility}</if>
+            <if test="printerInterface.printerInterfaceMethod != null  and printerInterface.printerInterfaceMethod != ''"> and printer_interface_method = #{printerInterface.printerInterfaceMethod}</if>
+            <if test="printerInterface.printerInterfaceValue != null  and printerInterface.printerInterfaceValue != ''"> and printer_interface_value = #{printerInterface.printerInterfaceValue}</if>
+        </where>
+    </select>
+
+
+</mapper>

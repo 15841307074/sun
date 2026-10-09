@@ -1,0 +1,34 @@
+# Merge into promotion's existing Nacos YAML (do not replace unrelated configuration).
+promotion:
+  lottery:
+    accepting: true
+    # All new draws use V2; no activity allowlist. Reconcile history before resuming old activities.
+    draw-rate: 100
+    query-rate: 1000
+    result-rate: 300
+    task-rate: 200
+    activity-draw-rate: 60
+    member-draw-rate: 1
+    draw-concurrency: 8
+    grant-concurrency: 4
+    connection-budget: 16
+    config-ttl-seconds: 1800
+    list-ttl-seconds: 30
+    result-ttl-seconds: 86400
+    refill-concurrency: 4
+
+# Member service ShardingSphere fragment: merge under the existing tables / shardingAlgorithms.
+# db_master here is an example alias. It MUST be the SAME physical datasource as wx_member
+# and points_log; verify the environment's existing rules before publishing.
+# tables:
+#   member_lottery_points:
+#     actualDataNodes: db_master.member_lottery_points_${0..9}
+#     tableStrategy:
+#       standard:
+#         shardingColumn: sharding_value
+#         shardingAlgorithmName: member-lottery-points-inline
+# shardingAlgorithms:
+#   member-lottery-points-inline:
+#     type: INLINE
+#     props:
+#       algorithm-expression: member_lottery_points_${sharding_value % 10}

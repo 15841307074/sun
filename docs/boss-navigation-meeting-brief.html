@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>老板助手 2.0 · 登录与权限流转说明</title>
+  <style>
+    :root{--ink:#17242b;--muted:#627079;--line:#dce4e4;--paper:#fff;--bg:#f4f7f5;--teal:#087d78;--teal-soft:#dff2ed;--coral:#bf4d39;--coral-soft:#fff0eb;--amber:#8b6200;--amber-soft:#fff3cf;--blue:#315e8d;--blue-soft:#e8f0fa}
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 "Microsoft YaHei", "PingFang SC", system-ui,sans-serif;letter-spacing:0}button,select{font:inherit}a{color:var(--teal)}.wrap{max-width:1240px;margin:auto;padding:0 28px}.mast{background:#15363b;color:#fff;padding:40px 0 30px}.eyebrow{font-size:12px;font-weight:700;color:#8ce0d0}.mast h1{font-size:clamp(28px,4vw,43px);line-height:1.25;margin:8px 0 10px;letter-spacing:0}.mast p{max-width:830px;color:#d2e4e4;margin:0}.meta{display:flex;gap:10px;flex-wrap:wrap;margin-top:24px}.meta span{border:1px solid #51757a;border-radius:4px;padding:4px 10px;font-size:12px;color:#dff0ec}.sticky{position:sticky;top:0;z-index:20;background:#fff;border-bottom:1px solid var(--line);overflow:auto}.nav{display:flex;gap:20px;white-space:nowrap}.nav a{display:block;padding:13px 0;text-decoration:none;color:#40565d;font-size:13px;font-weight:700}.nav a:hover{color:var(--teal)}section{padding:48px 0;border-bottom:1px solid var(--line);scroll-margin-top:50px}.section-head{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:20px}.section-head h2{font-size:25px;line-height:1.3;margin:0}.section-head p{margin:0;color:var(--muted)}h3{font-size:18px;line-height:1.35;margin:0 0 12px}h4{font-size:15px;margin:0 0 6px}p{margin:8px 0}ul,ol{margin:8px 0;padding-left:22px}li{margin:4px 0}.small{font-size:13px}.muted{color:var(--muted)}.lead{font-size:18px;line-height:1.6;max-width:980px}.grid{display:grid;gap:16px}.g2{grid-template-columns:repeat(2,minmax(0,1fr))}.g3{grid-template-columns:repeat(3,minmax(0,1fr))}.tile{background:#fff;border:1px solid var(--line);border-radius:6px;padding:20px;min-width:0}.tile strong{display:block;font-size:24px;line-height:1.2}.tile p{margin-bottom:0}.kicker{font-size:12px;color:var(--muted);font-weight:700}.chip{display:inline-flex;align-items:center;padding:2px 8px;border-radius:3px;font-size:12px;font-weight:700;white-space:nowrap}.ok{background:var(--teal-soft);color:#08675f}.ask{background:var(--amber-soft);color:var(--amber)}.gap{background:var(--coral-soft);color:var(--coral)}.design{background:var(--blue-soft);color:var(--blue)}.callout{border-left:4px solid var(--teal);background:#e8f5f0;padding:15px 18px;margin:18px 0}.callout.warn{border-color:#c68e20;background:#fff7de}.callout.risk{border-color:var(--coral);background:#fff0eb}.flow{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;align-items:stretch}.step{background:#fff;border:1px solid var(--line);border-top:4px solid var(--teal);border-radius:4px;padding:15px;position:relative}.step .num{font-size:12px;font-weight:800;color:var(--teal)}.step h3{font-size:15px;margin:6px 0}.step p{font-size:13px;color:var(--muted);margin:0}.table-wrap{overflow:auto;background:#fff;border:1px solid var(--line);border-radius:6px}table{border-collapse:collapse;width:100%;min-width:720px}th,td{padding:12px 13px;border-bottom:1px solid var(--line);vertical-align:top;text-align:left}th{background:#edf3f1;color:#365158;font-size:13px;white-space:nowrap}tr:last-child td{border-bottom:0}td{font-size:13px}code{font-family:Consolas,"Courier New",monospace;background:#eef2f2;padding:1px 4px;border-radius:3px;overflow-wrap:anywhere}.sim{background:#fff;border:1px solid var(--line);border-radius:6px;display:grid;grid-template-columns:minmax(220px,330px) 1fr;overflow:hidden}.sim-controls{padding:22px;border-right:1px solid var(--line);background:#f7faf8}.field{display:block;margin:15px 0}.field span{display:block;font-size:13px;font-weight:700;margin-bottom:6px}.field select{width:100%;padding:10px;border:1px solid #bbcaca;background:#fff;border-radius:4px;color:var(--ink)}.sim-result{padding:24px;min-width:0}.sim-result h3{font-size:22px}.path{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin:15px 0}.path span{padding:7px 10px;border:1px solid #a9cac4;border-radius:3px;background:#f0faf6;font-weight:700;font-size:13px}.path b{color:var(--muted)}.sim-note{color:var(--muted);font-size:13px}.persona{border-left:4px solid var(--teal)}.persona.riskline{border-color:var(--coral)}.persona h3{margin-bottom:8px}.persona .route{font-weight:700;color:#176e69}.rules{display:grid;grid-template-columns:190px 1fr;gap:12px 22px}.rule-key{font-weight:700;border-top:1px solid var(--line);padding-top:10px}.rule-value{border-top:1px solid var(--line);padding-top:10px}.q{padding:17px 0;border-bottom:1px solid var(--line)}.q summary{cursor:pointer;font-weight:700;list-style:none;display:flex;justify-content:space-between;gap:12px}.q summary::after{content:"+";font-size:20px;line-height:1;color:var(--teal)}.q[open] summary::after{content:"−"}.q p{margin:9px 25px 0 0;color:#4f5c63}.source a{overflow-wrap:anywhere}.footer{background:#15363b;color:#d3e5e3;padding:28px 0;font-size:13px}.footer strong{color:#fff}.screenflow{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}.screen{background:#fff;border:1px solid var(--line);border-radius:6px;min-height:190px;padding:18px}.screen .bar{height:9px;width:64px;background:#aec8c3;border-radius:8px;margin-bottom:20px}.screen .screen-title{font-weight:800;margin-bottom:13px}.screen .row{border-bottom:1px solid var(--line);padding:7px 0;font-size:13px}.screen .button{background:var(--teal);color:#fff;text-align:center;border-radius:4px;padding:7px;margin-top:16px;font-weight:700;font-size:13px}.banner{display:flex;gap:12px;align-items:flex-start}.banner strong{font-size:22px;line-height:1}.banner p{margin:0}@media(max-width:900px){.flow{grid-template-columns:repeat(2,minmax(0,1fr))}.g3,.screenflow{grid-template-columns:1fr 1fr}}@media(max-width:640px){.wrap{padding:0 16px}.mast{padding:30px 0}.g2,.g3,.screenflow,.sim{grid-template-columns:1fr}.sim-controls{border-right:0;border-bottom:1px solid var(--line)}.flow{grid-template-columns:1fr}.rules{grid-template-columns:1fr;gap:0}.rule-value{border-top:0;padding-top:0;padding-bottom:12px}section{padding:34px 0}.section-head h2{font-size:22px}}@media print{.sticky,.sim-controls{display:none}.mast{background:#fff;color:#000;padding:10px 0}.mast p,.eyebrow{color:#333}body{background:#fff;color:#000}.tile,.screen,.table-wrap{break-inside:avoid}section{padding:18px 0}.sim{display:block}.sim-result{padding:8px 0}.footer{background:#fff;color:#333}details{display:block}details>*{display:block}}
+  </style>
+</head>
+<body>
+  <header class="mast"><div class="wrap">
+    <div class="eyebrow">老板助手 2.0 · 登录与权限方案</div>
+    <h1>谁登录，能看什么，点进去去哪？</h1>
+    <p>从账号登录到项目、功能和门店选择，梳理不同权限下的页面路径，并对照当前接口实现明确待定规则。</p>
+    <div class="meta"><span>范围：登录后工作台 / 项目 / 门店 / 我的</span><span>依据：getNavigationByRole + storeListByBoss + 项目列表接口</span><span>版本：2026-09-28 代码审阅</span></div>
+  </div></header>
+  <nav class="sticky"><div class="wrap nav"><a href="#summary">核心规则</a><a href="#flow">登录流程</a><a href="#simulator">场景推演</a><a href="#people">用户类型</a><a href="#api">接口依据</a><a href="#gaps">实现差异</a><a href="#qa">常见问题</a><a href="#meeting">待确认事项</a></div></nav>
+  <main>
+    <section id="summary"><div class="wrap">
+      <div class="section-head"><h2>登录后的四层判断</h2><p>项目决定范围，角色决定入口，功能决定是否选择门店。</p></div>
+      <div class="grid g2">
+        <article class="tile"><div class="kicker">01 · 项目</div><strong>先确定当前项目</strong><p>登录用户可用项目来自 <code>getBusinessListByUser</code>。单项目可直进；多项目先选项目。后续导航权限按当前 <code>business-id</code> 查。</p></article>
+        <article class="tile"><div class="kicker">02 · 功能</div><strong>入口由菜单决定</strong><p><code>getNavigationByRole</code> 将当前项目角色的启用菜单映射为进货、OA、数据、管理、订单 5 个布尔值。一个入口可直进，多个显示工作台。</p></article>
+        <article class="tile"><div class="kicker">03 · 门店</div><strong>选择发生在点功能时</strong><p>门店相关功能先从 <code>storeListByBoss</code> 拿可访问门店；若该功能需要门店，1 家直进，多家弹门店选择。项目选择和门店选择是两件事。</p></article>
+        <article class="tile"><div class="kicker">04 · 例外</div><strong>“有门店”不等于“有权限”</strong><p>菜单入口与门店数据来自不同逻辑。必须同时校验功能权限、项目上下文和目标门店；空门店、角色失效、状态变化都要单独处理。</p></article>
+      </div>
+      <div class="callout warn"><strong>需求与实现边界：</strong>“1 个入口自动跳转、按功能决定是否选门店”来自需求图；当前两个接口提供权限和门店数据，客户端跳转行为需要另行落实。</div>
+    </div></section>
+
+    <section id="flow"><div class="wrap">
+      <div class="section-head"><h2>从登录到功能页</h2><p>按项目、权限和门店依次收窄可进入的范围。</p></div>
+      <div class="flow">
+        <div class="step"><div class="num">STEP 01</div><h3>账号登录</h3><p>先验证 token，再读当前账号的可用项目。无可用项目要给出明确提示。</p></div>
+        <div class="step"><div class="num">STEP 02</div><h3>确定项目</h3><p>1 个项目：直接设为当前项目。多个项目：展示“选择项目”，选后带上 <code>business-id</code>。</p></div>
+        <div class="step"><div class="num">STEP 03</div><h3>算入口</h3><p>按当前项目的有效角色与有效菜单调用 <code>getNavigationByRole</code>。先处理接口错误，再数可用入口。</p></div>
+        <div class="step"><div class="num">STEP 04</div><h3>展示工作台</h3><p>1 个入口：按需求直达；多个入口：工作台展示 icon；0 个入口：提示无可用功能。</p></div>
+        <div class="step"><div class="num">STEP 05</div><h3>点击功能</h3><p>需要门店的功能才读门店列表。1 家直达；多家选择；0 家给出无可用门店提示。</p></div>
+      </div>
+      <div class="screenflow" style="margin-top:18px">
+        <div class="screen"><div class="bar"></div><div class="screen-title">① 工作台</div><div class="row">进货　OA　商品管理　数据中心</div><div class="row">门店设置　外卖设置　会员管理</div><div class="row">订单　我的</div><p class="small muted">只展示已授权入口；图中未覆盖的入口需补充权限来源。</p></div>
+        <div class="screen"><div class="bar"></div><div class="screen-title">② 选择项目</div><div class="row">0090 汉堡工厂　›</div><div class="row">220° 鲜切牛肉堡　›</div><div class="row">0090 供应链系统　›</div><p class="small muted">仅多项目出现。切换项目后必须重新计算权限。</p></div>
+        <div class="screen"><div class="bar"></div><div class="screen-title">③ 选择门店</div><div class="row">堂食 / 外卖　门店 A　营业中</div><div class="row">堂食　门店 B　歇业</div><div class="row">堂食　门店 C　歇业</div><div class="button">选择项目 / 返回</div><p class="small muted">仅需门店且候选门店超过 1 家时出现；状态是否可选需确认。</p></div>
+      </div>
+    </div></section>
+
+    <section id="simulator"><div class="wrap">
+      <div class="section-head"><h2>场景推演</h2><p>选择账号条件，查看对应的登录路径。</p></div>
+      <div class="sim">
+        <div class="sim-controls">
+          <label class="field"><span>账号可用项目</span><select id="projects"><option value="one">1 个项目</option><option value="many">多个项目</option><option value="zero">0 个项目</option></select></label>
+          <label class="field"><span>所选项目内可用入口</span><select id="entries"><option value="many">多个入口</option><option value="one">1 个入口</option><option value="zero">0 个入口</option></select></label>
+          <label class="field"><span>点击的功能是否需要门店</span><select id="needsStore"><option value="yes">需要</option><option value="no">不需要</option></select></label>
+          <label class="field"><span>该功能可用门店</span><select id="stores"><option value="one">1 家</option><option value="many">多家</option><option value="zero">0 家</option></select></label>
+          <p class="sim-note">此推演按需求目标流程演示，实际门店集合必须与当前项目及功能交叉校验；单靠两个接口不能完全推出。</p>
+        </div>
+        <div class="sim-result"><span class="chip design">路径示例</span><h3 id="simTitle">单项目、多入口、单门店</h3><div class="path" id="simPath"></div><p id="simText"></p><div class="callout warn" id="simCaveat"></div></div>
+      </div>
+    </div></section>
+
+    <section id="people"><div class="wrap">
+      <div class="section-head"><h2>不同身份登录清单</h2><p>这里的“身份”指项目角色、菜单和门店关系的组合，不把角色名称当作唯一判断。</p></div>
+      <div class="grid g3">
+        <article class="tile persona"><span class="chip ok">常规</span><h3>单项目 · 单入口 · 单门店</h3><p class="route">登录 → 功能页</p><p>若该入口需要门店，只有 1 家候选门店时可静默带入；页面仍应展示当前项目和门店。</p></article>
+        <article class="tile persona"><span class="chip ok">常规</span><h3>单项目 · 多入口 · 多门店</h3><p class="route">登录 → 工作台 → 选功能 → 选门店</p><p>门店选择在点击具体功能后出现，不应让用户一登录就先做与功能无关的门店选择。</p></article>
+        <article class="tile persona"><span class="chip ok">常规</span><h3>多项目 · 单门店</h3><p class="route">登录 → 选项目 → 工作台/功能页</p><p>需求图写明：多项目先选项目；若该功能只有 1 家门店，无须再弹门店选择。</p></article>
+        <article class="tile persona"><span class="chip ok">常规</span><h3>多项目 · 多门店</h3><p class="route">登录 → 选项目 → 选功能 → 选门店</p><p>项目变更后旧门店选择必须失效，重新拉菜单和门店数据。</p></article>
+        <article class="tile persona"><span class="chip design">权限</span><h3>仅 OA / 仅进货</h3><p class="route">登录 → 唯一入口直达</p><p>两项在当前导航接口即使普通门店数为 0 也可能为 true；进入后的业务可用性由下游接口决定。</p></article>
+        <article class="tile persona"><span class="chip design">权限</span><h3>仅订单</h3><p class="route">登录 → 订单入口</p><p><code>isOrder</code> 有返回，但需求图对订单是否需要门店标了“？”；本页暂不替产品定论。</p></article>
+        <article class="tile persona riskline"><span class="chip gap">异常</span><h3>无项目 / 全部项目停用或过期</h3><p class="route">登录 → 错误提示</p><p>项目列表接口分别抛业务异常；不能把这种情况当作空白工作台。</p></article>
+        <article class="tile persona riskline"><span class="chip gap">异常</span><h3>所选项目无角色 / 菜单</h3><p class="route">选项目 → 权限提示</p><p>导航接口无角色会报“未绑定角色”；其他空菜单与根菜单边界要实测，见下方风险。</p></article>
+        <article class="tile persona riskline"><span class="chip gap">异常</span><h3>有菜单但无可用门店</h3><p class="route">工作台可出现部分入口 → 点击后提示</p><p>数据、管理会被导航接口关闭；进货、OA、订单仍可能打开。需要逐功能定义空门店态。</p></article>
+      </div>
+    </div></section>
+
+    <section id="api"><div class="wrap">
+      <div class="section-head"><h2>接口返回与判断依据</h2><p>以下规则以当前后端代码为准。</p></div>
+      <h3>接口 A · <code>GET /app-api/system/user/boss/getNavigationByRole</code></h3>
+      <p class="small muted">Controller 路径为 <code>/system/user/boss/getNavigationByRole</code>；经 app 网关时为上方路径。无业务请求体；依赖登录用户和当前 <code>business-id</code>。</p>
+      <div class="table-wrap"><table><thead><tr><th>字段</th><th>何时为 true</th><th>说明 / 限制</th></tr></thead><tbody>
+        <tr><td><code>isPurchase</code></td><td>有效菜单含进货菜单 ID</td><td>普通门店数为 0 时也可能为 true</td></tr>
+        <tr><td><code>isOA</code></td><td>有效菜单含 OA 菜单 ID</td><td>普通门店数为 0 时也可能为 true</td></tr>
+        <tr><td><code>isData</code></td><td>有效菜单含数据中心菜单 ID，且普通门店数 &gt; 0</td><td>普通门店数为 0 时强制 false</td></tr>
+        <tr><td><code>isManagement</code></td><td>有效菜单含管理菜单 ID，且普通门店数 &gt; 0</td><td>是合并的“管理”入口，未拆商品/门店/外卖/会员</td></tr>
+        <tr><td><code>isOrder</code></td><td>有效菜单含订单菜单 ID</td><td>普通门店数为 0 时也可能为 true；门店选择规则未定义</td></tr>
+        <tr><td><code>isManyStore</code></td><td>另行统计的普通门店数 &gt; 1</td><td>0 家和 1 家都为 false；不能用 false 推断“恰好 1 家”</td></tr>
+        <tr><td><code>isMyPermissions</code></td><td>当前实现没有设置 true</td><td>默认 false；不支持直接决定“我的”页是 2 栏还是 4 栏</td></tr>
+      </tbody></table></div>
+      <div class="callout"><strong>计算口径：</strong>角色按当前项目获取，禁用角色被移除，菜单也过滤禁用项。<code>isManyStore</code> 的计数来自组织及子组织门店 + 当前项目下直接关联门店，要求门店未删除且 <code>storeStatus=0</code>；供应链门店查询结果在此方法中未参与计数。</div>
+      <h3 style="margin-top:28px">功能入口与门店选择规则</h3>
+      <div class="table-wrap"><table><thead><tr><th>功能入口</th><th>当前权限依据</th><th>是否需要选择门店</th><th>待明确规则</th></tr></thead><tbody>
+        <tr><td>进货</td><td><code>isPurchase</code></td><td>需要</td><td>0 门店但有菜单时如何提示</td></tr>
+        <tr><td>OA</td><td><code>isOA</code></td><td>不需要</td><td>无需门店时的数据范围</td></tr>
+        <tr><td>商品管理</td><td>无独立返回；不能仅用 <code>isManagement</code> 精准判断</td><td>需要</td><td>补独立菜单映射</td></tr>
+        <tr><td>数据中心</td><td><code>isData</code></td><td>不需要</td><td>多门店汇总还是默认范围</td></tr>
+        <tr><td>门店设置</td><td>无独立返回；<code>isManagement</code> 仅为合并权限</td><td>需要</td><td>补独立菜单映射</td></tr>
+        <tr><td>外卖设置</td><td>无独立返回；<code>isManagement</code> 仅为合并权限</td><td>需要</td><td>补独立菜单映射</td></tr>
+        <tr><td>会员管理</td><td>无独立返回；<code>isManagement</code> 仅为合并权限</td><td>需要</td><td>补独立菜单映射</td></tr>
+        <tr><td>投诉管理</td><td>无独立返回</td><td>不需要</td><td>投诉列表按哪些项目/门店授权</td></tr>
+        <tr><td>供应链系统</td><td>无独立返回</td><td>不需要</td><td>是否以项目 11 和供应链角色判断</td></tr>
+        <tr><td>0090 系统</td><td>无独立返回</td><td>不需要</td><td>是否以项目或跳转链接判断</td></tr>
+        <tr><td>订单</td><td><code>isOrder</code></td><td>需求图未定（“？”）</td><td>列表与处理页是否分开定规则</td></tr>
+      </tbody></table></div>
+      <h3 style="margin-top:28px">接口 B · <code>GET /app-api/system/store/storeListByBoss</code></h3>
+      <p class="small muted">Controller 路径为 <code>/system/store/storeListByBoss</code>。返回门店数组，流程判断常用字段为 <code>storeId</code>、<code>storeName</code>、<code>orgId</code>、<code>visible</code>、<code>storeStatus</code>、<code>openStatus</code>、<code>useStatus</code>、<code>projectId</code>、<code>projectName</code>；VO 还有地址、外卖与供应链等字段。</p>
+      <div class="rules">
+        <div class="rule-key">普通门店</div><div class="rule-value">组织及子组织范围，或用户直接关联且 <code>visible=1</code> 的门店；查询含 <code>storeSource=0</code>、未删除、<code>storeStatus=0</code>。直接关联分支与基础筛选的 SQL 优先级需联调核实。</div>
+        <div class="rule-key">供应链门店</div><div class="rule-value">按门店 <code>userId=当前用户</code>，且 <code>businessId=11 / 当前项目 / null</code>；要求未删除、<code>storeStatus=0</code>。当前查询没有额外按 <code>useStatus=1</code> 过滤。</div>
+        <div class="rule-key">去重与可见</div><div class="rule-value">以 <code>storeId</code> 去重，普通门店优先。<code>visible</code> 先取用户-门店直接关系；否则取最近关联祖先组织的可见值；没有则记 0。<strong>列表可能包含 visible=0 的项</strong>，前端不能把“返回了”理解成“可选择”。</div>
+        <div class="rule-key">顺序与状态</div><div class="rule-value">没有明确排序保证。需求图中的“营业中/歇业”“堂食/外卖”展示与禁选规则，需要根据字段和产品规则另定；<code>storeStatus=0</code>、<code>openStatus</code>、<code>useStatus</code> 不是同一概念。</div>
+      </div>
+      <h3 style="margin-top:28px">支撑接口 · <code>GET /app-api/system/business/dc/getBusinessListByUser</code></h3>
+      <p>该接口负责“有哪些项目可以选”，会排除停用和过期项目，并返回每个项目的 <code>roleNames</code>。多项目时，个别项目即使没有角色也可能留在列表里；选中后才由导航接口报无角色。项目上下文由请求头 <code>business-id</code> 传入，切换项目时要刷新下游数据。</p>
+    </div></section>
+
+    <section id="gaps"><div class="wrap">
+      <div class="section-head"><h2>需求与当前实现的差异</h2><p>标红项仍缺少明确的接口字段或处理规则。</p></div>
+      <div class="table-wrap"><table><thead><tr><th>需求目标</th><th>当前接口实现</th><th>待落实事项</th></tr></thead><tbody>
+        <tr><td>工作台有 11 个 icon</td><td>导航仅有进货、OA、数据、管理、订单 5 个功能布尔值</td><td><span class="chip gap">缺映射</span> 商品/门店/外卖/会员/投诉/供应链/0090 需补菜单或另给接口</td></tr>
+        <tr><td>仅一个按钮权限就直接跳页面</td><td>后端只返回布尔值，不做页面导航</td><td><span class="chip design">前端编排</span> 明确“按钮”是一级 icon 还是子菜单</td></tr>
+        <tr><td>按单/多项目、单/多门店决定弹窗</td><td>导航的 <code>isManyStore</code> 只统计普通门店；列表可能含供应链或 invisible 项</td><td><span class="chip gap">计数分歧</span> 最终选门店数量应以当前功能过滤后的候选集为准</td></tr>
+        <tr><td>进货、商品、门店、外卖、会员需选门店；OA、数据、投诉、供应链、0090 不需要</td><td>接口没有“某功能是否需要门店”字段</td><td><span class="chip design">规则表</span> 前端配置或后端返回一张明确映射；订单待定</td></tr>
+        <tr><td>“我的”页与老板助手不同，显示账号、项目、权限等</td><td><code>isMyPermissions</code> 一直默认 false，导航接口不返回上述资料</td><td><span class="chip gap">新设计</span> 单独定义我的页数据源与字段</td></tr>
+        <tr><td>无项目权限时禁止登录</td><td>项目列表接口会报无项目；导航无角色也报错</td><td><span class="chip ask">文案确认</span> 登录失败、选项目失败、0 入口分别给出准确提示</td></tr>
+      </tbody></table></div>
+      <div class="callout risk"><strong>代码级边界：</strong>导航接口的“老板助手根菜单”校验只在菜单 ID 列表和父菜单 ID 列表都非空时执行；空菜单场景可能返回全 false。门店列表普通门店查询使用 <code>OR</code> 拼接，需用真实 SQL 确认直接关联分支是否受到门店状态等基础条件约束。</div>
+    </div></section>
+
+    <section id="qa"><div class="wrap">
+      <div class="section-head"><h2>常见问题</h2><p>点击问题查看页面行为和接口依据。</p></div>
+      <details class="q"><summary>Q1：同一账号有三个项目，是登录后先展示工作台，还是先选项目？</summary><p>按需求图先选项目。项目选择由 <code>getBusinessListByUser</code> 支撑；选中后带当前 <code>business-id</code> 再请求导航权限。不能拿 A 项目的菜单用于 B 项目。</p></details>
+      <details class="q"><summary>Q2：单项目、单门店是否一定一路直达？</summary><p>不是。“单入口”才决定是否跳过工作台；“单门店”只决定需门店功能是否跳过门店弹窗。若有多个功能入口，仍应先显示工作台。</p></details>
+      <details class="q"><summary>Q3：为什么有权限看到 icon，点进去却提示无门店？</summary><p>菜单权限和门店数据独立。尤其进货、OA、订单不被当前导航接口的 0 门店逻辑关闭。产品需确定空门店文案与是否禁用入口。</p></details>
+      <details class="q"><summary>Q4：<code>isManyStore=false</code> 就代表只有一家店吗？</summary><p>不代表。代码在 0 家和 1 家时都返回 false；供应链门店也不参与该计数。决定是否弹门店选择前，要查看实际候选列表。</p></details>
+      <details class="q"><summary>Q5：门店列表有三家，为什么只显示两家可以选？</summary><p>列表返回不等于可选。<code>visible=0</code> 可能仍出现在响应中；还需按当前项目、功能、使用/营业状态做过滤，具体过滤规则待确认。</p></details>
+      <details class="q"><summary>Q6：一个项目没有角色，能不能出现在“选择项目”里？</summary><p>当前项目列表接口在多项目时可能返回 <code>roleNames=[]</code> 的项目；选中后导航接口会抛“未绑定角色，请联系运营经理”。建议前端将其禁选并说明原因，或由后端在列表阶段过滤。</p></details>
+      <details class="q"><summary>Q7：切换项目后，原来选的门店和当前页面还能保留吗？</summary><p>不建议保留。项目切换要清空已选门店和功能上下文，重新拉项目角色菜单与候选门店，避免跨项目串数据。</p></details>
+      <details class="q"><summary>Q8：商品管理、门店设置、外卖设置、会员管理能直接根据 <code>isManagement</code> 展示吗？</summary><p>不能精确拆分。<code>isManagement</code> 是一个合并布尔值；四个子功能是否分别授权，需要明确菜单 ID 或新增粒度更细的导航返回。</p></details>
+      <details class="q"><summary>Q9：订单到底要不要选门店？</summary><p>需求图明确留了问号。需分别确认“订单列表是否跨门店聚合”和“订单详情/处理是否必须限定门店”；未确认前不把订单写进固定的需门店或免门店组。</p></details>
+      <details class="q"><summary>Q10：“我的”页要显示哪些资料？</summary><p>需求图要求与旧老板助手不同，建议至少展示当前账号、当前项目、可切换项目、角色/权限摘要与当前门店；哪些字段涉及隐私与展示名称，需产品确认。当前两个接口不足以完整生成这一页。</p></details>
+      <details class="q"><summary>Q11：歇业、闭店、停用门店是否还能选择？</summary><p>当前接口筛选 <code>storeStatus=0</code>，但还有 <code>openStatus</code>、<code>useStatus</code> 等不同状态。需求图展示了“歇业”，没有说明能否点击；需分别定义“展示”“可进入”“可操作”。</p></details>
+      <details class="q"><summary>Q12：权限或门店关系在使用中变更怎么办？</summary><p>切回工作台、切项目、进入功能时重新校验；接口报无角色/无门店时清理失效选择并展示提示。后端每个业务接口仍需独立鉴权，不能只靠首页隐藏 icon。</p></details>
+    </div></section>
+
+    <section id="meeting"><div class="wrap">
+      <div class="section-head"><h2>待确认的产品与技术规则</h2><p>这些问题会直接影响页面展示和跳转路径。</p></div>
+      <div class="grid g2">
+        <div class="tile"><h3>1. 入口清单与权限来源</h3><p>11 个 icon 哪些是一级入口？管理下四个子入口是否独立授权？投诉、供应链、0090 分别由哪个菜单 ID / 项目规则控制？</p></div>
+        <div class="tile"><h3>2. 门店选择矩阵</h3><p>订单是否选门店？数据中心“不选门店”时如何限定统计范围？多门店但仅 1 家 <code>visible=1</code> 时是否直接进入？</p></div>
+        <div class="tile"><h3>3. 异常与状态</h3><p>0 项目、0 角色、0 入口、0 可选门店、歇业/停用门店分别显示什么文案？歇业门店是否允许查看、是否允许操作？</p></div>
+        <div class="tile"><h3>4. 我的页与切换</h3><p>我的页展示字段、项目切换入口、门店切换入口放哪里？单入口直达后是否仍保留返回工作台的通路？</p></div>
+      </div>
+      <div class="callout"><div class="banner"><strong>✓</strong><p><strong>规则记录方式：</strong>逐项明确“触发条件 → 页面/弹窗 → 默认选择 → 异常提示 → 接口与前端职责”，并选取实际账号验证结果。</p></div></div>
+      <h3 style="margin-top:30px">代码出处</h3>
+      <div class="source small muted">
+        <p>导航：<a href="../youdao-module-system/youdao-module-system-biz/src/main/java/com/htyoudao/youdao/module/system/service/user/AdminUserServiceImpl.java">AdminUserServiceImpl.java · getNavigationByRole</a>；返回字段：<a href="../youdao-module-system/youdao-module-system-biz/src/main/java/com/htyoudao/youdao/module/system/controller/app/user/vo/SystemUserNavigationVO.java">SystemUserNavigationVO.java</a>。</p>
+        <p>门店：<a href="../youdao-module-system/youdao-module-system-biz/src/main/java/com/htyoudao/youdao/module/system/service/store/SystemStoreInfoServiceImpl.java">SystemStoreInfoServiceImpl.java · storeListByBoss</a>；查询：<a href="../youdao-module-system/youdao-module-system-biz/src/main/java/com/htyoudao/youdao/module/system/dal/mysql/store/SystemStoreInfoMapper.java">SystemStoreInfoMapper.java</a>。</p>
+        <p>项目：<a href="../youdao-module-system/youdao-module-system-biz/src/main/java/com/htyoudao/youdao/module/system/service/business/BusinessServiceImpl.java">BusinessServiceImpl.java · getUserByBossList</a>。需求依据：老板助手 2.0 页面与选择流程图。</p>
+      </div>
+    </div></section>
+  </main>
+  <footer class="footer"><div class="wrap"><strong>资料依据：</strong>“当前实现”以本地代码为准；“需求目标”以老板助手 2.0 需求图为准。</div></footer>
+  <script>
+    const selects=['projects','entries','needsStore','stores'].map(id=>document.getElementById(id));
+    function render(){
+      const [p,e,n,s]=selects.map(el=>el.value);
+      const title=document.getElementById('simTitle'),path=document.getElementById('simPath'),desc=document.getElementById('simText'),caveat=document.getElementById('simCaveat');
+      const steps=['登录'];let text='',note='这是一条需求目标路径，实际跳转由前端实现；后端只提供权限和门店数据。';
+      if(p==='zero'){steps.push('无可用项目提示');text='项目列表接口在无关联项目、项目全部停用或全部过期时给出业务错误。用户不应看到空白工作台。';note='无项目属于登录/项目资格问题，需要明确最终文案。';}
+      else{
+        if(p==='many')steps.push('选择项目');
+        if(e==='zero'){steps.push('无可用入口提示');text='当前项目没有可展示的功能入口。需要区分“无角色报错”和“有角色但无对应功能”两种情况。';note='当前导航接口的空菜单边界需要联调确认。';}
+        else{
+          if(e==='many')steps.push('工作台');else steps.push('唯一功能直达');
+          if(e==='many')steps.push('点击功能');
+          if(n==='no'){steps.push('功能页');text='该功能免选门店，直接进入。页面数据范围仍应由业务接口控制。';}
+          else if(s==='zero'){steps.push('无可用门店提示');text='该功能需要门店，但过滤后没有可选项。保留返回上一级入口，提示联系管理员配置门店。';note='不能只看 isManyStore；它无法区分 0 家与 1 家。';}
+          else if(s==='many'){steps.push('选择门店','功能页');text='只在点击需门店功能后弹出门店列表；选择成功后带入门店上下文。';note='候选门店要综合 visible、当前项目、功能和门店状态过滤。';}
+          else{steps.push('自动带入唯一门店','功能页');text='候选门店恰好 1 家时不弹选择框，直接进入，并让用户看见当前门店名称。';note='以功能可用候选列表数量为准，不单凭 isManyStore=false。';}
+        }
+      }
+      title.textContent=selects[0].selectedOptions[0].textContent+' · '+selects[1].selectedOptions[0].textContent+' · '+selects[3].selectedOptions[0].textContent;
+      path.replaceChildren();steps.forEach((step,i)=>{if(i){const b=document.createElement('b');b.textContent='→';path.appendChild(b)}const span=document.createElement('span');span.textContent=step;path.appendChild(span)});desc.textContent=text;caveat.textContent=note;
+    }
+    selects.forEach(el=>el.addEventListener('change',render));render();
+  </script>
+</body>
+</html>

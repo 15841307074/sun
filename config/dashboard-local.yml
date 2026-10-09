@@ -1,0 +1,12 @@
+auth:
+  password: ${CLOUD_DASHBOARD_LOCAL_PASSWORD_L2:}
+  username: sentinel123
+logging:
+  file:
+    name: ${user.home}/logs/csp/sentinel-dashboard.log
+  level:
+    org:
+      springframework:
+        web: INFO
+server:
+  port: 8080

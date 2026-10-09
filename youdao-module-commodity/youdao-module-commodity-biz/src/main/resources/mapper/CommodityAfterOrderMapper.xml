@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.htyoudao.youdao.module.commodity.dal.mysql.afterorder.AfterOrderMapper">
+
+    <select id="selectAfterListForRpc" resultType="com.htyoudao.youdao.module.commodity.api.DTO.AfterInfoDTO">
+        SELECT
+            af.after_id AS afterId,
+            af.commodity_id AS commodityId,
+            af.commodity_name AS skuName,
+            af.thumbnail_url AS imageUrl,
+            af.after_price AS afterPrice,
+            ssku.sku_id AS originalSkuId,
+            ssku.commodity_store_sku_id AS skuId,
+            ssku.commodity_store_sku_price AS skuPrice,
+            ssku.commodity_store_sku_strike_price AS strikePrice,
+            sspu.many_copy AS manyCopy,
+            sspu.package_fee AS packageFee,
+            sspu.commodity_store_spu_id AS spuId
+        FROM
+            commodity_after_order af
+        LEFT JOIN commodity_spus spu ON spu.commodity_id = af.commodity_id
+        AND spu.deleted = 0
+        LEFT JOIN commodity_store_spu sspu ON sspu.commodity_id = spu.commodity_id
+        AND sspu.deleted = 0 AND sspu.store_id = #{storeId}
+        LEFT JOIN commodity_store_sku ssku ON ssku.commodity_id = af.commodity_id
+        AND ssku.store_id = #{storeId}
+        AND ssku.deleted = 0
+        WHERE
+            af.deleted = 0
+        AND af.after_id IN
+        <foreach collection="afterIds" item="afterId" open="(" separator="," close=")">
+            #{afterId}
+        </foreach>
+        GROUP BY
+            af.commodity_id
+    </select>
+
+
+</mapper>

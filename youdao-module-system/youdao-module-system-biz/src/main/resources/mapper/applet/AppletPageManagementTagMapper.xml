@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.htyoudao.youdao.module.system.dal.mysql.applet.AppletPageManagementTagMapper">
+
+    <select id="selectPageIdsByStoreIds" resultType="java.lang.Long">
+        SELECT DISTINCT apt.applet_page_id
+        FROM applet_page_management_tag apt
+        INNER JOIN system_store_tag sst ON apt.tag_id = sst.tag_id
+        WHERE sst.store_id IN
+        <foreach collection="storeIds" item="storeId" open="(" separator="," close=")">#{storeId}</foreach>
+        AND apt.deleted = 0
+        AND sst.deleted = 0
+    </select>
+</mapper>

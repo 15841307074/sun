@@ -1,0 +1,135 @@
+package com.htyoudao.youdao.module.infra.service.file;
+
+import cn.hutool.core.lang.Assert;
+import cn.hutool.core.util.StrUtil;
+import com.htyoudao.youdao.framework.common.pojo.PageResult;
+import com.htyoudao.youdao.framework.common.util.io.FileUtils;
+import com.htyoudao.youdao.framework.common.util.object.BeanUtils;
+import com.htyoudao.youdao.module.infra.controller.admin.file.vo.file.FileCreateReqVO;
+import com.htyoudao.youdao.module.infra.controller.admin.file.vo.file.FilePageReqVO;
+import com.htyoudao.youdao.module.infra.controller.admin.file.vo.file.FilePresignedUrlRespVO;
+import com.htyoudao.youdao.module.infra.dal.dataobject.file.FileDO;
+import com.htyoudao.youdao.module.infra.dal.mysql.file.FileMapper;
+import com.htyoudao.youdao.module.infra.framework.file.core.client.FileClient;
+import com.htyoudao.youdao.module.infra.framework.file.core.client.s3.FilePresignedUrlRespDTO;
+import com.htyoudao.youdao.module.infra.framework.file.core.utils.FileTypeUtils;
+import jakarta.annotation.Resource;
+import lombok.SneakyThrows;
+import org.springframework.stereotype.Service;
+
+import java.io.File;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+
+import static com.htyoudao.youdao.framework.common.exception.util.ServiceExceptionUtil.exception;
+import static com.htyoudao.youdao.module.infra.enums.ErrorCodeConstants.FILE_NOT_EXISTS;
+
+/**
+ * 文件 Service 实现类
+ *
+ * @author 0090
+ */
+@Service
+public class FileServiceImpl implements FileService {
+
+    @Resource
+    private FileConfigService fileConfigService;
+
+    @Resource
+    private FileMapper fileMapper;
+
+    @Override
+    public PageResult<FileDO> getFilePage(FilePageReqVO pageReqVO) {
+        return fileMapper.selectPage(pageReqVO);
+    }
+
+    @Override
+    @SneakyThrows
+    public String createFile(String name, String path, byte[] content) {
+        // 计算默认的 path 名
+        String type = FileTypeUtils.getMineType(content, name);
+        if (StrUtil.isEmpty(path)) {
+            path = this.generateOssPath() + FileUtils.generatePath(content, name);
+        }
+        // 如果 name 为空，则使用 path 填充
+        if (StrUtil.isEmpty(name)) {
+            name = path;
+        }
+
+        // 上传到文件存储器
+        FileClient client = fileConfigService.getMasterFileClient();
+        Assert.notNull(client, "客户端(master) 不能为空");
+        String url = client.upload(content, path, type);
+
+        // 保存到数据库
+        FileDO file = new FileDO();
+        file.setConfigId(client.getId());
+        file.setName(name);
+        file.setPath(path);
+        file.setUrl(url);
+        file.setType(type);
+        file.setSize(content.length);
+        fileMapper.insert(file);
+        return url;
+    }
+
+    private String generateOssPath() {
+        LocalDate today = LocalDate.now(); // 当前日期
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy/MM/dd/");
+        return today.format(formatter);
+    }
+
+    @Override
+    @SneakyThrows
+    public String multiPartCreateFile(File file) {
+        // 上传到文件存储器
+        FileClient client = fileConfigService.getMasterFileClient();
+        Assert.notNull(client, "客户端(master) 不能为空");
+        return client.multiPartUpload(file);
+    }
+
+    @Override
+    public Long createFile(FileCreateReqVO createReqVO) {
+        FileDO file = BeanUtils.toBean(createReqVO, FileDO.class);
+        fileMapper.insert(file);
+        return file.getId();
+    }
+
+    @Override
+    public void deleteFile(Long id) throws Exception {
+        // 校验存在
+        FileDO file = validateFileExists(id);
+
+        // 从文件存储器中删除
+        FileClient client = fileConfigService.getFileClient(file.getConfigId());
+        Assert.notNull(client, "客户端({}) 不能为空", file.getConfigId());
+        client.delete(file.getPath());
+
+        // 删除记录
+        fileMapper.deleteById(id);
+    }
+
+    private FileDO validateFileExists(Long id) {
+        FileDO fileDO = fileMapper.selectById(id);
+        if (fileDO == null) {
+            throw exception(FILE_NOT_EXISTS);
+        }
+        return fileDO;
+    }
+
+    @Override
+    public byte[] getFileContent(Long configId, String path) throws Exception {
+        FileClient client = fileConfigService.getFileClient(configId);
+        Assert.notNull(client, "客户端({}) 不能为空", configId);
+        return client.getContent(path);
+    }
+
+    @Override
+    public FilePresignedUrlRespVO getFilePresignedUrl(String path) throws Exception {
+        FileClient fileClient = fileConfigService.getMasterFileClient();
+        FilePresignedUrlRespDTO presignedObjectUrl = fileClient.getPresignedObjectUrl(path);
+        return BeanUtils.toBean(presignedObjectUrl, FilePresignedUrlRespVO.class,
+                object -> object.setConfigId(fileClient.getId()));
+    }
+
+}

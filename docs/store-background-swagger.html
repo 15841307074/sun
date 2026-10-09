@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>门店背景模板 API - Swagger</title>
+  <style>
+    :root { --ink:#263238; --muted:#64748b; --line:#d8dee5; --paper:#fff; --page:#f5f7f9; --get:#61affe; --post:#49cc90; --put:#fca130; --delete:#f93e3e; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--page); color:var(--ink); font:14px/1.55 "Microsoft YaHei","PingFang SC",Arial,sans-serif; }
+    header { background:#17212b; color:#fff; padding:24px max(24px,calc((100% - 1180px)/2)); border-bottom:4px solid #49cc90; }
+    header h1 { margin:0 0 6px; font-size:27px; letter-spacing:0; }
+    header p { margin:0; color:#cbd5e1; }
+    main { max-width:1180px; margin:0 auto; padding:24px 22px 56px; }
+    h2 { margin:0 0 12px; font-size:21px; }
+    h3 { margin:22px 0 10px; font-size:16px; }
+    p { margin:7px 0; }
+    code { padding:2px 5px; background:#edf1f5; border-radius:4px; color:#17212b; font-family:Consolas,"Courier New",monospace; }
+    pre { margin:10px 0 16px; padding:14px 16px; overflow:auto; background:#263238; color:#f8fafc; border-radius:5px; font:13px/1.55 Consolas,"Courier New",monospace; }
+    table { width:100%; border-collapse:collapse; margin:10px 0 16px; background:#fff; }
+    th,td { padding:9px 11px; border:1px solid var(--line); text-align:left; vertical-align:top; word-break:break-word; }
+    th { background:#edf1f5; font-weight:700; }
+    .info { background:var(--paper); border:1px solid var(--line); border-radius:6px; padding:20px; margin-bottom:24px; }
+    .base { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:10px 0; }
+    .label { min-width:78px; font-weight:700; color:#475569; }
+    .tag-title { margin:28px 0 12px; padding-bottom:8px; border-bottom:1px solid #94a3b8; font-size:20px; }
+    details.operation { margin:0 0 10px; border:1px solid; border-radius:5px; overflow:hidden; background:#fff; }
+    details.get { border-color:var(--get); background:rgba(97,175,254,.08); }
+    details.post { border-color:var(--post); background:rgba(73,204,144,.08); }
+    details.put { border-color:var(--put); background:rgba(252,161,48,.08); }
+    details.delete { border-color:var(--delete); background:rgba(249,62,62,.08); }
+    summary { display:grid; grid-template-columns:86px minmax(250px,1fr) minmax(200px,.8fr) 22px; align-items:center; gap:12px; padding:9px; cursor:pointer; list-style:none; }
+    summary::-webkit-details-marker { display:none; }
+    summary::after { content:"⌄"; font-size:20px; text-align:center; }
+    details[open] summary::after { content:"⌃"; }
+    .method { display:inline-block; width:76px; padding:6px 8px; border-radius:4px; color:#fff; text-align:center; font-weight:700; text-shadow:0 1px 1px rgba(0,0,0,.2); }
+    .get .method { background:var(--get); } .post .method { background:var(--post); }
+    .put .method { background:var(--put); } .delete .method { background:var(--delete); }
+    .path { font-family:Consolas,"Courier New",monospace; font-weight:700; }
+    .summary-text { color:#334155; }
+    .body { padding:18px 20px 20px; background:#fff; border-top:1px solid rgba(0,0,0,.12); }
+    .operation-id { float:right; color:#64748b; font-family:Consolas,"Courier New",monospace; }
+    .required { color:#dc2626; font-weight:700; }
+    .notice { padding:11px 13px; margin:12px 0; border-left:4px solid #f59e0b; background:#fff7e6; }
+    .success { border-left-color:#16a34a; background:#ecfdf3; }
+    .schema { background:#fff; border:1px solid var(--line); border-radius:6px; padding:18px; margin-bottom:14px; }
+    .type { color:#7c3aed; font-family:Consolas,"Courier New",monospace; }
+    .enum { white-space:nowrap; }
+    footer { color:#64748b; text-align:center; padding-top:24px; }
+    @media (max-width:760px) {
+      summary { grid-template-columns:76px 1fr 22px; }
+      .summary-text { grid-column:1 / -1; padding-left:88px; }
+      main { padding:16px 10px 36px; }
+      .body { padding:14px 12px; }
+      table { font-size:12px; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <h1>门店背景模板 API <small>1.0.0</small></h1>
+  <p>OpenAPI / Swagger 风格接口文档，依据当前后台代码生成</p>
+</header>
+<main>
+  <section class="info">
+    <h2>基础信息</h2>
+    <div class="base"><span class="label">服务地址</span><code>/admin-api</code></div>
+    <div class="base"><span class="label">接口前缀</span><code>/system/store/background</code></div>
+    <div class="base"><span class="label">认证方式</span><code>Authorization: Bearer &lt;access-token&gt;</code></div>
+    <div class="base"><span class="label">内容类型</span><code>application/json;charset=UTF-8</code></div>
+    <div class="base"><span class="label">统一响应</span><code>CommonResult&lt;T&gt;</code></div>
+    <div class="notice success">系统默认模板始终保持发布状态，只允许修改图片，不允许关闭或删除；修改默认模板不会改变发布时间，也不会清空已命中自定义模板的门店缓存。</div>
+    <div class="notice">普通修改接口不修改发布时间。只有自定义模板通过“修改发布状态”接口且状态确实发生变化时，才更新 <code>releaseTime</code>。</div>
+  </section>
+
+  <h2 class="tag-title">store-background-controller　门店背景模板管理</h2>
+
+  <details class="operation get" open>
+    <summary><span class="method">GET</span><span class="path">/system/store/background/list</span><span class="summary-text">查询门店背景模板列表</span></summary>
+    <div class="body">
+      <span class="operation-id">operationId: list</span>
+      <h3>说明</h3><p>查询全部背景模板，包含系统默认模板和自定义模板，并返回实际适用门店数量及名称。</p>
+      <h3>请求参数</h3><p>无。</p>
+      <h3>200 响应</h3>
+      <pre>{
+  "code": 0,
+  "data": [
+    {
+      "backgroundId": 208900000000000001,
+      "templateName": "校园门店背景",
+      "backgroundImage": "https://example.com/store-background.png",
+      "appScope": 1,
+      "storeScope": 2,
+      "publishStatus": 1,
+      "defaultFlag": 0,
+      "releaseTime": "2026-08-17T16:30:00",
+      "storeIds": [1241338966192422912],
+      "tagIds": [],
+      "applyStoreCount": 1,
+      "applyStoreNames": ["沈阳零零玖零餐饮"]
+    }
+  ],
+  "msg": ""
+}</pre>
+    </div>
+  </details>
+
+  <details class="operation get">
+    <summary><span class="method">GET</span><span class="path">/system/store/background/get</span><span class="summary-text">查询门店背景模板详情</span></summary>
+    <div class="body">
+      <span class="operation-id">operationId: get</span>
+      <h3>Query 参数</h3>
+      <table><tr><th>名称</th><th>类型</th><th>必填</th><th>说明</th></tr><tr><td>id</td><td class="type">integer(int64)</td><td class="required">是</td><td>门店背景模板编号。</td></tr></table>
+      <h3>请求示例</h3><pre>GET /admin-api/system/store/background/get?id=208900000000000001</pre>
+      <h3>200 响应</h3><p><code>data</code> 为 <code>StoreBackgroundRespVO</code>，字段见文档底部模型说明。</p>
+    </div>
+  </details>
+
+  <details class="operation post">
+    <summary><span class="method">POST</span><span class="path">/system/store/background/create</span><span class="summary-text">新增门店背景模板</span></summary>
+    <div class="body">
+      <span class="operation-id">operationId: create</span>
+      <h3>说明</h3><p>新增自定义模板。新增后固定为关闭状态，发布时间为空。</p>
+      <h3>Request body <span class="required">required</span></h3><p><code>StoreBackgroundSaveReqVO</code></p>
+      <pre>{
+  "templateName": "校园门店背景",
+  "backgroundImage": "https://example.com/store-background.png",
+  "appScope": 1,
+  "storeScope": 2,
+  "storeIds": [1241338966192422912, 1241338966192422913],
+  "tagIds": []
+}</pre>
+      <h3>200 响应</h3><pre>{ "code": 0, "data": 208900000000000001, "msg": "" }</pre>
+      <div class="notice">按门店时：<code>storeScope=1</code> 表示全部门店；<code>storeScope=2</code> 时 <code>storeIds</code> 至少选择一个。按标签时：<code>tagIds</code> 至少选择一个，多个标签按并集匹配。</div>
+    </div>
+  </details>
+
+  <details class="operation put">
+    <summary><span class="method">PUT</span><span class="path">/system/store/background/update</span><span class="summary-text">修改门店背景模板</span></summary>
+    <div class="body">
+      <span class="operation-id">operationId: update</span>
+      <h3>说明</h3>
+      <p>自定义模板只有关闭状态可以修改名称、图片和适用范围。系统默认模板只更新背景图片。</p>
+      <p><strong>本接口不会修改发布时间。</strong></p>
+      <h3>Request body <span class="required">required</span></h3>
+      <pre>{
+  "backgroundId": 208900000000000001,
+  "templateName": "校园门店背景（新版）",
+  "backgroundImage": "https://example.com/store-background-v2.png",
+  "appScope": 2,
+  "storeScope": null,
+  "storeIds": [],
+  "tagIds": [208800000000000001, 208800000000000002]
+}</pre>
+      <h3>200 响应</h3><pre>{ "code": 0, "data": true, "msg": "" }</pre>
+    </div>
+  </details>
+
+  <details class="operation put" open>
+    <summary><span class="method">PUT</span><span class="path">/system/store/background/update-status</span><span class="summary-text">修改门店背景模板发布状态</span></summary>
+    <div class="body">
+      <span class="operation-id">operationId: updateStatus</span>
+      <h3>说明</h3>
+      <p>自定义模板发布或关闭的唯一入口。状态确实发生变化时更新 <code>releaseTime</code>；状态值相同时不更新时间，但会重新构建受影响门店缓存。</p>
+      <p>系统默认模板禁止调用该接口，始终保持发布状态。</p>
+      <h3>Request body <span class="required">required</span></h3>
+      <table><tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr><tr><td>backgroundId</td><td class="type">integer(int64)</td><td class="required">是</td><td>模板编号。</td></tr><tr><td>publishStatus</td><td class="type">integer(int32)</td><td class="required">是</td><td><span class="enum">0 关闭，1 发布</span>。</td></tr></table>
+      <pre>{
+  "backgroundId": 208900000000000001,
+  "publishStatus": 1
+}</pre>
+      <h3>200 响应</h3><pre>{ "code": 0, "data": true, "msg": "" }</pre>
+      <div class="notice success">状态提交后会异步重建受影响门店缓存。指定门店和标签模板优先于全部门店模板；同一优先级按 <code>releaseTime DESC, backgroundId DESC</code> 选择最新模板。</div>
+    </div>
+  </details>
+
+  <details class="operation delete">
+    <summary><span class="method">DELETE</span><span class="path">/system/store/background/delete</span><span class="summary-text">删除关闭状态的门店背景模板</span></summary>
+    <div class="body">
+      <span class="operation-id">operationId: delete</span>
+      <h3>Query 参数</h3>
+      <table><tr><th>名称</th><th>类型</th><th>必填</th><th>说明</th></tr><tr><td>id</td><td class="type">integer(int64)</td><td class="required">是</td><td>模板编号。仅关闭状态的自定义模板可删除。</td></tr></table>
+      <h3>请求示例</h3><pre>DELETE /admin-api/system/store/background/delete?id=208900000000000001</pre>
+      <h3>200 响应</h3><pre>{ "code": 0, "data": true, "msg": "" }</pre>
+    </div>
+  </details>
+
+  <h2 class="tag-title">Schemas　数据模型</h2>
+  <section class="schema">
+    <h2>StoreBackgroundSaveReqVO</h2>
+    <table>
+      <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td>backgroundId</td><td class="type">integer(int64)</td><td>修改必填</td><td>模板编号。</td></tr>
+      <tr><td>templateName</td><td class="type">string</td><td class="required">是</td><td>模板名称，不允许重复。</td></tr>
+      <tr><td>backgroundImage</td><td class="type">string</td><td class="required">是</td><td>背景图片 URL。</td></tr>
+      <tr><td>appScope</td><td class="type">integer(int32)</td><td class="required">是</td><td>应用范围：1 按门店，2 按标签。</td></tr>
+      <tr><td>storeScope</td><td class="type">integer(int32)</td><td>按门店必填</td><td>门店范围：1 全部门店，2 部分门店。</td></tr>
+      <tr><td>storeIds</td><td class="type">array&lt;integer(int64)&gt;</td><td>部分门店必填</td><td>门店编号，多选。</td></tr>
+      <tr><td>tagIds</td><td class="type">array&lt;integer(int64)&gt;</td><td>按标签必填</td><td>标签编号，多选，任意标签命中。</td></tr>
+    </table>
+  </section>
+
+  <section class="schema">
+    <h2>StoreBackgroundRespVO</h2>
+    <table>
+      <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+      <tr><td>backgroundId</td><td class="type">integer(int64)</td><td>模板编号。</td></tr>
+      <tr><td>templateName</td><td class="type">string</td><td>模板名称。</td></tr>
+      <tr><td>backgroundImage</td><td class="type">string</td><td>背景图片 URL。</td></tr>
+      <tr><td>appScope</td><td class="type">integer(int32)</td><td>1 按门店，2 按标签。</td></tr>
+      <tr><td>storeScope</td><td class="type">integer(int32)</td><td>1 全部门店，2 部分门店；按标签时可为空。</td></tr>
+      <tr><td>publishStatus</td><td class="type">integer(int32)</td><td>0 关闭，1 发布。</td></tr>
+      <tr><td>defaultFlag</td><td class="type">integer(int32)</td><td>0 自定义模板，1 系统默认模板。</td></tr>
+      <tr><td>releaseTime</td><td class="type">string(date-time)</td><td>发布时间，新建未发布模板为空。</td></tr>
+      <tr><td>storeIds</td><td class="type">array&lt;integer(int64)&gt;</td><td>直接选择的门店编号。</td></tr>
+      <tr><td>tagIds</td><td class="type">array&lt;integer(int64)&gt;</td><td>选择的标签编号。</td></tr>
+      <tr><td>applyStoreCount</td><td class="type">integer(int32)</td><td>模板实际命中的门店数量。</td></tr>
+      <tr><td>applyStoreNames</td><td class="type">array&lt;string&gt;</td><td>实际适用门店名称；全店模板返回“全部门店”。</td></tr>
+    </table>
+  </section>
+
+  <section class="schema">
+    <h2>业务错误码</h2>
+    <table>
+      <tr><th>错误码</th><th>错误信息</th><th>触发场景</th></tr>
+      <tr><td>1002031017</td><td>门店背景模板不存在</td><td>查询、修改状态、编辑或删除不存在的模板。</td></tr>
+      <tr><td>1002031018</td><td>门店背景模板名称已存在</td><td>新增或修改时模板名称重复。</td></tr>
+      <tr><td>1002031019</td><td>已发布的门店背景模板不能编辑或删除</td><td>编辑或删除发布中的自定义模板。</td></tr>
+      <tr><td>1002031020</td><td>系统默认模板不能关闭或删除</td><td>修改系统默认模板状态或删除默认模板。</td></tr>
+      <tr><td>1002031021</td><td>门店背景模板应用范围不合法</td><td>应用范围、门店范围或多选编号不符合规则。</td></tr>
+    </table>
+    <h3>错误响应示例</h3><pre>{
+  "code": 1002031019,
+  "data": null,
+  "msg": "已发布的门店背景模板不能编辑或删除"
+}</pre>
+  </section>
+
+  <footer>门店背景模板 API · 生成日期 2026-08-17</footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.htyoudao.youdao.module.system.dal.mysql.logger.OperateLogExtendMapper">
+
+    <resultMap id="operateLogExtendResultMap" type="com.htyoudao.youdao.module.system.dal.dataobject.logger.OperateLogExtendDO">
+        <id property="id" column="id"/>
+        <result property="logId" column="log_id"/>
+        <result property="requestParams" column="request_params"/>
+        <result property="requestHeaders" column="request_headers"/>
+        <result property="responseResult" column="response_result"/>
+        <result property="exceptionInfo" column="exception_info"/>
+        <result property="creator" column="creator"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updater" column="updater"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="deleted" column="deleted"/>
+    </resultMap>
+
+</mapper>

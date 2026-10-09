@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.htyoudao.cloud</groupId>
+        <artifactId>youdao</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <artifactId>youdao-module-member</artifactId>
+    <packaging>pom</packaging>
+    <name>${project.artifactId}</name>
+    <description>
+        member 模块下，主要会员相关业务。
+        例如说：会员卡、会员等级、会员积分等等
+    </description>
+    <modules>
+        <module>youdao-module-member-api</module>
+        <module>youdao-module-member-biz</module>
+    </modules>
+
+
+</project>

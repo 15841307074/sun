@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.htyoudao.youdao.module.order.dal.mysql.BzOrderPurchaseMapper">
+  <resultMap id="BaseResultMap" type="com.htyoudao.youdao.module.order.dal.dataobject.order.BzOrderPurchaseDO">
+    <id column="id" jdbcType="BIGINT" property="id" />
+    <result column="purchase_id" jdbcType="VARCHAR" property="purchaseId" />
+    <result column="order_sn" jdbcType="VARCHAR" property="orderSn" />
+    <result column="purchase_image" jdbcType="VARCHAR" property="purchaseImage" />
+    <result column="purchase_name" jdbcType="VARCHAR" property="purchaseName" />
+    <result column="purchase_price" jdbcType="DECIMAL" property="purchasePrice" />
+    <result column="is_single" jdbcType="INTEGER" property="isSingle" />
+  </resultMap>
+  <sql id="Example_Where_Clause">
+    <where>
+      <foreach collection="oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Update_By_Example_Where_Clause">
+    <where>
+      <foreach collection="example.oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Base_Column_List">
+    id, purchase_id, order_sn, purchase_image, purchase_name, purchase_price, is_single
+  </sql>
+  <select id="selectByExample" parameterType="com.htyoudao.youdao.module.order.dal.dataobject.order.BzOrderPurchaseDO" resultMap="BaseResultMap">
+    select
+    <if test="distinct">
+      distinct
+    </if>
+    <include refid="Base_Column_List" />
+    from bz_order_purchase${tableFix}
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+    <if test="orderByClause != null">
+      order by ${orderByClause}
+    </if>
+  </select>
+  <insert id="insertSingle" parameterType="com.htyoudao.youdao.module.order.dal.dataobject.order.BzOrderPurchaseDO">
+    insert into bz_order_purchase (id, purchase_id, order_sn,
+      purchase_image, purchase_name, purchase_price,
+      is_single, project_owner_ship)
+    values (#{r.id,jdbcType=BIGINT}, #{r.purchaseId,jdbcType=VARCHAR}, #{r.orderSn,jdbcType=VARCHAR},
+      #{r.purchaseImage,jdbcType=VARCHAR}, #{r.purchaseName,jdbcType=VARCHAR}, #{r.purchasePrice,jdbcType=DECIMAL},
+      #{r.isSingle,jdbcType=INTEGER}, #{r.projectOwnerShip,jdbcType=BIGINT})
+  </insert>
+  <update id="updateByExampleSelective" parameterType="map">
+    update bz_order_purchase
+    <set>
+      <if test="record.id != null">
+        id = #{record.id,jdbcType=BIGINT},
+      </if>
+      <if test="record.purchaseId != null">
+        purchase_id = #{record.purchaseId,jdbcType=VARCHAR},
+      </if>
+      <if test="record.orderSn != null">
+        order_sn = #{record.orderSn,jdbcType=VARCHAR},
+      </if>
+      <if test="record.purchaseImage != null">
+        purchase_image = #{record.purchaseImage,jdbcType=VARCHAR},
+      </if>
+      <if test="record.purchaseName != null">
+        purchase_name = #{record.purchaseName,jdbcType=VARCHAR},
+      </if>
+      <if test="record.purchasePrice != null">
+        purchase_price = #{record.purchasePrice,jdbcType=DECIMAL},
+      </if>
+      <if test="record.isSingle != null">
+        is_single = #{record.isSingle,jdbcType=INTEGER},
+      </if>
+    </set>
+    <if test="_parameter != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+
+  <sql id="selectBzOrderPurchaseVo">
+        SELECT purchase_id, order_sn, purchase_image, purchase_name, purchase_price, is_single
+        FROM bz_order_purchase
+  </sql>
+
+  <select id="getOrderPurchaseList" parameterType="com.htyoudao.youdao.module.order.dal.dataobject.order.BzOrderPurchaseDO" resultMap="BaseResultMap">
+      <include refid="selectBzOrderPurchaseVo"/>
+      <where>
+        <if test="record.orderSn != null  and record.orderSn != ''">
+          and order_sn = #{record.orderSn}
+        </if>
+        <if test="record.purchaseImage != null  and record.purchaseImage != ''">
+          and purchase_image = #{record.purchaseImage}
+        </if>
+        <if test="record.purchaseName != null  and record.purchaseName != ''">
+          and purchase_name like concat('%', #{record.purchaseName}, '%')
+        </if>
+        <if test="record.purchasePrice != null ">
+          and purchase_price = #{record.purchasePrice}
+        </if>
+        <if test="record.orderSnList != null  and record.orderSnList != ''">
+          and order_sn in
+          <foreach collection="record.orderSnList" item="orderSn" open="(" separator="," close=")">
+            #{orderSn}
+          </foreach>
+        </if>
+        <if test="record.isSingle != null ">
+          and is_single = #{record.isSingle}
+        </if>
+      </where>
+  </select>
+  <select id="selectSimulationList" resultType="com.htyoudao.youdao.module.order.dal.dataobject.order.BzOrderPurchaseDO">
+    SELECT * FROM bz_order_purchase${tableFix} WHERE order_sn = #{orderSn} AND deleted = 0
+  </select>
+</mapper>

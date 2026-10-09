@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.htyoudao.youdao.module.system.dal.mysql.store.SystemStoreFranchiseeInfoMapper">
+
+    <!-- 按门店唯一键新增或恢复加盟商信息，保留原始创建人和创建时间。 -->
+    <insert id="upsert">
+        INSERT INTO `system_store_franchisee_info`
+        (`store_id`, `franchisee_name`, `franchisee_mobile`, `id_card_no`,
+         `bank_name`, `bank_province`, `bank_city`, `bank_card_no`,
+         `creator`, `create_time`, `updater`, `update_time`, `deleted`, `business_id`)
+        VALUES
+        (#{storeId}, #{franchiseeName}, #{franchiseeMobile}, #{idCardNo},
+         #{bankName}, #{bankProvince}, #{bankCity}, #{bankCardNo},
+         COALESCE(#{creator}, ''), COALESCE(#{createTime}, NOW()),
+         COALESCE(#{updater}, ''), COALESCE(#{updateTime}, NOW()), b'0',
+         COALESCE(#{businessId}, 0))
+        ON DUPLICATE KEY UPDATE
+        `franchisee_name` = VALUES(`franchisee_name`),
+        `franchisee_mobile` = VALUES(`franchisee_mobile`),
+        `id_card_no` = VALUES(`id_card_no`),
+        `bank_name` = VALUES(`bank_name`),
+        `bank_province` = VALUES(`bank_province`),
+        `bank_city` = VALUES(`bank_city`),
+        `bank_card_no` = VALUES(`bank_card_no`),
+        `updater` = VALUES(`updater`),
+        `update_time` = VALUES(`update_time`),
+        `deleted` = b'0',
+        `business_id` = VALUES(`business_id`)
+    </insert>
+</mapper>

@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.htyoudao.youdao.module.promotion.dal.mysql.activity.ActivityMapper">
+
+    <select id="pageQuery"
+            resultType="com.htyoudao.youdao.module.promotion.dal.dataobject.activity.ActivityDO">
+            select
+                a.*
+            from
+                activity a
+            <if test="storeIds != null and !storeIds.isEmpty()">
+                LEFT JOIN activity_store ast ON
+                    a.id = ast.activity_id
+                    AND ast.deleted = b'0'
+                    AND ast.store_id IN
+                    <foreach collection="storeIds" item="storeId" open="(" separator="," close=")">
+                        #{storeId}
+                    </foreach>
+            </if>
+                ${ew.customSqlSegment}
+                and a.deleted = b'0'
+                <if test="storeIds != null and !storeIds.isEmpty()">
+                    AND (ast.store_id IS NOT NULL OR a.activity_store = 1)
+                </if>
+            order by a.create_time desc
+    </select>
+
+    <!-- 结算等需要完整候选集的场景禁止分页，避免默认页大小截断活动及额外 COUNT。 -->
+    <select id="listQuery"
+            resultType="com.htyoudao.youdao.module.promotion.dal.dataobject.activity.ActivityDO">
+        select a.*
+        from activity a
+        <if test="storeIds != null and !storeIds.isEmpty()">
+            LEFT JOIN activity_store ast ON
+                a.id = ast.activity_id
+                AND ast.deleted = b'0'
+                AND ast.store_id IN
+                <foreach collection="storeIds" item="storeId" open="(" separator="," close=")">
+                    #{storeId}
+                </foreach>
+        </if>
+        ${ew.customSqlSegment}
+        and a.deleted = b'0'
+        <if test="storeIds != null and !storeIds.isEmpty()">
+            AND (ast.store_id IS NOT NULL OR a.activity_store = 1)
+        </if>
+        order by a.create_time desc
+    </select>
+
+</mapper>

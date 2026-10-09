@@ -1,0 +1,441 @@
+server:
+  port: 8080
+  shutdown: graceful
+
+spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  codec:
+    max-in-memory-size: 10MB
+  cloud:
+    # Spring Cloud Gateway 配置项，对应 GatewayProperties 类
+    gateway:
+      # 路由配置项，对应 RouteDefinition 数组
+      routes:
+        ## im-server 服务
+        - id: im-admin-api # 路由的编号
+          uri: grayLb://im-server
+          predicates: # 断言，作为路由的匹配条件，对应 RouteDefinition 数组
+            - Path=/admin-api/im/**
+          filters:
+            - RewritePath=/admin-api/im/v3/api-docs, /v3/api-docs # 配置，保证转发到 /v3/api-docs
+        ## bpm-server 服务
+        - id: bpm-admin-api # 路由的编号
+          uri: grayLb://bpm-server
+          predicates: # 断言，作为路由的匹配条件，对应 RouteDefinition 数组
+            - Path=/admin-api/bpm/**
+          filters:
+            - RewritePath=/admin-api/bpm/v3/api-docs, /v3/api-docs # 配置，保证转发到 /v3/api-docs
+        - id: bpm-app-api # 路由的编号
+          uri: grayLb://bpm-server
+          predicates: # 断言，作为路由的匹配条件，对应 RouteDefinition 数组
+            - Path=/app-api/bpm/**
+          filters:
+            - RewritePath=/app-api/bpm/v3/api-docs, /v3/api-docs
+        ## system-server 服务
+        - id: system-admin-api # 路由的编号
+          uri: grayLb://system-server
+          predicates: # 断言，作为路由的匹配条件，对应 RouteDefinition 数组
+            - Path=/admin-api/system/**
+          filters:
+            - RewritePath=/admin-api/system/v3/api-docs, /v3/api-docs # 配置，保证转发到 /v3/api-docs
+        - id: system-app-api # 路由的编号
+          uri: grayLb://system-server
+          predicates: # 断言，作为路由的匹配条件，对应 RouteDefinition 数组
+            - Path=/app-api/system/**
+          filters:
+            - RewritePath=/app-api/system/v3/api-docs, /v3/api-docs
+        ## infra-server 服务
+        - id: infra-admin-api # 路由的编号
+          uri: grayLb://infra-server
+          predicates: # 断言，作为路由的匹配条件，对应 RouteDefinition 数组
+            - Path=/admin-api/infra/**
+          filters:
+            - RewritePath=/admin-api/infra/v3/api-docs, /v3/api-docs
+        - id: infra-app-api # 路由的编号
+          uri: grayLb://infra-server
+          predicates: # 断言，作为路由的匹配条件，对应 RouteDefinition 数组
+            - Path=/app-api/infra/**
+          filters:
+            - RewritePath=/app-api/infra/v3/api-docs, /v3/api-docs
+        - id: infra-spring-boot-admin # 路由的编号（Spring Boot Admin）
+          uri: grayLb://infra-server
+          predicates: # 断言，作为路由的匹配条件，对应 RouteDefinition 数组
+            - Path=/admin/**
+        - id: infra-websocket # 路由的编号（WebSocket）
+          uri: grayLb://infra-server
+          predicates: # 断言，作为路由的匹配条件，对应 RouteDefinition 数组
+            - Path=/infra/ws/**
+        ## commodity-server 服务
+        - id: commodity-admin-api # 路由的编号
+          uri: grayLb://commodity-server
+          predicates: # 断言，作为路由的匹配条件，对应 RouteDefinition 数组
+            - Path=/admin-api/commodity/**
+          filters:
+            - RewritePath=/admin-api/commodity/v3/api-docs, /v3/api-docs # 配置，保证转发到 /v3/api-docs
+        - id: commodity-app-api # 路由的编号
+          uri: grayLb://commodity-server
+          predicates: # 断言，作为路由的匹配条件，对应 RouteDefinition 数组
+            - Path=/app-api/commodity/**
+          filters:
+            - RewritePath=/app-api/commodity/v3/api-docs, /v3/api-docs
+        ## member-server 服务
+        - id: member-admin-api
+          uri: grayLb://member-server
+          predicates: # 断言，作为路由的匹配条件，对应 RouteDefinition 数组
+            - Path=/admin-api/member/**
+          filters:
+            - RewritePath=/admin-api/member/v3/api-docs, /v3/api-docs
+        - id: member-app-api # 路由的编号
+          uri: grayLb://member-server
+          predicates: # 断言，作为路由的匹配条件，对应 RouteDefinition 数组
+            - Path=/app-api/member/**
+          filters:
+            - RewritePath=/app-api/member/v3/api-docs, /v3/api-docs
+        - id: im-app-api
+          uri: grayLb://im-server
+          predicates: # 断言，作为路由的匹配条件，对应 RouteDefinition 数组
+            - Path=/app-api/im/**
+          filters:
+            - RewritePath=/app-api/im/v3/api-docs, /v3/api-docs
+        ## order-server 服务
+        - id: order-admin-api # 路由的编号
+          uri: grayLb://order-server
+          predicates: # 断言，作为路由的匹配条件，对应 RouteDefinition 数组
+            - Path=/admin-api/order/**
+          filters:
+            - RewritePath=/admin-api/order/v3/api-docs, /v3/api-docs # 配置，保证转发到 /v3/api-docs
+        - id: order-app-api # 路由的编号
+          uri: grayLb://order-server
+          predicates: # 断言，作为路由的匹配条件，对应 RouteDefinition 数组
+            - Path=/app-api/order/**
+          filters:
+            - RewritePath=/app-api/order/v3/api-docs, /v3/api-docs
+        ## promotion-server 服务
+        - id: promotion-admin-api
+          uri: grayLb://promotion-server
+          predicates: # 断言，作为路由的匹配条件，对应 RouteDefinition 数组
+            - Path=/admin-api/promotion/**
+          filters:
+            - RewritePath=/admin-api/promotion/v3/api-docs, /v3/api-docs
+        - id: promotion-app-api # 路由的编号
+          uri: grayLb://promotion-server
+          predicates: # 断言，作为路由的匹配条件，对应 RouteDefinition 数组
+            - Path=/app-api/promotion/**
+          filters:
+            - RewritePath=/app-api/promotion/v3/api-docs, /v3/api-docs
+        ## pay-server 服务
+        - id: pay-admin-api
+          uri: grayLb://pay-server
+          predicates: # 断言，作为路由的匹配条件，对应 RouteDefinition 数组
+            - Path=/admin-api/pay/**
+          filters:
+            - RewritePath=/admin-api/pay/v3/api-docs, /v3/api-docs
+        - id: pay-app-api # 路由的编号
+          uri: grayLb://pay-server
+          predicates: # 断言，作为路由的匹配条件，对应 RouteDefinition 数组
+            - Path=/app-api/pay/**
+          filters:
+            - RewritePath=/app-api/pay/v3/api-docs, /v3/api-docs
+        ## analysis-server 服务
+        - id: analysis-admin-api
+          uri: grayLb://analysis-server
+          predicates: # 断言，作为路由的匹配条件，对应 RouteDefinition 数组
+            - Path=/admin-api/analysis/**
+          filters:
+            - RewritePath=/admin-api/analysis/v3/api-docs, /v3/api-docs
+        - id: analysis-app-api # 路由的编号
+          uri: grayLb://analysis-server
+          predicates: # 断言，作为路由的匹配条件，对应 RouteDefinition 数组
+            - Path=/app-api/analysis/**
+          filters:
+            - RewritePath=/app-api/analysis/v3/api-docs, /v3/api-docs
+        ## version-server 服务
+        - id: version-admin-api
+          uri: grayLb://version-server
+          predicates: # 断言，作为路由的匹配条件，对应 RouteDefinition 数组
+            - Path=/admin-api/version/**
+          filters:
+            - RewritePath=/admin-api/version/v3/api-docs, /v3/api-docs
+        - id: version-app-api # 路由的编号
+          uri: grayLb://version-server
+          predicates: # 断言，作为路由的匹配条件，对应 RouteDefinition 数组
+            - Path=/app-api/version/**
+          filters:
+            - RewritePath=/app-api/version/v3/api-docs, /v3/api-docs
+        ## ai-server 服务
+        - id: ai-admin-api
+          uri: grayLb://ai-server
+          predicates: # 断言，作为路由的匹配条件，对应 RouteDefinition 数组
+            - Path=/admin-api/ai/**
+          filters:
+            - RewritePath=/admin-api/ai/v3/api-docs, /v3/api-docs
+        - id: ai-app-api # 路由的编号
+          uri: grayLb://ai-server
+          predicates: # 断言，作为路由的匹配条件，对应 RouteDefinition 数组
+            - Path=/app-api/ai/**
+          filters:
+            - RewritePath=/app-api/ai/v3/api-docs, /v3/api-docs
+        ## errand-server 服务
+        - id: errand-admin-api
+          uri: grayLb://errand-server
+          predicates: # 断言，作为路由的匹配条件，对应 RouteDefinition 数组
+            - Path=/admin-api/errand/**
+          filters:
+            - RewritePath=/admin-api/errand/v3/api-docs, /v3/api-docs
+        - id: errand-app-api # 路由的编号
+          uri: grayLb://errand-server
+          predicates: # 断言，作为路由的匹配条件，对应 RouteDefinition 数组
+            - Path=/app-api/errand/**
+          filters:
+            - RewritePath=/app-api/errand/v3/api-docs, /v3/api-docs
+
+      x-forwarded:
+        prefix-enabled: false # 避免 Swagger 重复带上额外的 /admin-api/system 前缀
+
+logging:
+  level:
+    io.netty.util.ResourceLeakDetector: DEBUG
+  file:
+    name: ${user.home}/logs/${spring.application.name}.log # 日志文件名，全路径
+
+knife4j:
+  # 聚合 Swagger 文档，参考 https://doc.xiaominfo.com/docs/action/springcloud-gateway 文档
+  gateway:
+    enabled: true
+    routes:
+      - name: im-server
+        service-name: im-server
+        url: /admin-api/im/v3/api-docs
+      - name: bpm-server
+        service-name: bpm-server
+        url: /admin-api/bpm/v3/api-docs
+      - name: system-server
+        service-name: system-server
+        url: /admin-api/system/v3/api-docs
+      - name: infra-server
+        service-name: infra-server
+        url: /admin-api/infra/v3/api-docs
+      - name: commodity-server
+        service-name: commodity-server
+        url: /admin-api/commodity/v3/api-docs
+      - name: member-server
+        service-name: member-server
+        url: /admin-api/member/v3/api-docs
+      - name: order-server
+        service-name: order-server
+        url: /admin-api/order/v3/api-docs
+      - name: promotion-server
+        service-name: promotion-server
+        url: /admin-api/promotion/v3/api-docs
+      - name: pay-server
+        service-name: pay-server
+        url: /admin-api/pay/v3/api-docs
+      - name: analysis-server
+        service-name: analysis-server
+        url: /admin-api/analysis/v3/api-docs
+      - name: errand-server
+        service-name: errand-server
+        url: /admin-api/errand/v3/api-docs
+    basic:
+      enable: true
+      username: admin # Basic 认证用户名
+      password: ${CLOUD_GATEWAY_LOCAL_PASSWORD_L243:}
+--- #################### lb相关配置 ####################
+spring:
+  cloud:
+    loadbalancer:
+      cache:
+        ttl: 10s
+
+--- #################### Sentinel相关配置 ####################
+spring:
+  cloud:
+    sentinel:
+      transport:
+        dashboard: testing-youdao-sentinel-dashboard-service
+      enabled: true # 是否开启。默认为 true 开启
+      eager: true # 是否饥饿加载。默认为 false 关闭
+      filter:
+        url-patterns: /** # 拦截请求的地址。默认为 /*
+      #自定义流控降级异常信息
+      #scg:
+      #  fallback:
+      #    mode: response
+      #    response-body: '{"code": 429, "msg":"服务压力过大，请稍后重试!"}'
+      # sentinel用nacos作为数据源的配置
+      datasource:
+        # 流控规则
+        gw-flow:
+          nacos:
+            server-addr: ${spring.cloud.nacos.config.server-addr}
+            namespace: ${spring.cloud.nacos.config.namespace}
+            username: ${spring.cloud.nacos.config.username}
+            password: ${CLOUD_GATEWAY_LOCAL_PASSWORD_L274:}
+            data-id:  ${spring.application.name}-flow-rules # 在修改的sentinel 源码中定义的规则名
+            groupId: SENTINEL_GROUP
+            rule-type: gw-flow
+        # api分组规则
+        gw-api-group:
+          nacos:
+            server-addr: ${spring.cloud.nacos.config.server-addr}
+            namespace: ${spring.cloud.nacos.config.namespace}
+            username: ${spring.cloud.nacos.config.username}
+            password: ${CLOUD_GATEWAY_LOCAL_PASSWORD_L284:}
+            data-id:  ${spring.application.name}-api-rules # 在修改的sentinel 源码中定义的规则名
+            groupId: SENTINEL_GROUP
+            rule-type: gw-api-group
+        # 降级规则
+        degrade:
+          nacos:
+            server-addr: ${spring.cloud.nacos.config.server-addr}
+            namespace: ${spring.cloud.nacos.config.namespace}
+            username: ${spring.cloud.nacos.config.username}
+            password: ${CLOUD_GATEWAY_LOCAL_PASSWORD_L294:}
+            dataId: ${spring.application.name}-degrade-rules
+            groupId: SENTINEL_GROUP
+            rule-type: degrade
+        # 系统规则
+        system:
+          nacos:
+            server-addr: ${spring.cloud.nacos.config.server-addr}
+            namespace: ${spring.cloud.nacos.config.namespace}
+            username: ${spring.cloud.nacos.config.username}
+            password: ${CLOUD_GATEWAY_LOCAL_PASSWORD_L304:}
+            dataId: ${spring.application.name}-system-rules
+            groupId: SENTINEL_GROUP
+            rule-type: system
+  data:
+    redis:
+      host: 192.168.31.141 # 地址
+      port: 26379 # 端口
+      database: 0 # 数据库索引
+      password: ${CLOUD_GATEWAY_LOCAL_PASSWORD_L313:}
+# redisson 配置
+redisson:
+  # redis key前缀
+  keyPrefix: t
+  # 线程池数量
+  threads: 4
+  # Netty线程池数量
+  nettyThreads: 8
+  # 单节点配置
+  singleServerConfig:
+    # 客户端名称
+    clientName: ${spring.application.name}
+    # 最小空闲连接数
+    connectionMinimumIdleSize: 8
+    # 连接池大小
+    connectionPoolSize: 32
+    # 连接空闲超时，单位：毫秒
+    idleConnectionTimeout: 10000
+    # 命令等待超时，单位：毫秒
+    timeout: 3000
+    # 发布和订阅连接池大小
+    subscriptionConnectionPoolSize: 50
+
+--- #################### 监控相关配置 ####################
+
+# Actuator 监控端点的配置项
+management:
+  server:
+    port: 8081
+  metrics:
+    enable:
+      all: false
+      jvm: true
+      application: true
+      process: true
+      system: true
+    tags:
+      application: ${spring.application.name}
+    export:
+      prometheus:
+        enabled: true
+  endpoints:
+    web:
+      base-path: /actuator # Actuator 提供的 API 接口的根目录。默认为 /actuator
+      exposure:
+        include: health,prometheus # 需要开放的端点。默认值只打开 health 和 info 两个端点。通过设置 * ，可以开放所有端点。
+  endpoint:
+    health:
+      group:
+        readiness:
+          include: readinessState
+      show-details: always
+      probes:
+        enabled: true
+    metrics:
+      enabled: true
+    prometheus:
+      enabled: true
+
+# Spring Boot Admin 配置项
+spring:
+  autoconfigure:
+    exclude:
+      - de.codecentric.boot.admin.client.config.SpringBootAdminClientAutoConfiguration # 禁用 Spring Boot Admin 的 Client
+
+--- #################### 接口安全相关配置 ####################
+security:
+  # 安全过滤器总开关，设置为 false 可完全禁用所有安全检查
+  enabled: false
+  check-business: true
+  sign:
+    # 签名验证开关
+    enabled: true
+    # 签名密钥，生产环境请修改
+    secret: ${CLOUD_GATEWAY_LOCAL_SECRET_L388:}
+    # 签名过期时间（秒）
+    expire-seconds: 300
+  replay:
+    # 防重放攻击检查开关
+    enabled: true
+    # 防重放窗口时间（秒）
+    window-seconds: 60
+    # 不需要防重放检查的路径
+  test-user-list:
+    - 1962393741935562754
+    #- 2678007364675174407
+
+  white-list:
+    - /**/v3/api-docs
+    - /app-api/order/bz-order-pay/notify
+    - /app-api/order/ylb/state/notify
+    - /admin-api/system/auth/login
+    - /admin-api/system/auth/refresh-token
+    - /admin-api/system/auth/logout
+    - /admin-api/system/business/page/user
+    - /admin-api/system/auth/send-sms-code
+    - /admin-api/system/auth/sms-login
+    - /admin-api/system/auth/reset-password
+    - /admin-api/system/user/profile/update-password
+    - /admin-api/system/user/profile/update
+    - /admin-api/system/user/profile/update-avatar
+    - /admin-api/system/captcha/get
+    - /admin-api/system/captcha/check
+    - /app-api/system/auth/get-permission-info
+    - /admin-api/system/auth/get-permission-info
+    - /app-api/system/auth/login
+    - /app-api/system/auth/saveOrUpdateEquipment
+    - /app-api/promotion/redPacket/notify
+    - /app-api/errand/runner/withdraw/notify
+    - /app-api/infra/file/download
+    - /app-api/system/business/dc/getBusinessListByUser
+    - /app-api/system/user/boss/getUserPermissions
+    - /app-api/system/user/boss/getNavigationByRole
+    - /admin-api/member/wecom/callback
+    - /app-api/order/sq/process
+    - /app-api/order/sq/process-appid-config
+    - /app-api/order/dy/webhook
+    - /app-api/order/dy/spi/cert/fulfil/asyncCancelFulfiled
+    - /app-api/order/dy/spi/retail/order/query/pickupStatus
+    - /app-api/order/dy/spi/meal/retail/poi/pickupStatus
+    - /app-api/order/dy/spi/retail/order/auditRefundApply
+    - /app-api/order/dy/spi/retail/order/cancelNotify
+    - /app-api/order/dy/spi/retail/order/waitAcceptNotify
+    - /app-api/order/dy/spi/retail/order/createOrder
+    - /app-api/order/dy/spi/retail/order/payNotify
+    - /app-api/order/dy/spi/retail/order/query
+    - /app-api/order/dy/spi/retail/order/refundSync
+    - /app-api/infra/file/upload

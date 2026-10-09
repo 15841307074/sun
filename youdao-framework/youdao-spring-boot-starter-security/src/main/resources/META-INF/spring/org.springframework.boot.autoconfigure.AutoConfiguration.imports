@@ -1,0 +1,3 @@
+com.htyoudao.youdao.framework.security.config.YoudaoSecurityAutoConfiguration
+com.htyoudao.youdao.framework.security.config.YoudaoWebSecurityConfigurerAdapter
+com.htyoudao.youdao.framework.operatelog.config.YoudaoOperateLogConfiguration

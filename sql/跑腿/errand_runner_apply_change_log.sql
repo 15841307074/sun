@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS `bz_errand_runner_apply_change_log` (
+  `id` bigint NOT NULL COMMENT '主键ID',
+  `runner_id` bigint NOT NULL COMMENT '跑腿员ID',
+  `member_id` bigint NOT NULL COMMENT '会员ID',
+  `change_field` varchar(64) NOT NULL COMMENT '变化字段编码',
+  `change_field_name` varchar(64) NOT NULL COMMENT '变化字段中文名',
+  `old_value` varchar(1000) DEFAULT NULL COMMENT '旧值',
+  `new_value` varchar(1000) DEFAULT NULL COMMENT '新值',
+  `business_id` bigint DEFAULT NULL COMMENT '项目ID',
+  `creator` varchar(64) DEFAULT '' COMMENT '创建者',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updater` varchar(64) DEFAULT '' COMMENT '更新者',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  PRIMARY KEY (`id`),
+  KEY `idx_runner_id` (`runner_id`),
+  KEY `idx_member_id` (`member_id`),
+  KEY `idx_change_field` (`change_field`),
+  KEY `idx_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='骑手入驻申请资料变更记录表';

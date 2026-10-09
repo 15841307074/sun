@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.htyoudao.youdao.module.commodity.dal.mysql.CommoditySyncTaskMapper">
+
+
+    <select id="syncPageList" resultType="com.htyoudao.youdao.module.commodity.controller.admin.sync.VO.CommoditySyncListRespVO">
+            select t.batch_no,
+                   t.storeCount,
+                   t.startTime,
+                   t.endTime,
+                   t.syncUserId,
+                   su.nickname as syncUserName,
+                   t.params,
+                   t.status
+            from (
+                select batch_no,
+                       count(store_id)  as storeCount,
+                       min(start_time)  as startTime,
+                       max(finish_time) as endTime,
+                       min(creator) as syncUserId,
+                       params,
+                       CASE
+                           -- 全部成功
+                           WHEN COUNT(store_id) = SUM(IF(status IN (2), 1, 0))
+                               THEN '完成'
+                           -- 全部失败
+                           WHEN COUNT(store_id) = SUM(IF(status IN (3), 1, 0))
+                               THEN '全部失败'
+                           -- 部分成功（混合成功和失败）
+                           WHEN SUM(IF(status IN (1), 1, 0)) > 0
+                               THEN '进行中'
+                           ELSE '部分成功'
+                           END AS status
+                from commodity_sync_task ${ew.customSqlSegment}
+                group by batch_no
+            ) t
+            left join system_users su on su.id = cast(t.syncUserId as unsigned)
+            order by t.startTime desc
+
+    </select>
+
+
+</mapper>

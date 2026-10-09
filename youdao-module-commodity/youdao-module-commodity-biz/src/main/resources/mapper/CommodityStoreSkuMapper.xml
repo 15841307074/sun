@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.htyoudao.youdao.module.commodity.dal.mysql.CommodityStoreSkuMapper">
+
+    <select id="selectSkuListForRpc" resultType="com.htyoudao.youdao.module.commodity.dal.dto.StoreSkuDTO">
+        SELECT
+            sku.commodity_store_sku_id AS skuId,
+            sku.commodity_store_sku_name AS skuName,
+            sku.commodity_store_sku_price AS skuPrice,
+            sku.commodity_store_sku_strike_price AS strikeThroughPrice,
+            sku.sku_id AS originalSkuId,
+
+--             category.commodity_store_category_name AS categoryName,
+            spu.category_name AS categoryName,
+
+            spu.commodity_id AS commodityId,
+            spu.commodity_store_category_id AS categoryId,
+            spu.commodity_store_spu_id AS spuId,
+            spu.commodity_store_spu_name AS spuName,
+            spu.commodity_store_spu_description AS spuDesc,
+            spu.setmeal_type AS setmealType,
+            spu.image_url AS imageUrl,
+            spu.many_copy AS manyCopy,
+            spu.package_fee AS packageFee,
+            spu.condiments AS condiments,
+            spu.sale_rule AS saleRule,
+            spu.limit_buy_number AS limitBuyNumber,
+            spu.condiment_is_more AS condimentIsMore,
+            spu.max_condiment_number AS maxCondimentNumber,
+            spu.time_sharing_topping AS timeSharingTopping,
+            spu.start_date AS startDate,
+            spu.end_date AS endDate,
+            spu.day_numbers AS dayNumbers,
+            spu.week_numbers AS weekNumbers,
+            spu.is_all_day AS isAllDay,
+            spu.time_range AS timeRange,
+            spu.commodity_store_spu_machine_status AS commodityStoreSpuMachineStatus,
+            spu.commodity_store_spu_applet_status AS commodityStoreSpuAppletStatus,
+            spu.commodity_store_spu_detail_url AS noDeliveryForSingleOrder
+        FROM
+            commodity_store_sku sku
+            LEFT JOIN commodity_store_spu spu ON sku.commodity_store_spu_id = spu.commodity_store_spu_id
+--             LEFT JOIN commodity_store_category category ON spu.commodity_store_category_id = category.commodity_store_category_id
+        WHERE
+            sku.deleted = 0
+        AND spu.deleted = 0
+        AND sku.commodity_store_sku_id IN
+        <foreach collection="storeSkuIds" item="storeSkuId" open="(" separator="," close=")">
+            #{storeSkuId}
+        </foreach>
+    </select>
+
+    <select id="selectSkuListByCommodityIdsForRpc" resultType="com.htyoudao.youdao.module.commodity.dal.dto.StoreSkuDTO">
+        SELECT
+            sku.commodity_store_sku_id AS skuId,
+            sku.commodity_store_sku_name AS skuName,
+            sku.commodity_store_sku_price AS skuPrice,
+            sku.commodity_store_sku_strike_price AS strikeThroughPrice,
+            sku.sku_id AS originalSkuId,
+
+--             category.commodity_store_category_name AS categoryName,
+            spu.category_name AS categoryName,
+
+            spu.commodity_id AS commodityId,
+            spu.commodity_store_category_id AS categoryId,
+            spu.commodity_store_spu_id AS spuId,
+            spu.commodity_store_spu_name AS spuName,
+            spu.commodity_store_spu_description AS spuDesc,
+            spu.setmeal_type AS setmealType,
+            spu.image_url AS imageUrl,
+            spu.many_copy AS manyCopy,
+            spu.package_fee AS packageFee,
+            spu.sale_rule AS saleRule,
+            spu.time_sharing_topping AS timeSharingTopping,
+            spu.start_date AS startDate,
+            spu.end_date AS endDate,
+            spu.day_numbers AS dayNumbers,
+            spu.week_numbers AS weekNumbers,
+            spu.is_all_day AS isAllDay,
+            spu.time_range AS timeRange,
+            spu.commodity_store_spu_machine_status AS commodityStoreSpuMachineStatus,
+            spu.commodity_store_spu_applet_status AS commodityStoreSpuAppletStatus
+        FROM commodity_store_sku sku
+        JOIN commodity_store_spu spu ON sku.commodity_store_spu_id = spu.commodity_store_spu_id
+--         LEFT JOIN commodity_store_category category ON spu.commodity_store_category_id = category.commodity_store_category_id
+        WHERE sku.deleted = 0
+          AND spu.deleted = 0
+          AND sku.store_id = #{storeId}
+          AND sku.commodity_store_sku_status = 1
+          -- 分组可选套餐不能作为满赠赠品；NULL按普通单品处理。
+          AND IFNULL(spu.setmeal_type, 0) != 2
+          -- 有小料配置的单品不能作为赠品。condiments为JSON文本，在SQL中过滤，不查询到应用层判断。
+          -- NULL、空字符串、空数组[]、空对象{}视为无小料；非空非法JSON按有配置处理，避免脏数据误赠。
+          AND IF(
+                spu.condiments IS NULL OR TRIM(spu.condiments) = '',
+                0,
+                IF(JSON_VALID(spu.condiments), IFNULL(JSON_LENGTH(spu.condiments), 0), 1)
+              ) = 0
+          AND spu.commodity_id IN
+        <foreach collection="commodityIds" item="commodityId" open="(" separator="," close=")">
+            #{commodityId}
+        </foreach>
+    </select>
+
+
+</mapper>

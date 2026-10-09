@@ -1,0 +1,64 @@
+--- #################### 数据库相关配置 ####################
+spring:
+  elasticsearch:
+    repositories:
+      enabled: true
+    uris: "http://192.168.31.141:9200"
+    socket-timeout: "30s"
+    username: "elastic"
+    password: ${CLOUD_ANALYSIS_LOCAL_PASSWORD_L9:}
+  datasource:
+    dynamic: # 多数据源配置
+      datasource:
+        sharding:
+          driver-class-name: org.apache.shardingsphere.driver.ShardingSphereDriver
+          url: jdbc:shardingsphere:nacos:sharding.yaml?serverAddr=${spring.cloud.nacos.config.server-addr}&namespace=${spring.cloud.nacos.config.namespace}&username=${spring.cloud.nacos.config.username}&password=${CLOUD_ANALYSIS_LOCAL_EMBEDDED_PASSWORD:}
+        clickhouse:
+          type: com.zaxxer.hikari.HikariDataSource
+          driver-class-name: com.clickhouse.jdbc.ClickHouseDriver
+          url: jdbc:clickhouse://cc-7xvcm0499h03ism79.public.clickhouse.ads.aliyuncs.com:8123/analytics?socket_timeout=300000
+          username: clickhouse
+          password: ${CLOUD_ANALYSIS_LOCAL_PASSWORD_L21:}
+          hikari:
+            connection-timeout: 30000
+            maximum-pool-size: 10
+
+--- #################### Kafka相关配置（广告埋点异步写入，与 order 模块同结构） ####################
+kafka:
+  consumer:
+    enable: true    # 是否开启
+    groupId: analysis-ad-event-group    # 埋点专用消费者组，与订单的 saas_canal 隔离
+    bootstrapServers: node01-local.kafka.htyoudao.com:9092,node02-local.kafka.htyoudao.com:9092,node03-local.kafka.htyoudao.com:9092    # kafka节点
+    keyDeserializer: org.apache.kafka.common.serialization.StringDeserializer    # key反序列化器
+    valueDeserializer: org.apache.kafka.common.serialization.StringDeserializer    # value反序列化器
+    useSecurity: true    # 是否开启安全认证
+    securityProtocol: SASL_PLAINTEXT    # 安全认证使用的协议
+    saslJaasConfig: org.apache.kafka.common.security.plain.PlainLoginModule required username="admin" password="${CLOUD_JAAS_PASSWORD:}";    # 安全认证所需信息
+    saslMechanism: PLAIN    # 安全认证机制
+    concurrency: 3    # 消费并发数，需 <= Topic 分区数，否则多余线程空闲
+  topic:
+    ad-event: ad_event    # 广告埋点 Topic
+  producer:
+    enable: true    # 是否开启
+    bootstrapServers: node01-local.kafka.htyoudao.com:9092,node02-local.kafka.htyoudao.com:9092,node03-local.kafka.htyoudao.com:9092    # kafka节点
+    keySerializer: org.apache.kafka.common.serialization.StringSerializer    # key序列化器
+    valueSerializer: org.apache.kafka.common.serialization.StringSerializer    # value序列化器
+    useSecurity: true    # 是否开启安全认证
+    securityProtocol: SASL_PLAINTEXT    # 安全认证使用的协议
+    saslJaasConfig: org.apache.kafka.common.security.plain.PlainLoginModule required username="admin" password="${CLOUD_JAAS_PASSWORD:}";    # 安全认证所需信息
+    saslMechanism: PLAIN    # 安全认证机制
+    acks: "0"             # 发出即成功，不等 broker 确认（fire-and-forget，埋点场景可接受）
+    retries: 0            # 不重试
+    ad-event-enabled: true    # 广告埋点Kafka发送开关：false 时 /ad-add 埋点链路直接返回成功不发消息（压测/本地调试/紧急止损用），改后 Nacos 热刷新生效，无需重启
+
+--- #################### youdao相关配置 ####################
+
+youdao:
+  info:
+    base-package: com.htyoudao.youdao.module.analysis
+  swagger:
+    title: 管理后台
+    description: 提供统计管理的所有功能
+    version: ${youdao.info.version}
+
+clickhouseTag: 2

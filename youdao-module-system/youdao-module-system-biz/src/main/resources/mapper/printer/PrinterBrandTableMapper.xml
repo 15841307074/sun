@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.htyoudao.youdao.module.system.dal.mysql.printer.PrinterBrandTableMapper">
+
+    <resultMap type="PrinterBrandTable" id="PrinterBrandTableResult">
+        <result property="printerBrandId"    column="printer_brand_id"    />
+        <result property="printerBrandName"    column="printer_brand_name"    />
+        <result property="printerBrandType"    column="printer_brand_type"    />
+        <result property="printerBrandUser"    column="printer_brand_user"    />
+        <result property="printerBrandUserkey"    column="printer_brand_UserKey"    />
+        <result property="contentType"    column="content_type"    />
+        <result property="printerBrandInterface"    column="printer_brand_interface"    />
+    </resultMap>
+
+    <sql id="selectPrinterBrandTableVo">
+        select printer_brand_id, printer_brand_name, printer_brand_type, printer_brand_user, printer_brand_UserKey, content_type, printer_brand_interface from printer_brand_table
+    </sql>
+
+    <select id="selectPrinterBrandTableList" parameterType="PrinterBrandTable" resultMap="PrinterBrandTableResult">
+        <include refid="selectPrinterBrandTableVo"/>
+        <where>
+            <if test="printerBrandTable.printerBrandName != null  and printerBrandTable.printerBrandName != ''"> and printer_brand_name like concat('%', #{printerBrandTable.printerBrandName}, '%')</if>
+            <if test="printerBrandTable.printerBrandType != null  and printerBrandTable.printerBrandType != ''"> and printer_brand_type = #{printerBrandTable.printerBrandType}</if>
+            <if test="printerBrandTable.printerBrandUser != null  and printerBrandTable.printerBrandUser != ''"> and printer_brand_user = #{printerBrandTable.printerBrandUser}</if>
+            <if test="printerBrandTable.printerBrandUserkey != null  and printerBrandTable.printerBrandUserkey != ''"> and printer_brand_UserKey = #{printerBrandTable.printerBrandUserkey}</if>
+            <if test="printerBrandTable.printerBrandInterface != null  and printerBrandTable.printerBrandInterface != ''"> and printer_brand_interface = #{printerBrandTable.printerBrandInterface}</if>
+        </where>
+    </select>
+
+</mapper>

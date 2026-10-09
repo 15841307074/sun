@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.htyoudao.youdao.module.promotion.dal.mysql.lottery.LotteryPrizeMapper">
+
+    <!-- LotteryPrizeMapper.xml -->
+    <update id="updateBatchByCode">
+        UPDATE lottery_prize lp
+        JOIN (
+        <foreach collection="list" item="item" separator=" UNION ALL ">
+            SELECT
+            #{item.code} AS code,
+            #{item.minimumNumber} AS minimum_number,
+            #{item.prizeImgUrl} AS prize_img_url,
+            #{item.isGuarantees} AS is_guarantees,
+            #{item.isRepeat} AS is_repeat,
+            #{item.awardId} AS award_id,
+            #{item.probability} AS probability,
+            #{item.prizeType} AS prize_type,
+            #{item.prizeName} AS prize_name,
+            #{item.prizeNum} AS prize_num,
+            #{item.prizeValue} AS prize_value,
+            #{item.winningCitys} AS winning_citys,
+            #{item.updater} AS updater,
+            #{item.updateTime} AS update_time
+        </foreach>
+        ) AS tmp ON lp.code = tmp.code
+        SET
+        lp.minimum_number = tmp.minimum_number,
+        lp.prize_img_url = tmp.prize_img_url,
+        lp.is_guarantees = tmp.is_guarantees,
+        lp.is_repeat = tmp.is_repeat,
+        lp.award_id = tmp.award_id,
+        lp.probability = tmp.probability,
+        lp.prize_type = tmp.prize_type,
+        lp.prize_name = tmp.prize_name,
+        lp.prize_num = tmp.prize_num,
+        lp.prize_value = tmp.prize_value,
+        lp.winning_citys = tmp.winning_citys,
+        lp.updater = tmp.updater,
+        lp.update_time = tmp.update_time
+    </update>
+</mapper>

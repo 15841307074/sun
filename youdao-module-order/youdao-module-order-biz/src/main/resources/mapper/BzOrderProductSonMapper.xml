@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.htyoudao.youdao.module.order.dal.mysql.BzOrderProductSonMapper">
+    <resultMap id="BaseResultMap" type="com.htyoudao.youdao.module.order.dal.dataobject.order.BzOrderProductSonDO">
+        <id column="order_product_id" jdbcType="BIGINT" property="orderProductId"/>
+        <result column="order_sn" jdbcType="VARCHAR" property="orderSn"/>
+        <result column="goods_id" jdbcType="BIGINT" property="goodsId"/>
+        <result column="goods_name" jdbcType="VARCHAR" property="goodsName"/>
+        <result column="goods_image" jdbcType="VARCHAR" property="goodsImage"/>
+        <result column="spec_values" jdbcType="VARCHAR" property="specValues"/>
+        <result column="goods_show_price" jdbcType="DECIMAL" property="goodsShowPrice"/>
+        <result column="goods_num" jdbcType="INTEGER" property="goodsNum"/>
+        <result column="is_gift" jdbcType="BIT" property="isGift"/>
+        <result column="gift_id" jdbcType="INTEGER" property="giftId"/>
+        <result column="parent_goods_id" jdbcType="BIGINT" property="parentGoodsId"/>
+    </resultMap>
+    <sql id="Example_Where_Clause">
+        <where>
+            <foreach collection="oredCriteria" item="criteria" separator="or">
+                <if test="criteria.valid">
+                    <trim prefix="(" prefixOverrides="and" suffix=")">
+                        <foreach collection="criteria.criteria" item="criterion">
+                            <choose>
+                                <when test="criterion.noValue">
+                                    and ${criterion.condition}
+                                </when>
+                                <when test="criterion.singleValue">
+                                    and ${criterion.condition} #{criterion.value}
+                                </when>
+                                <when test="criterion.betweenValue">
+                                    and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                                </when>
+                                <when test="criterion.listValue">
+                                    and ${criterion.condition}
+                                    <foreach close=")" collection="criterion.value" item="listItem" open="("
+                                             separator=",">
+                                        #{listItem}
+                                    </foreach>
+                                </when>
+                            </choose>
+                        </foreach>
+                    </trim>
+                </if>
+            </foreach>
+        </where>
+    </sql>
+    <sql id="Update_By_Example_Where_Clause">
+        <where>
+            <foreach collection="example.oredCriteria" item="criteria" separator="or">
+                <if test="criteria.valid">
+                    <trim prefix="(" prefixOverrides="and" suffix=")">
+                        <foreach collection="criteria.criteria" item="criterion">
+                            <choose>
+                                <when test="criterion.noValue">
+                                    and ${criterion.condition}
+                                </when>
+                                <when test="criterion.singleValue">
+                                    and ${criterion.condition} #{criterion.value}
+                                </when>
+                                <when test="criterion.betweenValue">
+                                    and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                                </when>
+                                <when test="criterion.listValue">
+                                    and ${criterion.condition}
+                                    <foreach close=")" collection="criterion.value" item="listItem" open="("
+                                             separator=",">
+                                        #{listItem}
+                                    </foreach>
+                                </when>
+                            </choose>
+                        </foreach>
+                    </trim>
+                </if>
+            </foreach>
+        </where>
+    </sql>
+    <sql id="Base_Column_List">
+    order_product_id, order_sn, goods_id, goods_name, goods_image, spec_values, goods_show_price,
+    goods_num, is_gift, gift_id, parent_goods_id
+  </sql>
+    <insert id="insertSingle" parameterType="com.htyoudao.youdao.module.order.dal.dataobject.order.BzOrderProductSonDO">
+    insert into bz_order_product_son (order_product_id, order_sn, goods_id, commodity_id,
+      goods_name, goods_image, spec_values,
+      goods_show_price, goods_num, is_gift,
+      gift_id, parent_goods_id, project_owner_ship)
+    values (#{r.orderProductId,jdbcType=BIGINT}, #{r.orderSn,jdbcType=VARCHAR}, #{r.goodsId,jdbcType=BIGINT}, #{r.commodityId,jdbcType=BIGINT},
+      #{r.goodsName,jdbcType=VARCHAR}, #{r.goodsImage,jdbcType=VARCHAR}, #{r.specValues,jdbcType=VARCHAR},
+      #{r.goodsShowPrice,jdbcType=DECIMAL}, #{r.goodsNum,jdbcType=INTEGER},IFNULL(#{r.isGift,jdbcType=BIT},0),
+      IFNULL(#{r.giftId,jdbcType=INTEGER},0), #{r.parentGoodsId,jdbcType=BIGINT}, #{r.projectOwnerShip,jdbcType=BIGINT})
+  </insert>
+    <update id="updateByExampleSelective" parameterType="map">
+        update bz_order_product_son
+        <set>
+            <if test="record.orderProductId != null">
+                order_product_id = #{record.orderProductId,jdbcType=BIGINT},
+            </if>
+            <if test="record.orderSn != null">
+                order_sn = #{record.orderSn,jdbcType=VARCHAR},
+            </if>
+            <if test="record.goodsId != null">
+                goods_id = #{record.goodsId,jdbcType=BIGINT},
+            </if>
+            <if test="record.goodsName != null">
+                goods_name = #{record.goodsName,jdbcType=VARCHAR},
+            </if>
+            <if test="record.goodsImage != null">
+                goods_image = #{record.goodsImage,jdbcType=VARCHAR},
+            </if>
+            <if test="record.specValues != null">
+                spec_values = #{record.specValues,jdbcType=VARCHAR},
+            </if>
+            <if test="record.goodsShowPrice != null">
+                goods_show_price = #{record.goodsShowPrice,jdbcType=DECIMAL},
+            </if>
+            <if test="record.goodsNum != null">
+                goods_num = #{record.goodsNum,jdbcType=INTEGER},
+            </if>
+            <if test="record.isGift != null">
+                is_gift = #{record.isGift,jdbcType=BIT},
+            </if>
+            <if test="record.giftId != null">
+                gift_id = #{record.giftId,jdbcType=INTEGER},
+            </if>
+            <if test="record.parentGoodsId != null">
+                parent_goods_id = #{record.parentGoodsId,jdbcType=BIGINT},
+            </if>
+        </set>
+        <if test="_parameter != null">
+            <include refid="Update_By_Example_Where_Clause"/>
+        </if>
+    </update>
+
+    <sql id="selectBzOrderProductSonVo">
+        SELECT order_product_id, order_sn, goods_id, goods_name, goods_image, spec_values, goods_show_price, goods_num, is_gift, gift_id, parent_goods_id FROM bz_order_product_son${tableFix}
+    </sql>
+
+    <select id="getOrderProductSonList" parameterType="com.htyoudao.youdao.module.order.dal.dataobject.order.BzOrderProductSonDO" resultMap="BaseResultMap">
+
+            <include refid="selectBzOrderProductSonVo"/>
+            <where>
+                <if test="record.orderSn != null  and record.orderSn != ''">
+                    and order_sn = #{record.orderSn}
+                </if>
+                <if test="record.goodsId != null ">
+                    and goods_id = #{record.goodsId}
+                </if>
+                <if test="record.goodsName != null  and record.goodsName != ''">
+                    and goods_name like concat('%', #{record.goodsName}, '%')
+                </if>
+                <if test="record.goodsImage != null  and record.goodsImage != ''">
+                    and goods_image = #{record.goodsImage}
+                </if>
+                <if test="record.specValues != null  and record.specValues != ''">
+                    and spec_values = #{record.specValues}
+                </if>
+                <if test="record.goodsShowPrice != null ">
+                    and goods_show_price = #{record.goodsShowPrice}
+                </if>
+                <if test="record.goodsNum != null ">
+                    and goods_num = #{record.goodsNum}
+                </if>
+                <if test="record.isGift != null ">
+                    and is_gift = #{record.isGift}
+                </if>
+                <if test="record.giftId != null ">
+                    and gift_id = #{record.giftId}
+                </if>
+                <if test="record.parentGoodsId != null ">
+                    and parent_goods_id = #{record.parentGoodsId}
+                </if>
+                <if test="record.orderProductId != null ">
+                    and order_product_id = #{record.orderProductId}
+                </if>
+                <if test="record.parentGoodsIds != null and record.parentGoodsIds.size > 0">
+                    and parent_goods_id in
+                    <foreach item="goodId" collection="record.parentGoodsIds" open="(" separator="," close=")">
+                        #{goodId}
+                    </foreach>
+                </if>
+                <if test="record.orderSnList != null  and record.orderSnList != ''">
+                    and order_sn in
+                    <foreach collection="record.orderSnList" item="orderSn" open="(" separator="," close=")">
+                        #{orderSn}
+                    </foreach>
+                </if>
+            </where>
+    </select>
+ <select id="productSonList"
+     resultType="com.htyoudao.youdao.module.order.controller.admin.order.vo.analysis.ProductSonResult">
+
+     select
+         s.commodity_id as commodityId ,
+         s.goods_name as goodsName,
+         s.goods_image as goodsImage,
+         sum(s.goods_num) as salesVolume
+     from (
+          <foreach item="tableFix" collection="tableFixs" separator=" union all ">
+        select
+            bops.commodity_id,
+            bops.goods_name,
+            bops.goods_image,
+            bops.goods_num
+        from bz_order_product_son${tableFix} bops
+        left join bz_order${tableFix} bo on bops.order_sn = bo.order_sn
+        left join bz_order_product${tableFix} bop on bops.parent_goods_id = bop.order_product_id
+        where bo.order_state in (20,30,40,50,60,80,110,120,200)
+        <if test="param.storeIds != null and param.storeIds.size() > 0">
+            and bo.store_id in
+            <foreach collection="param.storeIds" item="storeId" open="(" separator="," close=")">
+                #{storeId}
+            </foreach>
+        </if>
+        and bo.create_time between #{param.currentTimeStart} and #{param.currentTimeEnd}
+        and bop.commodity_id = #{param.commodityId}
+    </foreach>
+     )s
+     group by s.commodity_id
+</select>
+
+
+
+<select id="selectSimulationList" resultType="com.htyoudao.youdao.module.order.dal.dataobject.order.BzOrderProductSonDO">
+    SELECT * FROM bz_order_product_son${tableFix} WHERE order_sn = #{orderSn} AND deleted = 0
+</select>
+</mapper>

@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.htyoudao.youdao.module.system.dal.mysql.printer.PrinterSettingMapper">
+
+    <resultMap type="PrinterSetting" id="PrinterSettingResult">
+        <result property="printerSettingId"    column="printer_setting_id"    />
+        <result property="documentType"    column="document_type"    />
+        <result property="printCopies"    column="print_copies"    />
+        <result property="documentSize"    column="document_size"    />
+        <result property="paperCuttingMethod"    column="paper_cutting_method"    />
+        <result property="printableProducts"    column="printable_products"    />
+        <result property="printableChannel"    column="printable_channel"    />
+    </resultMap>
+
+    <sql id="selectPrinterSettingVo">
+        select printer_setting_id, document_type, print_copies, document_size, paper_cutting_method, printable_products, printable_channel from printer_setting
+    </sql>
+
+
+
+    <insert id="insertPrinterSetting" parameterType="PrinterSetting" useGeneratedKeys="true" keyProperty="printerSettingId">
+        insert into printer_setting
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="printerSetting.documentType != null">document_type,</if>
+            <if test="printerSetting.printCopies != null">print_copies,</if>
+            <if test="printerSetting.documentSize != null">document_size,</if>
+            <if test="printerSetting.paperCuttingMethod != null">paper_cutting_method,</if>
+            <if test="printerSetting.printableProducts != null">printable_products,</if>
+            <if test="printerSetting.printableChannel != null">printable_channel,</if>
+            <if test="printerSetting.projectOwnerShip != null">project_owner_ship,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="printerSetting.documentType != null">#{printerSetting.documentType},</if>
+            <if test="printerSetting.printCopies != null">#{printerSetting.printCopies},</if>
+            <if test="printerSetting.documentSize != null">#{printerSetting.documentSize},</if>
+            <if test="printerSetting.paperCuttingMethod != null">#{printerSetting.paperCuttingMethod},</if>
+            <if test="printerSetting.printableProducts != null">#{printerSetting.printableProducts},</if>
+            <if test="printerSetting.printableChannel != null">#{printerSetting.printableChannel},</if>
+            <if test="printerSetting.projectOwnerShip != null">#{printerSetting.projectOwnerShip},</if>
+        </trim>
+    </insert>
+
+    <update id="updatePrinterSetting" parameterType="PrinterSetting">
+        update printer_setting
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="printerSetting.documentType != null">document_type = #{printerSetting.documentType},</if>
+            <if test="printerSetting.printCopies != null">print_copies = #{printerSetting.printCopies},</if>
+            <if test="printerSetting.documentSize != null">document_size = #{printerSetting.documentSize},</if>
+            <if test="printerSetting.paperCuttingMethod != null">paper_cutting_method = #{printerSetting.paperCuttingMethod},</if>
+            <if test="printerSetting.printableProducts != null">printable_products = #{printerSetting.printableProducts},</if>
+            <if test="printerSetting.printableChannel != null">printable_channel = #{printerSetting.printableChannel},</if>
+        </trim>
+        where printer_setting_id = #{printerSetting.printerSettingId}
+    </update>
+
+    <select id="selectPrinterSettingListByIds" parameterType="java.util.List" resultType="PrinterSetting">
+        <include refid="selectPrinterSettingVo"/>
+        where printer_setting_id in
+        <foreach item="printerSettingId" collection="printerSettingIdsForArray" open="(" separator="," close=")">
+            #{printerSettingId}
+        </foreach>
+    </select>
+
+
+
+
+</mapper>

@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.htyoudao.youdao.module.member.dal.mysql.wxmember.WxMemberMapper">
+    <!--
+        一般情况下，尽可能使用 Mapper 进行 CRUD 增删改查即可。
+        无法满足的场景，例如说多表关联查询，才使用 XML 编写 SQL。
+        代码生成器暂时只生成 Mapper XML 文件本身，更多推荐 MybatisX 快速开发插件来生成查询。
+        文档可见：https://www.iocoder.cn/MyBatis/x-plugins/
+     -->
+
+    <select id="getSmsPhone" resultType="java.lang.String">
+        select
+        member_mobile
+        from wx_member_${key}
+        and member_mobile is not null
+        and member_id in
+        <foreach collection="value" item="item" open="(" separator="," close=")">
+            #{item}
+        </foreach>
+    </select>
+
+    <select id="getCommunityList" resultType="java.lang.Long">
+        SELECT DISTINCT
+            wm.member_id
+        FROM wx_member wm
+            JOIN wecom_group_member wgm
+            ON wm.wx_unionid = wgm.union_id
+        WHERE
+            wm.last_login_time >= DATE_SUB(NOW(), INTERVAL 1 YEAR)
+          AND wm.business_id = ${busId}
+          AND wm.wx_unionid IS NOT NULL
+    </select>
+
+    <select id="getNotInCommunityList" resultType="java.lang.Long">
+        SELECT DISTINCT
+            wm.member_id
+        FROM wx_member wm
+                 LEFT JOIN wecom_group_member wgm
+                           ON wm.wx_unionid = wgm.union_id
+                               and wgm.union_id is not null
+        WHERE
+            wm.last_login_time >= DATE_SUB(NOW(), INTERVAL 1 YEAR)
+          AND wm.business_id = ${busId}
+          AND wm.wx_unionid IS NOT NULL
+          AND wgm.union_id IS NULL
+    </select>
+
+    <update id="resetCommunityFlag">
+        UPDATE wx_member_${key} SET community_flag = 1 AND member_category = 0
+    </update>
+    <update id="setCommunityFlag">
+        UPDATE wx_member_${key}
+        SET community_flag = 2
+        WHERE
+            wx_unionid IN (
+                SELECT DISTINCT
+                    union_id
+                FROM
+                    wecom_group_member
+                WHERE
+                    deleted = b'0'
+                  AND union_id IS NOT NULL)
+          AND wx_unionid IS NOT NULL
+          AND member_category = 0
+    </update>
+
+</mapper>

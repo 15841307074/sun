@@ -1,0 +1,201 @@
+--- #################### 数据库相关配置 ####################
+spring:
+  # 数据源配置项
+  datasource:
+    dynamic: # 多数据源配置
+      datasource:
+        sharding:
+          type: com.zaxxer.hikari.HikariDataSource
+          driver-class-name: org.apache.shardingsphere.driver.ShardingSphereDriver
+          url: jdbc:shardingsphere:nacos:sharding.yaml?serverAddr=${spring.cloud.nacos.config.server-addr}&namespace=${spring.cloud.nacos.config.namespace}&username=${spring.cloud.nacos.config.username}&password=${CLOUD_PROMOTION_LOCAL_EMBEDDED_PASSWORD:}
+        shadow_sharding:
+          type: com.zaxxer.hikari.HikariDataSource
+          driver-class-name: org.apache.shardingsphere.driver.ShardingSphereDriver
+          url: jdbc:shardingsphere:nacos:shadow_sharding.yaml?serverAddr=${spring.cloud.nacos.config.server-addr}&namespace=${spring.cloud.nacos.config.namespace}&username=${spring.cloud.nacos.config.username}&password=${CLOUD_PROMOTION_LOCAL_EMBEDDED_PASSWORD:}
+  elasticsearch:
+    repositories:
+      enabled: true
+    uris: "http://192.168.31.141:9200"
+    # uris: "https://es-cn-rno438wed0006j382.elasticsearch.aliyuncs.com:9200" 生产
+    socket-timeout: "10s"
+    username: "elastic"
+    password: ${CLOUD_PROMOTION_LOCAL_PASSWORD_L22:}
+--- #################### youdao相关配置 ####################
+
+youdao:
+  info:
+    base-package: com.htyoudao.youdao.module.promotion
+  swagger:
+    title: 管理后台
+    description: 提供营销管理的所有功能
+    version: ${youdao.info.version}
+coupon:
+  largePicUrl: https://zjhb0090-local.oss-cn-beijing.aliyuncs.com/2024/NOVEMBER/27/14/47/7a2a0553-15f0-4462-a38e-8514b016e73c.jpg
+  littlePicUrl: https://zjhb0090-local.oss-cn-beijing.aliyuncs.com/2024/NOVEMBER/27/14/47/0f353f24-3361-4f7b-9d84-cf610146d020.jpg
+  #sortPath: /pages/coupon/couponReceive
+  sortPath: /pages/GetCoupon/GetCoupon
+  sort:
+    server:
+      host: https://s.htyoudao.com/rest/v3/short-urls
+    h5:
+      host: https://test-h5.htyoudao.com/coupon?id=
+    #sortPath: /pages/coupon/couponReceive
+    sortPath: /pages/GetCoupon/GetCoupon
+    apiKey: ${CLOUD_PROMOTION_LOCAL_APIKEY_L44:}
+couponPackage:
+  packageId: 1
+  zzPackageId: 6
+  sort:
+    #sortPath: /pages/coupon/couponPackage
+    sortPath: /pages/GetCouponPackage/GetCouponPackage
+    h5:
+      host: https://test-h5.htyoudao.com/coupon?id=
+market:
+  sms:
+    signName: 零零玖零餐饮
+    templateCode: SMS_484645045
+    templateParam: '{"code":"2o6F","name":"尊贵的回归会员"}'
+  sortPath: /pages/coupon/marketCouponPackage
+  #sortPath: /pages/couponPackage/couponPackage
+  storeIds: "1326599768014848,1326601986113536,1326605314195456,1326610118049792,1326611980648448,1326615734255616,1326617321963520,1326619081998336,1326623908495360,1326626035138560,1326627672096768,1225562759917232128,1225573285028192256,1225574631524818944,1233039563626143744,1233042129382825984,1225575721087557632,1264898264526512128,1326607875604480,1288853057647173632"
+
+md5:
+  secret: ${CLOUD_PROMOTION_LOCAL_SECRET_L63:}
+wx:
+  generate_url: https://api.weixin.qq.com/wxa/generatescheme?access_token=
+  env_version: trial
+  app_code_url: https://api.weixin.qq.com/wxa/getwxacodeunlimit?access_token=
+
+wechat:
+  schemeInfo:
+    envVersion: trial
+  pay:
+    hanbao:
+      mch-id: 1729793817              # 商户号
+      app-id: wx3b84773f5f12d87f      # appID
+      cert-serial-no: 7BA37A098376D524198F55F91061F95EFEADB716   # 商户API证书序列号
+      private-key-path: /pemfile/apiclient_key.pem  # 商户API证书私钥文件路径
+      wechat-public-key-id: PUB_KEY_ID_0117297938172025101400382046001400          # 微信支付公钥ID
+      wechat-public-key-path: /pemfile/pub_key.pem  # 微信支付公钥文件路径
+      transfer-scene-id: 1000    # 场景ID
+      notify-url: https://test-saas.htyoudao.com/prod-api/app-api/promotion/redPacket/notify   # 回调地址
+      api-V3-key: ${CLOUD_PROMOTION_LOCAL_API_V3_KEY_L82:}
+
+sms:
+  access-key-id: ${CLOUD_PROMOTION_LOCAL_ACCESS_KEY_ID_L85:}
+  access-key-secret: ${CLOUD_PROMOTION_LOCAL_ACCESS_KEY_SECRET_L86:}
+  endpoint: dysmsapi.aliyuncs.com
+  auto-retry: false
+  max-retry-times: 3
+
+activity:
+  default:
+    appletName: 默认渠道(小程序活动路径)
+    socialName: 默认渠道(社群活动路径)
+    h5Name: 默认渠道(微信H5路径)
+  njnz:
+    switch: 1
+  seckill:  #秒杀
+    sortPath: /marketing/SeckillPage/SeckillPage
+    h5Path: https://test-h5.htyoudao.com/flashSale?id=
+    shareImageUrl: https://pfiles.htyoudao.com/2026/04/17/fn2fmlksk01776411994908.png
+    shareTitle: 限时秒杀
+    shareDescription: 限时秒杀，等你开启！
+  lottery: #抽奖
+    turntable: #转盘
+      sortPath: /pages/turntable/index
+      h5Path: https://test-h5.htyoudao.com/turntable?id=
+    fortune: #福袋
+      sortPath: /pages/turntable/lucky
+      h5Path: https://test-h5.htyoudao.com/lucky?id=
+  collect: #集点
+    sortPath: /marketing/CollectPoints/CollectPoints
+    h5Path: https://test-h5.htyoudao.com/collection?id=
+    shareImageUrl: https://pfiles.htyoudao.com/2026/04/17/2jn6jvcq1t1776411960789.png
+    shareTitle: 集点“堡”藏
+    shareDescription: 吃汉堡，集点数，换心动好礼！
+  coupon: #优惠卷
+    sortPath: /pages/GetCoupon/GetCoupon
+    h5Path: https://test-h5.htyoudao.com/coupon?id=
+  couponPackage: #优惠卷包
+    sortPath: /pages/GetCouponPackage/GetCouponPackage
+    h5Path: https://test-h5.htyoudao.com/packages?id=
+  card: #集卡
+    shareImageUrl: https://pfiles.htyoudao.com/2026/04/17/u9vdugh36h1776412672801.png
+    shareTitle: 集卡大作战，好礼兑不停
+    shareDescription: 好礼任选，隐藏福利等你拿!
+    sortPath: /marketing/CollectCard/CollectCard
+    h5Path: https://test-h5.htyoudao.com/collecting?id=
+  cq: #抽签
+    shareImageUrl: https://pfiles.htyoudao.com/2026/04/17/101jr2yxlb1776412015247.png
+    shareTitle: 限时赢福利
+    shareDescription: 豪礼带回家！!
+    sortPath: /marketing/DrawLots/DrawLots
+    h5Path: https://test-h5.htyoudao.com/drawLots?id=
+    # 1 开启：支付宝用户不能中大奖；0 关闭：支付宝用户可以中大奖
+    alipayGrandPrizeExclude: 0
+    grandPrizeMobileBlacklist: "18624318321"
+  sign: #抽签
+    shareImageUrl: https://pfiles.htyoudao.com/2026/06/17/apm3cvhqp71781685621106.png
+    shareTitle: 签到领福利,优惠不间断
+    shareDescription: 签到赢好礼,福利优惠享不停
+    sortPath: /marketing/SignInActivity/SignInActivity
+    h5Path: https://test-h5.htyoudao.com/SignInActivity?id=
+  wj: #问卷
+    shareImageUrl: https://pfiles.htyoudao.com/2026/07/08/b0v2ovf9wq1783474388607.jpg
+    shareTitle: 您有一份专属问卷待填写
+    shareDescription: 诚邀您参与本次调研，您的意见对我们至关重要！
+    sortPath: /marketing/QuestionnaireSurvey/QuestionnaireSurvey
+    h5Path: https://test-h5.htyoudao.com/questionnaire?id=
+  dt: #有奖问答
+    shareImageUrl: https://pfiles.htyoudao.com/2026/07/09/zy7e7lgnkh1783582821897.jpg
+    shareTitle: 轻松答题领豪礼
+    shareDescription: 超多惊喜,在等你
+    sortPath: marketing/ActivityAnswer/ActivityAnswer
+    h5Path: https://test-h5.htyoudao.com/answer?id=
+  vote: #投票
+    shareImageUrl: https://pfiles.htyoudao.com/2026/08/05/rfayo22w5h1785909818971.jpg
+    shareTitle: 参与投票，即得惊喜好礼
+    shareDescription: 动动手指投一票，多重好礼放肆送~
+    sortPath: /marketing/QuestionnaireSurvey/QuestionnaireSurvey
+    h5Path: https://test-h5.htyoudao.com/questionnaire?id=
+
+--- #################### MQ相关配置 ####################
+spring:
+  rabbitmq:
+    # 集群节点地址列表（逗号分隔）
+    addresses: 192.168.31.141:5672,192.168.31.142:5672,192.168.31.143:5672
+    username: admin
+    password: ${CLOUD_PROMOTION_LOCAL_PASSWORD_L169:}
+    virtual-host: saas_prod_vhost
+    # 连接池配置
+    connection-timeout: 3000
+    cache:
+      channel:
+        size: 50  # 通道缓存数量
+      connection:
+        mode: CONNECTION  # 连接缓存模式
+    # 消息确认配置
+    publisher-confirm-type: correlated  # 发布确认
+    publisher-returns: true  # 返回模式
+    template:
+      mandatory: true
+    listener:
+      simple:
+        acknowledge-mode: manual  # 手动ACK
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 2000
+#会员卡发放权益线程配置
+promotion:
+  member-card-benefit:
+    write-thread-num: 10
+    write-chunk-size: 500
+  sign:
+    test-date-enabled: true
+  member-card-coupon-archive: #一级会员卡发放优惠券任务是否开启 5:30限制
+    daily-stop-enabled: false
+
+userCoupon:
+  exportLimit: 300000

@@ -1,0 +1,666 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.htyoudao.youdao.module.order.dal.mysql.ReportOrderMapper">
+
+
+    <select id="getReportTotalPSX" resultType="com.htyoudao.youdao.module.order.dal.DTO.OrderReportDTO">
+        SELECT count(*)      totalNum,
+               sum(s.amount) totalAmount,
+                1             type,
+                #{numberType}              numberType
+        FROM (SELECT a.store_id,
+                     sum(a.order_amount) AS amount
+              FROM (SELECT order_amount,
+                           store_id
+                    FROM scm_order${tableFix0}
+                    WHERE create_time >= #{startTime}
+                      AND create_time &lt;= #{endTime}
+                      AND delivery_line_name not like '%发货%'
+                      AND store_name not like '%220%'
+                      AND delivery_line_name != '外地发货线'
+                    AND delivery_line_name != '社会店专线'
+                    AND delivery_line_name != '总部线路'
+                    AND warehouse_name != '测试仓库勿动'
+                    AND warehouse_name != '测试专用仓库'
+                      and project_code = 1
+                      AND order_type = 0
+                      AND order_status != 7
+                      AND order_status != 70
+                      AND order_status != 0
+                    UNION ALL
+                    SELECT
+                        order_amount, store_id
+                    FROM
+                        scm_order${tableFix1}
+                    WHERE
+                        create_time >= #{startTime}
+                      AND create_time &lt;= #{endTime}
+                      AND delivery_line_name not like '%发货%'
+                      AND store_name not like '%220%'
+                      AND delivery_line_name != '外地发货线'
+                      AND delivery_line_name != '社会店专线'
+                      AND delivery_line_name != '总部线路'
+                      AND warehouse_name != '测试仓库勿动'
+                      AND warehouse_name != '测试专用仓库'
+                      and project_code = 1
+                      AND order_type = 0
+                      AND order_status != 7
+                      AND order_status != 70
+                      AND order_status != 0) a
+              GROUP BY store_id) s
+    </select>
+
+    <select id="getReportTotalFHX" resultType="com.htyoudao.youdao.module.order.dal.DTO.OrderReportDTO">
+        SELECT count(*)      totalNum,
+               sum(s.amount) totalAmount,
+               2              type,
+               #{numberType}              numberType
+        FROM (SELECT a.store_id,
+                     sum(a.order_amount) AS amount
+              FROM (SELECT order_amount,
+                           store_id
+                    FROM scm_order${tableFix0}
+                    WHERE create_time >= #{startTime}
+                      AND create_time &lt;= #{endTime}
+                      AND delivery_line_name like '%发货%'
+                      AND delivery_line_name != '外地发货线'
+                      AND store_name not like '%220%'
+                      AND warehouse_name != '测试仓库勿动'
+                      AND warehouse_name != '测试专用仓库'
+                      and project_code = 1
+                      AND order_type = 0
+                      AND order_status != 7
+                      AND order_status != 70
+                      AND order_status != 0
+                    UNION ALL
+                    SELECT
+                        order_amount, store_id
+                    FROM
+                        scm_order${tableFix1}
+                    WHERE
+                        create_time >= #{startTime}
+                      AND create_time &lt;= #{endTime}
+                      AND delivery_line_name like '%发货%'
+                      AND delivery_line_name != '外地发货线'
+                      AND store_name not like '%220%'
+                      AND warehouse_name != '测试仓库勿动'
+                      AND warehouse_name != '测试专用仓库'
+                      and project_code = 1
+                      AND order_type = 0
+                      AND order_status != 7
+                      AND order_status != 70
+                      AND order_status != 0) a
+              GROUP BY store_id) s
+    </select>
+
+    <select id="getReportTotalWDX" resultType="com.htyoudao.youdao.module.order.dal.DTO.OrderReportDTO">
+        SELECT count(*)      totalNum,
+               sum(s.amount) totalAmount,
+               3              type,
+               #{numberType}              numberType
+        FROM (SELECT a.store_id,
+                     sum(a.order_amount) AS amount
+              FROM (SELECT order_amount,
+                           store_id
+                    FROM scm_order${tableFix0}
+                    WHERE create_time >= #{startTime}
+                      AND create_time &lt;= #{endTime}
+                      AND delivery_line_name = '外地发货线'
+                      AND warehouse_name != '测试仓库勿动'
+				      AND warehouse_name != '测试专用仓库'
+                      AND project_code = 1
+                      AND order_type = 0
+                      AND order_status != 7
+                      AND order_status != 70
+                      AND order_status != 0
+                    UNION ALL
+                    SELECT
+                        order_amount, store_id
+                    FROM
+                        scm_order${tableFix1}
+                    WHERE
+                        create_time >= #{startTime}
+                      AND create_time &lt;= #{endTime}
+                      AND delivery_line_name = '外地发货线'
+                      AND warehouse_name != '测试仓库勿动'
+                      AND warehouse_name != '测试专用仓库'
+                      AND project_code = 1
+                      AND order_type = 0
+                      AND order_status != 7
+                      AND order_status != 70
+                      AND order_status != 0) a
+              GROUP BY store_id) s
+    </select>
+
+    <select id="getReportTotal220" resultType="com.htyoudao.youdao.module.order.dal.DTO.OrderReportDTO">
+        SELECT count(*)      totalNum,
+               sum(s.amount) totalAmount,
+               4              type,
+               #{numberType}              numberType
+        FROM (SELECT a.store_id,
+                     sum(a.order_amount) AS amount
+              FROM (SELECT order_amount,
+                           store_id
+                    FROM scm_order${tableFix0}
+                    WHERE create_time >= #{startTime}
+                      AND create_time &lt;= #{endTime}
+                      AND delivery_line_name = '社会店专线'
+                      AND store_name like '%220%'
+                      AND warehouse_name != '测试仓库勿动'
+				      AND warehouse_name != '测试专用仓库'
+                      AND order_type = 0
+                      AND order_status != 7
+                      AND order_status != 70
+                      AND order_status != 0
+                    UNION ALL
+                    SELECT
+                        order_amount, store_id
+                    FROM
+                        scm_order${tableFix1}
+                    WHERE
+                        create_time >= #{startTime}
+                      AND create_time &lt;= #{endTime}
+                      AND delivery_line_name = '社会店专线'
+                      AND store_name like '%220%'
+                      AND warehouse_name != '测试仓库勿动'
+                      AND warehouse_name != '测试专用仓库'
+                      AND order_type = 0
+                      AND order_status != 7
+                      AND order_status != 70
+                      AND order_status != 0) a
+              GROUP BY store_id) s
+    </select>
+
+    <select id="getReportTotalZBX" resultType="com.htyoudao.youdao.module.order.dal.DTO.OrderReportDTO">
+        SELECT count(*)      totalNum,
+               sum(s.amount) totalAmount,
+               5              type,
+               #{numberType}              numberType
+        FROM (SELECT a.store_id,
+                     sum(a.order_amount) AS amount
+              FROM (SELECT order_amount,
+                           store_id
+                    FROM scm_order${tableFix0}
+                    WHERE create_time >= #{startTime}
+                      AND create_time &lt;= #{endTime}
+                      AND project_code = 1
+                      AND delivery_line_name = '总部线路'
+                      AND warehouse_name != '测试仓库勿动'
+				      AND warehouse_name != '测试专用仓库'
+                      AND order_type = 0
+                      AND order_status != 7
+                      AND order_status != 70
+                      AND order_status != 0
+                    UNION ALL
+                    SELECT
+                        order_amount, store_id
+                    FROM
+                        scm_order${tableFix1}
+                    WHERE
+                        create_time >= #{startTime}
+                      AND create_time &lt;= #{endTime}
+                      AND project_code = 1
+                      AND delivery_line_name = '总部线路'
+                      AND warehouse_name != '测试仓库勿动'
+                      AND warehouse_name != '测试专用仓库'
+                      AND order_type = 0
+                      AND order_status != 7
+                      AND order_status != 70
+                      AND order_status != 0) a
+              GROUP BY store_id) s
+    </select>
+
+    <select id="getReportTotalLDS" resultType="com.htyoudao.youdao.module.order.dal.DTO.OrderReportDTO">
+        SELECT count(*)      totalNum,
+               sum(s.amount) totalAmount,
+               6              type,
+               #{numberType}              numberType
+        FROM (SELECT a.store_id,
+                     sum(a.order_amount) AS amount
+              FROM (SELECT order_amount,
+                           store_id
+                    FROM scm_order${tableFix0}
+                    WHERE create_time >= #{startTime}
+                      AND create_time &lt;= #{endTime}
+                      AND delivery_line_name = '社会店专线'
+                      AND project_name = '浪大勺'
+                      AND store_name not like '%（异常，外售）%'
+                      AND warehouse_name != '测试仓库勿动'
+				      AND warehouse_name != '测试专用仓库'
+                      AND order_type = 0
+                      AND order_status != 7
+                      AND order_status != 70
+                      AND order_status != 0
+                    UNION ALL
+                    SELECT
+                        order_amount, store_id
+                    FROM
+                        scm_order${tableFix1}
+                    WHERE
+                        create_time >= #{startTime}
+                      AND create_time &lt;= #{endTime}
+                      AND delivery_line_name = '社会店专线'
+                      AND project_name = '浪大勺'
+                      AND store_name not like '%（异常，外售）%'
+                      AND warehouse_name != '测试仓库勿动'
+                      AND warehouse_name != '测试专用仓库'
+                      AND order_type = 0
+                      AND order_status != 7
+                      AND order_status != 70
+                      AND order_status != 0) a
+              GROUP BY store_id) s
+    </select>
+
+    <select id="getReportWarehouse" resultType="com.htyoudao.youdao.module.order.dal.DTO.OrderReportDTO">
+        SELECT w.warehouse_name warehouseName,
+               ss.amount totalAmount,
+               ss.cnt totalNum,
+               #{numberType}  numberType
+        FROM (SELECT *
+              FROM scm_warehouse
+              WHERE is_delete = 0
+                AND warehouse_name != '测试仓库勿动' AND warehouse_name != '测试专用仓库' AND warehouse_name != '沈阳仓样品库' AND warehouse_name NOT LIKE '%丰裕%'
+              ORDER BY id) w
+                 LEFT JOIN (SELECT s.warehouse_id,
+                                   count(*)      cnt,
+                                   sum(s.amount) amount
+                            FROM (SELECT a.warehouse_id,
+                                         a.store_id,
+                                         sum(a.order_amount) AS amount
+                                  FROM (SELECT store_id,
+                                               order_amount,
+                                               warehouse_id
+                                        FROM scm_order${tableFix0}
+                                        WHERE create_time >= #{startTime}
+                                          AND create_time &lt;= #{endTime}
+                                          AND project_code = 1
+                                          AND delivery_line_name != '外地发货线'
+                                          AND delivery_line_name != '社会店专线'
+                                          AND store_name NOT LIKE '%220%'
+                                          AND delivery_line_name != '总部线路'
+                                          AND order_type = 0
+                                          AND order_status != 7
+                                          AND order_status != 70
+                                          AND order_status != 0
+                                        UNION ALL
+                                        SELECT
+                                            store_id, order_amount, warehouse_id
+                                        FROM
+                                            scm_order${tableFix1}
+                                        WHERE
+                                            create_time >= #{startTime}
+                                          AND create_time &lt;= #{endTime}
+                                          AND project_code = 1
+                                          AND delivery_line_name != '外地发货线'
+                                          AND delivery_line_name != '社会店专线'
+                                          AND store_name NOT LIKE '%220%'
+                                          AND delivery_line_name != '总部线路'
+                                          AND order_type = 0
+                                          AND order_status != 7
+                                          AND order_status != 70
+                                          AND order_status != 0) a
+                                  GROUP BY warehouse_id,
+                                           store_id) s
+                            GROUP BY s.warehouse_id) ss ON ss.warehouse_id = w.id
+    </select>
+
+    <select id="getReportCommodity" resultType="com.htyoudao.youdao.module.order.dal.DTO.OrderReportDTO">
+        SELECT spu.warehouse_name AS warehouseName,
+               spu.stastics_commodity_name AS commodityName,
+               IF
+               (b.commodityAmount IS NOT NULL, b.commodityAmount, 0)                                     AS totalAmount,
+               IF
+               (b.commodityAmount IS NOT NULL, ROUND(b.commodityAmount / bt.commodityAmount, 4), 0.0000) AS proportion,
+               #{numberType}              numberType
+        FROM (SELECT warehouse_id,
+                     warehouse_name,
+                     commodity_name,
+                     stastics_commodity_name
+              FROM scm_commodity
+              WHERE is_delete = 0
+                AND stastics_commodity_name IS NOT NULL
+                AND warehouse_name != '测试仓库勿动'
+        AND warehouse_name != '测试专用仓库'
+        AND warehouse_name != '沈阳仓样品库'
+        AND project_code = 1
+              GROUP BY
+                  warehouse_id,
+                  stastics_commodity_name) spu
+                 LEFT JOIN (SELECT k.warehouse_id,
+                                   k.stastics_commodity_name,
+                                   sum(k.commodity_amount) commodityAmount
+                            FROM (SELECT od.warehouse_id,
+                                         od.stastics_commodity_name,
+                                         od.commodity_amount
+                                  FROM scm_order_detail${tableFix0} od
+                                           LEFT JOIN scm_order${tableFix0} o ON o.id = od.order_id
+                                  WHERE o.order_status != 7
+        AND o.order_status != 70
+        AND o.order_status != 0
+        AND o.order_type = 0
+        AND o.project_code = 1
+        AND o.delivery_line_name != '外地发货线'
+        AND o.delivery_line_name != '社会店专线'
+        AND o.store_name NOT LIKE '%220%'
+        AND o.delivery_line_name != '总部线路'
+        AND od.stastics_commodity_name IS NOT NULL
+        AND o.create_time >= #{startTime}
+                                    AND o.create_time &lt;= #{endTime}
+                                  UNION ALL
+                                  SELECT
+                                      od.warehouse_id, od.stastics_commodity_name, od.commodity_amount
+                                  FROM
+                                      scm_order_detail${tableFix1} od
+                                      LEFT JOIN scm_order${tableFix1} o
+                                  ON o.id = od.order_id
+                                  WHERE
+                                      o.order_status != 7
+                                    AND o.order_status != 70
+                                    AND o.order_status != 0
+                                    AND o.order_type = 0
+                                    AND o.project_code = 1
+                                    AND o.delivery_line_name != '外地发货线'
+                                    AND o.delivery_line_name != '社会店专线'
+                                    AND o.store_name NOT LIKE '%220%'
+                                    AND o.delivery_line_name != '总部线路'
+                                    AND od.stastics_commodity_name IS NOT NULL
+                                    AND o.create_time >= #{startTime}
+                                    AND o.create_time &lt;= #{endTime}) k
+                            GROUP BY k.warehouse_id,
+                                     k.stastics_commodity_name) b
+                           ON b.stastics_commodity_name = spu.stastics_commodity_name
+                               AND b.warehouse_id = spu.warehouse_id
+                 LEFT JOIN (SELECT k.warehouse_id,
+                                   sum(k.commodity_amount) commodityAmount
+                            FROM (SELECT od.warehouse_id,
+                                         od.commodity_amount
+                                  FROM scm_order_detail${tableFix0} od
+                                           LEFT JOIN scm_order${tableFix0} o ON o.id = od.order_id
+                                  WHERE o.order_status != 7
+        AND o.order_status != 70
+        AND o.order_status != 0
+        AND o.order_type = 0
+        AND o.delivery_line_name != '外地发货线'
+        AND o.delivery_line_name != '社会店专线'
+        AND o.store_name NOT LIKE '%220%'
+        AND o.delivery_line_name != '总部线路'
+        AND od.stastics_commodity_name IS NOT NULL
+        AND o.project_code = 1
+        AND o.create_time >= #{startTime}
+                                    AND o.create_time &lt;= #{endTime}
+                                  UNION ALL
+                                  SELECT
+                                      od.warehouse_id, od.commodity_amount
+                                  FROM
+                                      scm_order_detail${tableFix1} od
+                                      LEFT JOIN scm_order${tableFix1} o
+                                  ON o.id = od.order_id
+                                  WHERE
+                                      o.order_status != 7
+                                    AND o.order_status != 70
+                                    AND o.order_status != 0
+                                    AND o.order_type = 0
+                                    AND o.project_code = 1
+                                    AND o.delivery_line_name != '外地发货线'
+                                    AND o.delivery_line_name != '社会店专线'
+                                    AND o.store_name NOT LIKE '%220%'
+                                    AND o.delivery_line_name != '总部线路'
+                                    AND od.stastics_commodity_name IS NOT NULL
+                                    AND o.create_time >= #{startTime}
+                                    AND o.create_time &lt;= #{endTime}) k
+                            GROUP BY k.warehouse_id) bt ON bt.warehouse_id = b.warehouse_id
+        ORDER BY spu.warehouse_id,
+                 b.commodityAmount DESC
+    </select>
+
+    <select id="getReportStoreSales" resultType="com.htyoudao.youdao.module.order.dal.DTO.OrderReportDTO">
+        SELECT store.store_name                                storeName,
+               IF
+               (s.payAmount IS NOT NULL, s.payAmount, 0.00) AS totalAmount,
+               IF
+               (s.orderCnt IS NOT NULL, s.orderCnt, 0)      AS totalNum,
+               #{numberType}              numberType
+        FROM (SELECT store_id,
+                     store_name,
+                     warehouse_name
+              FROM system_store_info
+              WHERE store_name NOT LIKE '%总部%'
+                AND store_name NOT LIKE '%测试%'
+                AND store_name NOT LIKE '%零零%'
+                AND store_name != '图洛'
+        AND business_id = 10) store
+                 LEFT JOIN (SELECT a.store_id,
+                                   sum(a.pay_amount) payAmount,
+                                   count(*) AS       orderCnt
+                            FROM (SELECT store_id,
+                                         pay_amount
+                                  FROM bz_order${tableFix0}
+                                  WHERE create_time >= #{startTime}
+                                    AND create_time &lt;= #{endTime}
+                                    AND order_state != 0
+        AND order_state != 70
+        AND order_state != 10
+        AND order_state != 100
+        AND order_state != 90
+        AND order_state != - 10
+                                  UNION ALL
+                                  SELECT
+                                      store_id, pay_amount
+                                  FROM
+                                      bz_order${tableFix1}
+                                  WHERE
+                                      create_time >= #{startTime}
+                                    AND create_time &lt;= #{endTime}
+                                    AND order_state != 0
+                                    AND order_state != 70
+                                    AND order_state != 10
+                                    AND order_state != 100
+                                    AND order_state != 90
+                                    AND order_state != - 10) a
+                            GROUP BY store_id) s ON s.store_id = store.store_id
+--         WHERE s.orderCnt IS NOT NULL
+--           AND s.orderCnt > 0
+    </select>
+
+    <select id="getReportStastics" resultType="com.htyoudao.youdao.module.order.dal.DTO.OrderReportDTO">
+        SELECT store.warehouse_name                               warehouseName,
+               store.store_name                                   storeName,
+               <if test="numberType == 1">
+               IF
+               (s.amount IS NOT NULL, s.amount, 0) / 7         AS buyAmount,
+               IF
+               (xs.orderCnt IS NOT NULL, xs.orderCnt, 0) / 7   AS totalNum,
+               IF
+               (xs.payAmount IS NOT NULL, xs.payAmount, 0) / 7 AS totalAmount,
+                </if>
+            <if test="numberType == 2">
+                IF
+                (s.amount IS NOT NULL, s.amount, 0)         AS buyAmount,
+                IF
+                (xs.orderCnt IS NOT NULL, xs.orderCnt, 0)   AS totalNum,
+                IF
+                (xs.payAmount IS NOT NULL, xs.payAmount, 0) AS totalAmount,
+            </if>
+               #{numberType}              numberType
+        FROM (SELECT store_id,
+                     store_name,
+                     warehouse_name
+              FROM system_store_info
+              WHERE store_name NOT LIKE '%总部%'
+                AND store_name NOT LIKE '%测试%'
+                AND store_name NOT LIKE '%零零%'
+                AND store_name != '图洛'
+        AND business_id = 10
+        AND del_flag = 0) store
+                 LEFT JOIN (SELECT a.store_id,
+                                   sum(a.order_amount) AS amount,
+                                   count(*)            AS totalCnt
+                            FROM (SELECT order_amount,
+                                         store_id
+                                  FROM scm_order${tableFix0}
+                                  WHERE create_time >= #{startTime}
+                                    AND create_time &lt;= #{endTime}
+                                    AND project_code = 1
+                                    AND delivery_line_name != '外地发货线'
+        AND delivery_line_name != '社会店专线'
+        AND store_name NOT LIKE '%220%'
+        AND delivery_line_name != '总部线路'
+        AND warehouse_name != '测试仓库勿动'
+        AND order_type = 0
+        AND order_status != 7
+        AND order_status != 70
+        AND order_status != 0
+                                  UNION ALL
+                                  SELECT
+                                      order_amount, store_id
+                                  FROM
+                                      scm_order${tableFix1}
+                                  WHERE
+                                      create_time >= #{startTime}
+                                    AND create_time &lt;= #{endTime}
+                                    AND project_code = 1
+                                    AND delivery_line_name != '外地发货线'
+                                    AND delivery_line_name != '社会店专线'
+                                    AND store_name NOT LIKE '%220%'
+                                    AND delivery_line_name != '总部线路'
+                                    AND warehouse_name != '测试仓库勿动'
+                                    AND order_type = 0
+                                    AND order_status != 7
+                                    AND order_status != 70
+                                    AND order_status != 0) a
+                            GROUP BY store_id) s ON s.store_id = store.store_id
+                 LEFT JOIN (SELECT a.store_id,
+                                   count(*)          AS orderCnt,
+                                   sum(a.pay_amount) AS payAmount
+                            FROM (SELECT store_id,
+                                         pay_amount
+                                  FROM bz_order${tableFix0}
+                                  WHERE create_time >= #{startTime}
+                                    AND create_time &lt;= #{endTime}
+                                    AND order_state != 0
+        AND order_state != 70
+        AND order_state != 10
+        AND order_state != 100
+        AND order_state != 90
+        AND order_state != - 10
+                                  UNION ALL
+                                  SELECT
+                                      store_id, pay_amount
+                                  FROM
+                                      bz_order${tableFix1}
+                                  WHERE
+                                      create_time >= #{startTime}
+                                    AND create_time &lt;= #{endTime}
+                                    AND order_state != 0
+                                    AND order_state != 70
+                                    AND order_state != 10
+                                    AND order_state != 100
+                                    AND order_state != 90
+                                    AND order_state != - 10) a
+                            GROUP BY store_id) xs ON xs.store_id = store.store_id
+        WHERE
+--             (s.amount IS NOT NULL OR xs.orderCnt IS NOT NULL) AND
+           store.warehouse_name IS NOT NULL
+    </select>
+
+    <select id="getAppSalesNum">
+        SELECT count(*) FROM (
+        SELECT a.store_id,
+               count(*) c
+        FROM (SELECT store_id
+              FROM bz_order${tableFix0}
+              WHERE create_time >= #{startTime}
+                AND create_time &lt;= #{endTime}
+                AND order_state != 0
+                AND order_state != 70
+                AND order_state != 10
+                AND order_state != 100
+                AND order_state != 90
+                AND order_state != - 10
+                AND business_id = 10
+                AND store_name NOT LIKE '%总部%'
+                AND store_name NOT LIKE '%测试%'
+                AND store_name NOT LIKE '%零零%'
+                AND store_name != '图洛'
+              UNION ALL
+              SELECT
+                  store_id
+              FROM
+                  bz_order${tableFix1}
+              WHERE
+                  create_time >= #{startTime}
+                AND create_time &lt;= #{endTime}
+                AND order_state != 0
+                AND order_state != 70
+                AND order_state != 10
+                AND order_state != 100
+                AND order_state != 90
+                AND order_state != - 10
+                AND business_id = 10
+                AND store_name NOT LIKE '%总部%'
+                AND store_name NOT LIKE '%测试%'
+                AND store_name NOT LIKE '%零零%'
+                AND store_name != '图洛') a
+        GROUP BY a.store_id
+        HAVING c > 0
+                             ) b
+    </select>
+
+    <select id="getReportBuyProportion">
+        SELECT
+            k.warehouse_name warehouseName,
+            k.store_name storeName,
+            k.stastics_commodity_name commodityName,
+            sum( k.commodity_amount ) buyAmount
+        FROM
+            (
+                SELECT
+                    od.store_id,
+                    od.warehouse_id,
+                    od.warehouse_name,
+                    od.store_name,
+                    od.stastics_commodity_name,
+                    od.min_number,
+                    od.commodity_amount
+                FROM
+                    scm_order_detail${tableFix0} od
+                        LEFT JOIN scm_order${tableFix0} o ON o.id = od.order_id
+                WHERE
+                    od.warehouse_name != '测试仓库勿动'
+				AND od.warehouse_name != '测试专用仓库'
+				AND od.warehouse_name != '沈阳仓样品库'
+				AND od.project_code = 1
+				AND od.order_type = 0
+				AND od.order_status != 7
+				AND od.order_status != 70
+				AND od.order_status != 0
+				AND od.delivery_line_name != '外地发货线'
+				AND od.delivery_line_name != '社会店专线'
+				AND od.store_name NOT LIKE '%220%'
+				AND od.delivery_line_name != '总部线路'
+            ) k GROUP BY k.warehouse_name,k.store_id, k.stastics_commodity_name order by k.warehouse_id, k.store_name, buyAmount desc
+    </select>
+
+    <select id="getReportStoreList" resultType="com.htyoudao.youdao.module.order.controller.app.report.VO.ReportSelectRespVO">
+        SELECT
+            store_id k,
+            store_name v
+        FROM
+            system_store_info
+        WHERE
+            deleted = 0
+          AND use_status = 1
+    </select>
+
+    <select id="getReportWarehouseList" resultType="com.htyoudao.youdao.module.order.controller.app.report.VO.ReportSelectRespVO">
+        SELECT
+            id k,
+            warehouse_name v
+        FROM
+            scm_warehouse
+        WHERE
+            is_delete = 0
+    </select>
+</mapper>

@@ -1,0 +1,40 @@
+server:
+  port: 48080
+
+spring:
+  application:
+    name: gateway-server
+
+  profiles:
+    active: @activated.profile@
+
+  main:
+    allow-circular-references: true # 允许循环依赖，因为项目是三层架构，无法避免这个情况。
+
+  config:
+    import:
+#      - optional:classpath:application-${spring.profiles.active}.yaml # 加载【本地】配置
+      - optional:nacos:${spring.application.name}.yaml # 加载【Nacos】的配置
+
+--- #################### 注册中心 + 配置中心相关配置 ####################
+
+spring:
+  cloud:
+    nacos:
+      discovery: # 【配置中心】配置项
+        server-addr: @nacos.discovery.server@ # Nacos 服务器地址
+        username: @nacos.discovery.username@ # Nacos 账号
+        password: ${CLOUD_APPLICATION_PASSWORD_L27:}
+        namespace: @nacos.discovery.namespace@ # 命名空间。这里使用 dev 开发环境
+        group: DEFAULT_GROUP # 使用的 Nacos 配置分组，默认为 DEFAULT_GROUP
+      config: # 【注册中心】配置项
+        server-addr: @nacos.config.server@ # Nacos 服务器地址
+        username: @nacos.config.username@ # Nacos 账号
+        password: ${CLOUD_APPLICATION_PASSWORD_L33:}
+        namespace: @nacos.config.namespace@ # 命名空间。这里使用 dev 开发环境
+        group: DEFAULT_GROUP # 使用的 Nacos 配置分组，默认为 DEFAULT_GROUP
+
+# 日志文件配置
+logging:
+  level:
+    org.springframework.context.support.PostProcessorRegistrationDelegate: ERROR # TODO 0090：先禁用，Spring Boot 3.X 存在部分错误的 WARN 提示

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.htyoudao.cloud</groupId>
+        <artifactId>youdao</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <artifactId>youdao-module-commodity</artifactId>
+    <packaging>pom</packaging>
+    <name>${project.artifactId}</name>
+    <description>
+        commodity 模块下，主要商品相关业务。
+        例如说：商品分类、商品模版等等
+    </description>
+    <modules>
+        <module>youdao-module-commodity-api</module>
+        <module>youdao-module-commodity-biz</module>
+    </modules>
+
+
+</project>

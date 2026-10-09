@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.htyoudao.youdao.module.order.dal.mysql.BzOrderLogMapper">
+    <resultMap id="BaseResultMap" type="com.htyoudao.youdao.module.order.dal.dataobject.order.BzOrderLogDO">
+        <id column="log_id" jdbcType="BIGINT" property="logId"/>
+        <result column="log_user_id" jdbcType="BIGINT" property="logUserId"/>
+        <result column="log_user_name" jdbcType="VARCHAR" property="logUserName"/>
+        <result column="order_sn" jdbcType="VARCHAR" property="orderSn"/>
+        <result column="order_state_log" jdbcType="INTEGER" property="orderStateLog"/>
+        <result column="log_time" jdbcType="TIMESTAMP" property="logTime"/>
+        <result column="log_content" jdbcType="VARCHAR" property="logContent"/>
+    </resultMap>
+    <sql id="Example_Where_Clause">
+        <where>
+            <foreach collection="oredCriteria" item="criteria" separator="or">
+                <if test="criteria.valid">
+                    <trim prefix="(" prefixOverrides="and" suffix=")">
+                        <foreach collection="criteria.criteria" item="criterion">
+                            <choose>
+                                <when test="criterion.noValue">
+                                    and ${criterion.condition}
+                                </when>
+                                <when test="criterion.singleValue">
+                                    and ${criterion.condition} #{criterion.value}
+                                </when>
+                                <when test="criterion.betweenValue">
+                                    and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                                </when>
+                                <when test="criterion.listValue">
+                                    and ${criterion.condition}
+                                    <foreach close=")" collection="criterion.value" item="listItem" open="("
+                                             separator=",">
+                                        #{listItem}
+                                    </foreach>
+                                </when>
+                            </choose>
+                        </foreach>
+                    </trim>
+                </if>
+            </foreach>
+        </where>
+    </sql>
+    <sql id="Update_By_Example_Where_Clause">
+        <where>
+            <foreach collection="example.oredCriteria" item="criteria" separator="or">
+                <if test="criteria.valid">
+                    <trim prefix="(" prefixOverrides="and" suffix=")">
+                        <foreach collection="criteria.criteria" item="criterion">
+                            <choose>
+                                <when test="criterion.noValue">
+                                    and ${criterion.condition}
+                                </when>
+                                <when test="criterion.singleValue">
+                                    and ${criterion.condition} #{criterion.value}
+                                </when>
+                                <when test="criterion.betweenValue">
+                                    and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                                </when>
+                                <when test="criterion.listValue">
+                                    and ${criterion.condition}
+                                    <foreach close=")" collection="criterion.value" item="listItem" open="("
+                                             separator=",">
+                                        #{listItem}
+                                    </foreach>
+                                </when>
+                            </choose>
+                        </foreach>
+                    </trim>
+                </if>
+            </foreach>
+        </where>
+    </sql>
+    <sql id="Base_Column_List">
+    log_id, log_user_id, log_user_name, order_sn, order_state_log, log_time, log_content
+  </sql>
+    <insert id="insertSingle" parameterType="com.htyoudao.youdao.module.order.dal.dataobject.order.BzOrderLogDO">
+    insert into bz_order_log${tableFix} (log_id, log_user_id, log_user_name,
+      order_sn, order_state_log, log_time,
+      log_content, project_owner_ship)
+    values (#{r.logId,jdbcType=BIGINT}, IFNULL(#{r.logUserId,jdbcType=BIGINT},0), #{r.logUserName,jdbcType=VARCHAR},
+      #{r.orderSn,jdbcType=VARCHAR}, #{r.orderStateLog,jdbcType=INTEGER}, #{r.logTime,jdbcType=TIMESTAMP},
+      #{r.logContent,jdbcType=VARCHAR}, #{r.projectOwnerShip,jdbcType=BIGINT})
+  </insert>
+    <update id="updateByExampleSelective" parameterType="map">
+        update bz_order_log${example.tableFix}
+        <set>
+            <if test="record.logId != null">
+                log_id = #{record.logId,jdbcType=BIGINT},
+            </if>
+            <if test="record.logUserId != null">
+                log_user_id = #{record.logUserId,jdbcType=BIGINT},
+            </if>
+            <if test="record.logUserName != null">
+                log_user_name = #{record.logUserName,jdbcType=VARCHAR},
+            </if>
+            <if test="record.orderSn != null">
+                order_sn = #{record.orderSn,jdbcType=VARCHAR},
+            </if>
+            <if test="record.orderStateLog != null">
+                order_state_log = #{record.orderStateLog,jdbcType=INTEGER},
+            </if>
+            <if test="record.logTime != null">
+                log_time = #{record.logTime,jdbcType=TIMESTAMP},
+            </if>
+            <if test="record.logContent != null">
+                log_content = #{record.logContent,jdbcType=VARCHAR},
+            </if>
+        </set>
+        <if test="_parameter != null">
+            <include refid="Update_By_Example_Where_Clause"/>
+        </if>
+    </update>
+
+    <sql id="selectBzOrderLogVo">
+        SELECT log_id, log_user_id, log_user_name, order_sn, order_state_log, log_time, log_content FROM bz_order_log${tableFix}
+    </sql>
+
+    <select id="getOrderLogList" parameterType="BzOrderLogDO" resultMap="BaseResultMap">
+            <include refid="selectBzOrderLogVo"/>
+            <where>
+                <if test="record.logUserId != null ">
+                    AND log_user_id = #{record.logUserId}
+                </if>
+                <if test="record.logUserName != null  and record.logUserName != ''">
+                    AND log_user_name like concat('%', #{record.logUserName}, '%')
+                </if>
+                <if test="record.orderSn != null  and record.orderSn != ''">
+                    AND order_sn = #{record.orderSn}
+                </if>
+                <if test="record.orderStateLog != null ">
+                    AND order_state_log = #{record.orderStateLog}
+                </if>
+                <if test="record.logTime != null ">
+                    AND log_time = #{record.logTime}
+                </if>
+                <if test="record.logContent != null  and record.logContent != ''">
+                    AND log_content = #{record.logContent}
+                </if>
+            </where>
+    </select>
+</mapper>

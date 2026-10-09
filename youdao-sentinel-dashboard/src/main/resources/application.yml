@@ -1,0 +1,60 @@
+auth:
+  filter:
+    exclude-url-suffixes: htm,html,js,css,map,ico,ttf,woff,png
+    exclude-urls: /,/auth/login,/auth/logout,/registry/machine,/version,/health-check
+  password: ${CLOUD_APPLICATION_PASSWORD_L5:}
+  username: sentinel
+logging:
+  file:
+    name: ${user.home}/logs/csp/sentinel-dashboard.log
+  level:
+    org:
+      springframework:
+        web: INFO
+  pattern:
+    file: '%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n'
+sentinel:
+  dashboard:
+    version: @sentinel.version@
+server:
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+    session:
+      cookie:
+        name: sentinel_dashboard_cookie
+  port: 58080
+
+spring:
+  mvc:
+    pathmatch:
+      matching-strategy: ant-path-matcher
+  application:
+    name: youdao-sentinel-dashboard
+
+  profiles:
+    active: @activated.profile@
+
+  config:
+    import:
+      - optional:nacos:${spring.application.name}.yaml # 加载【Nacos】的配置
+
+--- #################### 注册中心 + 配置中心相关配置 ####################
+spring:
+  cloud:
+    nacos:
+      discovery: # 【配置中心】配置项
+        server-addr: @nacos.discovery.server@ # Nacos 服务器地址
+        username: @nacos.discovery.username@ # Nacos 账号
+        password: ${CLOUD_APPLICATION_PASSWORD_L51:}
+        namespace: @nacos.discovery.namespace@ # 命名空间。这里使用 dev 开发环境
+        group: DEFAULT_GROUP # 使用的 Nacos 配置分组，默认为 DEFAULT_GROUP
+      config: # 【注册中心】配置项
+        server-addr: @nacos.config.server@ # Nacos 服务器地址
+        username: @nacos.config.username@ # Nacos 账号
+        password: ${CLOUD_APPLICATION_PASSWORD_L57:}
+        namespace: @nacos.config.namespace@ # 命名空间。这里使用 dev 开发环境
+        group: DEFAULT_GROUP # 使用的 Nacos 配置分组，默认为 DEFAULT_GROUP
+

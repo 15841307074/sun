@@ -1,0 +1,197 @@
+--- #################### 数据库相关配置 ####################
+spring:
+  elasticsearch:
+    repositories:
+      enabled: true
+    uris: "http://192.168.31.141:9200"
+    socket-timeout: "10s"
+    username: "elastic"
+    password: ${CLOUD_ORDER_LOCAL_PASSWORD_L9:}
+  datasource:
+    dynamic: # 多数据源配置
+      datasource:
+        sharding:
+          type: com.zaxxer.hikari.HikariDataSource
+          driver-class-name: org.apache.shardingsphere.driver.ShardingSphereDriver
+          url: jdbc:shardingsphere:nacos:sharding.yaml?serverAddr=${spring.cloud.nacos.config.server-addr}&namespace=${spring.cloud.nacos.config.namespace}&username=${spring.cloud.nacos.config.username}&password=${CLOUD_ORDER_LOCAL_EMBEDDED_PASSWORD:}
+        shadow_sharding:
+          type: com.zaxxer.hikari.HikariDataSource
+          driver-class-name: org.apache.shardingsphere.driver.ShardingSphereDriver
+          url: jdbc:shardingsphere:nacos:shadow_sharding.yaml?serverAddr=${spring.cloud.nacos.config.server-addr}&namespace=${spring.cloud.nacos.config.namespace}&username=${spring.cloud.nacos.config.username}&password=${CLOUD_ORDER_LOCAL_EMBEDDED_PASSWORD:}
+
+--- #################### youdao相关配置 ####################
+
+youdao:
+  info:
+    base-package: com.htyoudao.youdao.module.order
+  swagger:
+    title: 管理后台
+    description: 提供订单管理的所有功能
+    version: ${youdao.info.version}
+
+xingyipay:
+  agetId: 61000000472395
+  eOLink:
+    url: https://yyfsvxm.postar.cn
+  callbackurl: http://192.168.130.163:8009/yyfToIsvsyshtydwlkj10/prod-api/app-api/order/bz-order-pay/notify
+  public:
+    key: ${CLOUD_ORDER_LOCAL_KEY_L38:}
+  #分账商户号
+  #测试
+  errandRewardInCustId: 60000016973052
+  #生产
+  # errandRewardInCustId: 60000016689267
+  #商圈ID
+  errandRewardSplitAreaId: 20260616172918
+
+#支付宝原生支付
+alipay:
+  native-pay:
+    enabled: false
+    gateway-url: https://openapi.alipay.com/gateway.do
+    notify-url: https://test-saas.htyoudao.com/prod-api/app-api/order/bz-order-pay/alipay/notify
+    apps:
+      10:
+        app-id: 2021006154675873
+        private-key: ${CLOUD_ORDER_LOCAL_PRIVATE_KEY_L56:}
+        alipay-public-key: CLOUD_SECRET_REQUIRED
+        seller-id:
+
+#全局支付渠道切换
+order:
+  pay:
+    channel:
+      #微企付 ：WEI_QI_FU 星驿付：XING_YI
+      default: WEI_QI_FU
+#微企付配置
+weiqifu:
+  base-url: https://tp.allinpay.com/pay/api/
+  pay-timeout-minutes: 15
+  mch-no: E249974037860
+  app-id: 66384647e4b0148f4bb07829
+  org-id: ""
+  sign-type: MD5
+  sign-key: ${CLOUD_ORDER_LOCAL_SIGN_KEY_L74:}
+  notify-url: https://front-local.htyoudao.com/prod-api/app-api/order/bz-order-pay/notify
+  return-url: ""
+  front-callback:
+    mp-path: pages/order/detail
+    mp-appid: wx3b84773f5f12d87f
+    mp-username: ""
+    mp-urlscheme: ""
+  auto-bar:
+    device-type: "10"
+
+
+wechat:
+  apps: "{
+    '9':{'appId':'wxbcaed25cd85609ab','appSecret':'CLOUD_SECRET_REQUIRED'},
+    '10':{'appId':'wx3b84773f5f12d87f','appSecret':'CLOUD_SECRET_REQUIRED'},
+    '7':{'appId':'wx9135e93470a0afdb','appSecret':'04b3cf8ebdb3db55554b1cf5e788d55b'},
+    '2':{'appId':'wx0b670f3436a8dbbf','appSecret':'CLOUD_SECRET_REQUIRED'},
+    '13':{'appId':'wx7b424bf5c2695da7','appSecret':'CLOUD_SECRET_REQUIRED'}
+    }"
+--- #################### MQ相关配置 ####################
+spring:
+  rabbitmq:
+    # 集群节点地址列表（逗号分隔）
+    addresses: 192.168.31.141:5672,192.168.31.142:5672,192.168.31.143:5672
+    username: admin
+    password: ${CLOUD_ORDER_LOCAL_PASSWORD_L100:}
+    virtual-host: saas_prod_vhost
+    # 连接池配置
+    connection-timeout: 3000
+    cache:
+      channel:
+        size: 50  # 通道缓存数量
+      connection:
+        mode: CONNECTION  # 连接缓存模式
+    # 消息确认配置
+    publisher-confirm-type: correlated  # 发布确认
+    publisher-returns: true  # 返回模式
+    listener:
+      simple:
+        acknowledge-mode: manual  # 手动ACK
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 2000
+
+kafka:
+  consumer:
+    enable: true    # 是否开启
+    groupId: saas_canal    # 消费者组
+    bootstrapServers: node01-local.kafka.htyoudao.com:9092,node02-local.kafka.htyoudao.com:9092,node03-local.kafka.htyoudao.com:9092    # 外网kafka节点
+    keyDeserializer: org.apache.kafka.common.serialization.StringDeserializer    # key反序列化器
+    valueDeserializer: org.apache.kafka.common.serialization.StringDeserializer    # value反序列化器
+    useSecurity: true    # 是否开启安全认证
+    securityProtocol: SASL_PLAINTEXT    # 安全认证使用的协议
+    saslJaasConfig: org.apache.kafka.common.security.plain.PlainLoginModule required username="admin" password="${CLOUD_JAAS_PASSWORD:}";    # 安全认证所需信息
+    saslMechanism: PLAIN    # 安全认证机制
+    concurrency: 1
+  topic:
+    order-notify: order-notify
+    order-refund: order-refund
+  group:
+    order-refund: 0
+    order-notify: 0
+  producer:
+    enable: true    # 是否开启
+    orderNotifyTopic: orderNotifyTopic    # 订阅主题
+    orderNotifyGroupId: 1    # 订阅主题
+    bootstrapServers: node01-local.kafka.htyoudao.com:9092,node02-local.kafka.htyoudao.com:9092,node03-local.kafka.htyoudao.com:9092    # kafka节点
+    keySerializer: org.apache.kafka.common.serialization.StringSerializer    # key序列化器
+    valueSerializer: org.apache.kafka.common.serialization.StringSerializer    # value序列化器
+    useSecurity: true    # 是否开启安全认证
+    securityProtocol: SASL_PLAINTEXT    # 安全认证使用的协议
+    saslJaasConfig: org.apache.kafka.common.security.plain.PlainLoginModule required username="admin" password="${CLOUD_JAAS_PASSWORD:}";    # 安全认证所需信息
+    saslMechanism: PLAIN    # 安全认证机制
+
+#云喇叭
+ylb:
+  reqList: 1241338966192422912
+  deliveryList: 1241338966192422912
+  source: 9061
+  secret: ${CLOUD_ORDER_LOCAL_SECRET_L155:}
+  host: https://pao.ylb.io/
+hbgc:
+  platformName: 0090汉堡工厂+
+  host: https://test.saas.htyoudao.com/test-api/
+
+#回调开关
+notifyswitch:
+  #控制原材料
+  rawmaterial: true
+  #加积分
+  addpoint: true
+  #转盘活动
+  activity: true
+  #微信服务通知
+  wxnotice: false
+  #集点
+  pointscollect: true
+  #集卡
+  jk: true
+
+#报告补偿开关
+report:
+  switch:
+    weekComplete: false
+    monthComplete: false
+
+#代取订单22点下单开关
+errand:
+  order:
+    deadline-limit-enabled: true
+    refund-cross-day-whitelist:
+      - ORD202607080001
+
+#在线点单
+douyin:
+  clientKey: ${CLOUD_ORDER_LOCAL_CLIENTKEY_L191:}
+  clientSecret: ${CLOUD_ORDER_LOCAL_CLIENTSECRET_L192:}
+  baseUrl: https://open.douyin.com
+  # accountId: 7485283719483066419
+  #沙箱
+  accountId: 7554236744879573018
+  transitAccount:

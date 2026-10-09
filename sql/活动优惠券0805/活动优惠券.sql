@@ -1,0 +1,1 @@
+ALTER TABLE `good_coupon` MODIFY COLUMN `reduce_amount` INT(11) DEFAULT NULL COMMENT '减少金额';

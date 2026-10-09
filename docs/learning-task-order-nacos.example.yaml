@@ -1,0 +1,12 @@
+# 合并到当前环境 Nacos 的 bpm-server.yaml；保留已有的 bpm 配置节点。
+# 默认空集合，不跳过任何人的学习订货校验。支持动态刷新。
+# userId 取当前店长登录态，统一调用 /task/order-limit/check，无业务入参。
+# 命中白名单时直接返回 canOrder=true，remainingDays 和 taskId 为 null。
+# 配置仅跳过学习任务订货校验，其他订货规则仍由订货接口判断。
+bpm:
+  learning-task:
+    order:
+      bypass-user-ids: []
+      # 启用示例（店长用户ID建议加引号，避免工具处理大整数时丢失精度）：
+      # bypass-user-ids:
+      #   - "190000000000000001"

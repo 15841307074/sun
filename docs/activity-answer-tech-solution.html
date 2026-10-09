@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>有奖问答技术方案</title>
+  <style>
+    :root { --bg:#f6f8fa; --card:#fff; --text:#24292f; --muted:#57606a; --border:#d0d7de; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--text); font:14px/1.7 "Microsoft YaHei","PingFang SC","Segoe UI",sans-serif; }
+    header { background:#24292f; color:#fff; padding:30px 42px; }
+    header h1 { margin:0 0 8px; font-size:30px; }
+    header p { margin:0; color:#d8dee4; }
+    main { max-width:1180px; margin:24px auto 56px; padding:0 20px; }
+    section { background:var(--card); border:1px solid var(--border); border-radius:10px; margin-bottom:18px; overflow:hidden; box-shadow:0 8px 24px rgba(140,149,159,.15); }
+    .section-head { padding:16px 20px; border-bottom:1px solid var(--border); background:#f6f8fa; }
+    .content { padding:18px 20px; }
+    h2, h3 { margin:0; }
+    h3 { margin-top:18px; }
+    p { margin:8px 0; }
+    ul, ol { margin:8px 0 8px 22px; padding:0; }
+    li { margin:3px 0; }
+    code { background:#afb8c133; padding:2px 6px; border-radius:4px; font-family:Consolas,"Liberation Mono",monospace; }
+    pre { background:#0d1117; color:#e6edf3; border-radius:8px; padding:14px 16px; overflow:auto; }
+    table { width:100%; border-collapse:collapse; margin:12px 0 16px; }
+    th, td { border:1px solid var(--border); padding:9px 10px; text-align:left; vertical-align:top; }
+    th { background:#f6f8fa; }
+    .tag { display:inline-block; border:1px solid var(--border); border-radius:999px; padding:2px 10px; margin:2px 8px 2px 0; color:var(--muted); background:#fff; }
+    .warn { background:#fff8c5; border:1px solid #eac54f; border-radius:8px; padding:10px 12px; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>有奖问答技术方案</h1>
+  <p>模块：promotion；活动类型：<code>ActivityTypeEnum.ANSWER = 9</code>；渠道类型：<code>ActivityChannelTypeEnum.ANSWER = 12</code></p>
+</header>
+<main>
+  <section>
+    <div class="section-head"><h2>1. 目标与复用范围</h2></div>
+    <div class="content">
+      <p>有奖问答作为新的营销活动类型实现，核心是“按活动时间答题 + 按答对数量发奖”。不直接复用抽奖随机奖池，但复用现有营销活动公共能力；活动时间、上下架、门店范围参考 lottery 抽奖活动。</p>
+      <p><span class="tag">复用 activity 主表</span><span class="tag">复用 activity_store 门店范围</span><span class="tag">复用 activity_channel 渠道</span><span class="tag">复用积分/券/券包/红包/实物发放</span><span class="tag">复用 PV/UV 分析思路</span></p>
+      <ul>
+        <li>用户在活动有效时间内开始答题，未答完可在同一活动周期内继续。</li>
+        <li>未完成答题超过活动结束时间后视为结束；活动再次配置或复制新活动后重新开始。</li>
+        <li>启用中的有奖问答活动不允许直接修改配置，需要先通过启停接口停用，再进入编辑流程。</li>
+        <li>每答一题提交一次，最后一题提交后按答对数量匹配奖励档位。</li>
+        <li>答题次数和任务次数按用户手机号维度统计，避免同一手机号绑定不同 <code>memberId</code> 后重复获取次数。</li>
+        <li>奖品库存不足时向低一档奖励降级，直到没有奖品时返回“很遗憾，奖品已发完”。</li>
+        <li>库存以数据库原子扣减为最终依据，Redis 只做配置缓存、次数缓存和提交短锁。</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head"><h2>3. 枚举与配置</h2></div>
+    <div class="content">
+      <table>
+        <thead><tr><th>枚举/配置</th><th>值</th><th>说明</th></tr></thead>
+        <tbody>
+        <tr><td><code>ActivityTypeEnum.ANSWER</code></td><td>9</td><td>有奖问答活动类型</td></tr>
+        <tr><td><code>ActivityChannelTypeEnum.ANSWER</code></td><td>12</td><td>有奖问答渠道类型</td></tr>
+        <tr><td><code>answerStatus</code></td><td>0/1/2</td><td>0 未完成，1 已完成，2 活动超时结束</td></tr>
+        <tr><td><code>chanceCalcRule</code></td><td>1/2</td><td>1 按天计算次数，2 按场次计算次数；场次复用活动已有时间段规则</td></tr>
+        <tr><td><code>rulesReset</code></td><td>0/1</td><td>0 关闭，1 开启</td></tr>
+        <tr><td><code>prizeType</code></td><td>1/2/3/4/5</td><td>积分、优惠券、优惠券包、实物奖品、现金红包</td></tr>
+        <tr><td><code>claimStatus</code></td><td>1/2/3</td><td>1 未领取，2 已领取，3 已失效</td></tr>
+        </tbody>
+      </table>
+      <pre>activity:
+  answer:
+    sortPath: /marketing/Answer/Answer
+    h5Path: https://test-h5.htyoudao.com/answer?id=
+    shareImageUrl: https://pfiles.htyoudao.com/default-answer-share.png
+    shareTitle: 有奖问答
+    shareDescription: 完成答题，赢取奖励！</pre>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head"><h2>4. 表结构与索引建议</h2></div>
+    <div class="content">
+      <h3>4.1 activity_answer</h3>
+      <p>作用类似抽奖的 <code>lottery_settings</code>，只保存有奖问答自己的玩法配置；活动名称、活动规则、活动时间、上下架状态、门店范围、渠道推广仍复用活动公共表。</p>
+      <table><thead><tr><th>字段</th><th>类型建议</th><th>说明</th><th>索引</th></tr></thead><tbody>
+        <tr><td>id</td><td>bigint</td><td>问答配置主键</td><td>主键</td></tr>
+        <tr><td>activity_id</td><td>bigint</td><td>关联活动主表 ID</td><td><code>uk_activity_id(activity_id)</code></td></tr>
+        <tr><td>activity.activity_name</td><td>varchar(100)</td><td>活动标题，保存到活动主表，不在 <code>activity_answer</code> 冗余保存</td><td><code>idx_business_enabled_time</code></td></tr>
+        <tr><td>activity.activity_rules</td><td>text</td><td>活动规则，保存到活动主表，不在 <code>activity_answer</code> 冗余保存</td><td>无</td></tr>
+        <tr><td>activity.is_enabled</td><td>int</td><td>启用状态，保存到活动主表，不在 <code>activity_answer</code> 冗余保存</td><td><code>idx_business_enabled_time</code></td></tr>
+        <tr><td>activity_img_url</td><td>varchar(255)</td><td>活动图片/封面图</td><td>无</td></tr>
+        <tr><td>activity_background</td><td>varchar(255)</td><td>活动背景图</td><td>无</td></tr>
+        <tr><td>button_img_url</td><td>varchar(255)</td><td>按钮图</td><td>无</td></tr>
+        <tr><td>background_color</td><td>varchar(64)</td><td>页面背景色</td><td>无</td></tr>
+        <tr><td>share_title</td><td>varchar(255)</td><td>分享标题</td><td>无</td></tr>
+        <tr><td>share_note</td><td>varchar(255)</td><td>分享内容</td><td>无</td></tr>
+        <tr><td>share_img_url</td><td>varchar(500)</td><td>分享图片</td><td>无</td></tr>
+        <tr><td>share_type</td><td>int</td><td>分享方式：1 不允许转发至好友，2 允许转发至好友，3 允许复制链接到好友</td><td>无</td></tr>
+        <tr><td>public_button</td><td>tinyint</td><td>公共展示：0 开启，1 关闭</td><td>无</td></tr>
+        <tr><td>community_flag</td><td>tinyint</td><td>社群专享：1 不开启，2 开启</td><td>无</td></tr>
+        <tr><td>guide_image</td><td>text</td><td>引导图片</td><td>无</td></tr>
+        <tr><td>answer_total_number</td><td>int</td><td>答题总次数限制，0 表示不限制；参考抽奖 <code>lottery_total_number</code></td><td>无</td></tr>
+        <tr><td>calculation_rules</td><td>tinyint</td><td>次数计算规则：1 按天，2 按场次；参考抽奖 <code>calculation_rules</code>，场次复用活动已有时间段规则</td><td>无</td></tr>
+        <tr><td>prize_pool_rules</td><td>tinyint</td><td>门店奖励库存规则：1 共用库存，2 独立库存；参考抽奖 <code>prize_pool_rules</code></td><td>无</td></tr>
+        <tr><td>answer_rules_reset</td><td>tinyint</td><td>规则重置：0 关闭，1 开启；用于活动配置变更后是否重置次数/奖品规则</td><td>无</td></tr>
+        <tr><td>free_status/free_count/free_limit_rule</td><td>tinyint/int/tinyint</td><td>免费答题开关、获得次数、限制规则：1 每人每天，2 每人每场次</td><td>无</td></tr>
+        <tr><td>sign_status/sign_count/sign_limit_rule</td><td>tinyint/int/tinyint</td><td>签到任务开关、获得次数、限制规则：1 每人每天，2 每人每场次</td><td>无</td></tr>
+        <tr><td>points_status/points_type/points_count</td><td>tinyint/tinyint/int</td><td>积分获得开关、积分状态、积分限制次数；参考抽奖积分获得配置</td><td>无</td></tr>
+        <tr><td>share_status/share_count/share_limit/share_limit_rule</td><td>tinyint/int/int/tinyint</td><td>分享任务开关、每次获得次数、上限、限制规则</td><td>无</td></tr>
+        <tr><td>browse_status/browse_count/browse_limit/browse_limit_rule</td><td>tinyint/int/int/tinyint</td><td>浏览首页任务开关、每次获得次数、上限、限制规则</td><td>无</td></tr>
+        <tr><td>order_status/order_count/order_limit/order_limit_rule</td><td>tinyint/int/int/tinyint</td><td>下单任务开关、每次获得次数、上限、限制规则</td><td>无</td></tr>
+        <tr><td>place_order_type/order_product_scope/payment_threshold_type/payment_threshold_amount</td><td>tinyint</td><td>下单任务限制：按品类/按商品、全部/指定商品、支付门槛不限制/实付金额大于指定金额</td><td>无</td></tr>
+      </tbody></table>
+
+      <h3>4.2 activity_answer_question</h3>
+      <p>现阶段只支持选择题，答案只有选项编码。为后续前端倒计时和超时提交预留每题答题时间字段，每道题单独设置。</p>
+      <table><thead><tr><th>字段</th><th>类型建议</th><th>说明</th><th>索引</th></tr></thead><tbody>
+        <tr><td>id</td><td>bigint</td><td>题目主键</td><td>主键</td></tr>
+        <tr><td>activity_id</td><td>bigint</td><td>活动 ID</td><td><code>idx_activity_id(activity_id)</code></td></tr>
+        <tr><td>question_type</td><td>tinyint</td><td>题目类型，现阶段固定 1=选择题；预留字段不做多类型实现</td><td>无</td></tr>
+        <tr><td>question_title</td><td>varchar(500)</td><td>题目名称，导出时作为动态列名</td><td>无</td></tr>
+        <tr><td>question_tips</td><td>varchar(500)</td><td>题目提示文案，可用于答题页展示提示说明</td><td>无</td></tr>
+        <tr><td>options_json</td><td>varchar(2000)</td><td>选项 JSON，例如 <code>[{"optionCode":"A","optionText":"选项A"}]</code></td><td>无</td></tr>
+        <tr><td>correct_answer</td><td>varchar(20)</td><td>正确答案选项编码，例如 A/B/C/D；必须命中选项编码</td><td>无</td></tr>
+        <tr><td>answer_time</td><td>int</td><td>每题答题时间，单位秒；0 或空表示不限制</td><td>无</td></tr>
+      </tbody></table>
+      <p class="warn">不单独设计排序字段。题目展示和导出动态列默认按 <code>id</code> 升序或创建顺序处理；如果后台页面支持拖拽排序，建议通过重新保存题目列表顺序或后续单独评估排序字段。</p>
+
+      <h3>4.3 activity_answer_reward</h3>
+      <p>作用类似抽奖的 <code>lottery_prize</code>，但命中奖励不靠随机概率，而是按答对数量档位匹配。库存扣减必须走数据库原子更新，避免超发。</p>
+      <table><thead><tr><th>字段</th><th>类型建议</th><th>说明</th><th>索引</th></tr></thead><tbody>
+        <tr><td>id</td><td>bigint</td><td>奖励档位主键</td><td>主键</td></tr>
+        <tr><td>activity_id</td><td>bigint</td><td>活动 ID</td><td><code>idx_activity_correct(activity_id,correct_count)</code></td></tr>
+        <tr><td>correct_count</td><td>int</td><td>答对数量档位，例如答对 5 题命中该档</td><td><code>idx_activity_correct(activity_id,correct_count)</code></td></tr>
+        <tr><td>prize_type</td><td>tinyint</td><td>1 积分，2 优惠券，3 优惠券包，4 实物奖品，5 现金红包</td><td><code>idx_prize(prize_type,prize_id)</code></td></tr>
+        <tr><td>prize_id</td><td>bigint</td><td>奖品 ID；积分可为空，其他类型关联对应奖品</td><td><code>idx_prize(prize_type,prize_id)</code></td></tr>
+        <tr><td>prize_name</td><td>varchar(255)</td><td>奖品名称快照</td><td>无</td></tr>
+        <tr><td>prize_num</td><td>int</td><td>发放数量，例如积分数量或券张数</td><td>无</td></tr>
+        <tr><td>total_num</td><td>int</td><td>总库存，0 表示不限库存</td><td>无</td></tr>
+        <tr><td>used_num</td><td>int</td><td>已发库存，只能通过原子扣减更新</td><td>无</td></tr>
+      </tbody></table>
+
+      <h3>4.4 activity_answer_record</h3>
+      <p>作用类似抽奖的 <code>lottery_log</code> 中的参与记录部分，保存一次答题的汇总结果。导出列表优先查该表，再批量查明细表。</p>
+      <table><thead><tr><th>字段</th><th>类型建议</th><th>说明</th><th>索引</th></tr></thead><tbody>
+        <tr><td>id</td><td>bigint</td><td>答题记录主键</td><td>主键</td></tr>
+        <tr><td>answer_no</td><td>varchar(64)</td><td>答题编号</td><td><code>uk_answer_no(answer_no)</code></td></tr>
+        <tr><td>activity_id</td><td>bigint</td><td>活动 ID</td><td><code>idx_activity_create_time(activity_id,create_time)</code></td></tr>
+        <tr><td>member_id</td><td>bigint</td><td>会员 ID，用于记录归属</td><td><code>idx_member_status(activity_id,member_id,status)</code></td></tr>
+        <tr><td>member_mobile</td><td>varchar(20)</td><td>会员手机号快照；次数统计、任务幂等以该字段为准</td><td><code>idx_mobile_status(activity_id,member_mobile,status)</code></td></tr>
+        <tr><td>period_key</td><td>varchar(64)</td><td>活动场次/周期标识，由后端根据活动已有场次规则计算；不由前端传入</td><td><code>idx_mobile_period(activity_id,member_mobile,period_key,status)</code></td></tr>
+        <tr><td>member_name</td><td>varchar(255)</td><td>会员昵称快照，便于后台列表和导出</td><td>无</td></tr>
+        <tr><td>store_id</td><td>bigint</td><td>参与门店 ID</td><td><code>idx_store_id(store_id)</code></td></tr>
+        <tr><td>store_name</td><td>varchar(255)</td><td>参与门店名称快照</td><td>无</td></tr>
+        <tr><td>question_count</td><td>int</td><td>题目数量</td><td>无</td></tr>
+        <tr><td>correct_count</td><td>int</td><td>正确数量</td><td>无</td></tr>
+        <tr><td>wrong_count</td><td>int</td><td>错误数量</td><td>无</td></tr>
+        <tr><td>accuracy</td><td>decimal(5,2)</td><td>正确率，百分比</td><td>无</td></tr>
+        <tr><td>status</td><td>tinyint</td><td>0 未完成，1 已完成，2 活动超时结束</td><td><code>idx_mobile_status(activity_id,member_mobile,status)</code></td></tr>
+        <tr><td>start_time</td><td>datetime</td><td>开始答题时间</td><td><code>idx_activity_create_time(activity_id,create_time)</code></td></tr>
+        <tr><td>submit_time</td><td>datetime</td><td>提交时间</td><td>无</td></tr>
+      </tbody></table>
+
+      <h3>4.5 activity_answer_record_detail</h3>
+      <table><thead><tr><th>字段</th><th>类型建议</th><th>说明</th><th>索引</th></tr></thead><tbody>
+        <tr><td>id</td><td>bigint</td><td>明细主键</td><td>主键</td></tr>
+        <tr><td>activity_id</td><td>bigint</td><td>活动 ID，方便按活动批量导出和清理</td><td><code>idx_activity_record(activity_id,record_id)</code></td></tr>
+        <tr><td>record_id</td><td>bigint</td><td>答题记录 ID</td><td><code>idx_record_id(record_id)</code></td></tr>
+        <tr><td>question_id</td><td>bigint</td><td>题目 ID</td><td><code>idx_question_id(question_id)</code></td></tr>
+        <tr><td>selected_answer</td><td>varchar(20)</td><td>用户选择的答案编码，例如 A/B/C/D</td><td>无</td></tr>
+        <tr><td>answer_result</td><td>tinyint</td><td>答题结果：0 错误，1 正确</td><td>无</td></tr>
+        <tr><td>answer_time</td><td>int</td><td>本题配置的答题时间快照，单位秒；方便后续排查超时规则</td><td>无</td></tr>
+        <tr><td>record_id/question_id</td><td>-</td><td>一条记录的一道题只允许一条明细</td><td><code>uk_record_question(record_id,question_id)</code></td></tr>
+      </tbody></table>
+      <p class="warn">明细表不存题目顺序、题目名称、正确答案文案、用户选择文案。导出时通过 <code>activity_answer_question</code> 按 <code>id</code> 升序或创建顺序获取题目名称，再用明细表的 <code>answer_result</code> 填充“正确/错误”。</p>
+
+      <h3>4.6 activity_answer_reward_log</h3>
+      <p>作用类似抽奖 <code>lottery_log</code> 中的中奖/发放部分。为了避免一条答题记录重复发奖，<code>record_id</code> 建议唯一。</p>
+      <table><thead><tr><th>字段</th><th>类型建议</th><th>说明</th><th>索引</th></tr></thead><tbody>
+        <tr><td>id</td><td>bigint</td><td>奖励发放记录主键</td><td>主键</td></tr>
+        <tr><td>record_id</td><td>bigint</td><td>答题记录 ID</td><td><code>uk_record_id(record_id)</code></td></tr>
+        <tr><td>activity_id</td><td>bigint</td><td>活动 ID</td><td><code>idx_activity_id(activity_id)</code></td></tr>
+        <tr><td>member_id</td><td>bigint</td><td>会员 ID</td><td><code>idx_member_activity(member_id,activity_id)</code></td></tr>
+        <tr><td>member_mobile</td><td>varchar(20)</td><td>会员手机号快照</td><td>无</td></tr>
+        <tr><td>reward_id</td><td>bigint</td><td>命中奖励档位 ID</td><td>无</td></tr>
+        <tr><td>reward_correct_count</td><td>int</td><td>实际命中的答对数量，降级发奖时用于追踪</td><td>无</td></tr>
+        <tr><td>prize_type</td><td>tinyint</td><td>奖品类型</td><td><code>idx_prize(prize_type,prize_id)</code></td></tr>
+        <tr><td>prize_id</td><td>bigint</td><td>奖品 ID</td><td><code>idx_prize(prize_type,prize_id)</code></td></tr>
+        <tr><td>prize_name</td><td>varchar(255)</td><td>奖品名称快照</td><td>无</td></tr>
+        <tr><td>prize_num</td><td>int</td><td>发放数量</td><td>无</td></tr>
+        <tr><td>claim_status</td><td>tinyint</td><td>红包领取状态：1 未领取，2 已领取，3 已失效</td><td><code>idx_claim_update_time(claim_status,update_time)</code></td></tr>
+        <tr><td>receiver_name</td><td>varchar(64)</td><td>实物奖品收货人</td><td>无</td></tr>
+        <tr><td>receiver_mobile</td><td>varchar(20)</td><td>实物奖品收货手机号</td><td>无</td></tr>
+        <tr><td>receiver_address</td><td>varchar(500)</td><td>实物奖品收货地址</td><td>无</td></tr>
+        <tr><td>express_company</td><td>varchar(64)</td><td>快递公司</td><td>无</td></tr>
+        <tr><td>express_no</td><td>varchar(64)</td><td>快递单号</td><td>无</td></tr>
+      </tbody></table>
+      <p class="warn">以上业务表均默认包含项目通用字段：<code>business_id</code>、<code>tenant_id</code>、<code>creator</code>、<code>updater</code>、<code>create_time</code>、<code>update_time</code>、<code>deleted</code>。</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head"><h2>5. 核心流程</h2></div>
+    <div class="content">
+      <h3>5.1 开始或继续答题</h3>
+      <ol>
+        <li>校验活动有效、上下架状态、门店范围、当前时间是否在活动时间内。</li>
+        <li>从当前登录会员查询手机号，手机号为空时拒绝参与；次数统计、任务统计和未完成记录查找优先使用手机号维度。</li>
+        <li>根据活动已有时间/场次规则计算 <code>periodKey</code>。如果活动一天上午一场、下午一场，并且配置按场次重置，则上午和下午生成不同 <code>periodKey</code>。</li>
+        <li>查询当前手机号在当前活动、当前 <code>periodKey</code> 下的未完成记录。</li>
+        <li>如果存在且活动仍有效，返回原记录和已答明细。</li>
+        <li>如果存在但活动已结束，将旧记录置为 <code>status=2</code>。</li>
+        <li>扣减或占用一次答题机会，返回题目列表和当前进度。</li>
+      </ol>
+      <p class="warn">当前只按天/活动周期的表设计，不足以支持“上午一场、下午一场且次数重置”。要支持该场景，需要增加内部字段 <code>period_key</code> 保存后端根据活动场次算出的周期标识。它不是新增前端入参，也不是新增问答场次配置表，只是记录和缓存的计算维度。</p>
+      <h3>5.2 提交答题与降级发奖</h3>
+      <ol>
+        <li>先用 <code>activity_answer:submit:lock:{recordId}</code> 加短锁，避免瞬时重复提交。</li>
+        <li>事务内锁定答题记录；若已完成，直接返回已有结果，不重复扣库存。</li>
+        <li>校验提交题目数量必须等于活动题目数。</li>
+        <li>逐题对比题目表的 <code>correct_answer</code>，写入轻量答题明细：<code>question_id</code>、<code>selected_answer</code>、<code>answer_result</code>。</li>
+        <li>汇总计算 <code>correctCount</code>、<code>wrongCount</code>、<code>accuracy</code> 并更新答题主记录。</li>
+        <li>从 <code>correct_count = correctCount</code> 开始向下查找奖励档位。</li>
+        <li>每个候选奖励执行数据库原子扣减；扣减成功才写奖励发放记录。</li>
+        <li>全部档位不可发时，答题记录仍完成，但返回无奖文案。</li>
+      </ol>
+      <pre>UPDATE activity_answer_reward
+SET used_num = used_num + 1
+WHERE id = #{rewardId}
+  AND deleted = 0
+  AND (total_num = 0 OR used_num &lt; total_num);</pre>
+      <p class="warn">高并发下只认这条 SQL 的影响行数。影响行数为 1 表示抢占成功；为 0 立即降级查上一档，不能依赖 Redis 库存判断发奖。</p>
+
+      <h3>5.3 答题记录导出</h3>
+      <ol>
+        <li>先按筛选条件分页查询 <code>activity_answer_record</code>，拿到会员、手机号、答题编号、答题数量、正确数量、错误数量、正确率、参与时间、参与门店。</li>
+        <li>一次性查询当前活动题目列表，按 <code>id</code> 升序或创建顺序生成导出列：<code>题目名称1</code>、<code>题目名称2</code>、<code>题目名称3</code>。</li>
+        <li>按本批次 <code>record_id</code> 批量查询 <code>activity_answer_record_detail</code>，不要一条记录查一次。</li>
+        <li>每条记录按 <code>question_id</code> 匹配明细，<code>answer_result=1</code> 导出“正确”，<code>answer_result=0</code> 导出“错误”。</li>
+        <li>如果某条题目明细缺失，导出空值或“未答”，并记录日志，避免导出任务中断。</li>
+      </ol>
+      <p class="warn">导出不依赖 Redis。ES 可以作为查询加速副本，但不能替代数据库明细，因为提交答题、库存扣减、发奖记录需要事务一致性。</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head"><h2>6. Redis Key</h2></div>
+    <div class="content">
+      <table>
+        <thead><tr><th>Key</th><th>用途</th><th>过期建议</th></tr></thead>
+        <tbody>
+        <tr><td><code>activity_answer:config:{activityId}</code></td><td>活动配置缓存</td><td>活动结束后清理</td></tr>
+        <tr><td><code>activity_answer:questions:{activityId}</code></td><td>题目列表缓存</td><td>活动结束后清理</td></tr>
+        <tr><td><code>activity_answer:rewards:{activityId}</code></td><td>奖励档位缓存，只做读取加速</td><td>活动结束后清理</td></tr>
+        <tr><td><code>activity_answer:chance:{activityId}:{mobile}:{periodKey}</code></td><td>用户可用答题次数；手机号 + 活动周期/场次维度</td><td>按天、按活动周期或按活动已有场次</td></tr>
+        <tr><td><code>activity_answer:record:unfinished:{activityId}:{mobile}:{periodKey}</code></td><td>同手机号同活动周期未完成记录</td><td>活动周期结束后清理</td></tr>
+        <tr><td><code>activity_answer:submit:lock:{recordId}</code></td><td>提交短锁</td><td>5-10 秒</td></tr>
+        <tr><td><code>activity_answer:task:sign:{activityId}:{mobile}:{date}</code></td><td>签到任务幂等；手机号维度</td><td>当天</td></tr>
+        <tr><td><code>activity_answer:task:share:{activityId}:{mobile}:{date}</code></td><td>分享任务次数；手机号维度</td><td>当天</td></tr>
+        <tr><td><code>activity_answer:task:browse:{activityId}:{mobile}:{date}</code></td><td>浏览任务次数；手机号维度</td><td>当天</td></tr>
+        <tr><td><code>activity_answer:task:order:{activityId}:{mobile}:{orderId}</code></td><td>下单任务幂等；手机号维度</td><td>活动结束后清理</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head"><h2>7. 测试重点</h2></div>
+    <div class="content">
+      <ul>
+        <li>同一活动周期未完成可继续；活动结束后未完成记录置为超时结束。</li>
+        <li>每题提交一次并写入作答明细，重复提交同一题应幂等返回原结果。</li>
+        <li>最后一题提交后才结算正确数、错误数和奖励；未答完时只返回本题对错、已答数量和下一题。</li>
+        <li>答对数量命中奖品无库存时，向低档位逐级降级。</li>
+        <li>奖励剩余 1 个库存时并发 100 次提交，只允许 1 次扣减成功。</li>
+        <li>同一 <code>recordId</code> 重复提交，只返回已有结果，不重复发奖。</li>
+        <li>红包超过 24 小时未领取，前台和后台展示已失效。</li>
+        <li>小程序我的记录、我的奖励、填写地址与后台记录一致。</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head"><h2>8. 原型功能覆盖清单</h2></div>
+    <div class="content">
+      <table>
+        <thead><tr><th>原型功能</th><th>覆盖字段/规则</th><th>说明</th></tr></thead>
+        <tbody>
+        <tr><td>免费答题</td><td><code>free_status/free_count/free_limit_rule</code></td><td>支持每人每天、每人每场次；统计维度为手机号。</td></tr>
+        <tr><td>每日签到</td><td><code>sign_status/sign_count/sign_limit_rule</code></td><td>按手机号幂等，避免同手机号不同 memberId 重复领取。</td></tr>
+        <tr><td>下单获得</td><td><code>order_status/order_count/order_limit/order_limit_rule</code></td><td>支持按品类/按商品、全部/指定商品、支付门槛限制。</td></tr>
+        <tr><td>分享活动</td><td><code>share_status/share_count/share_limit/share_limit_rule</code></td><td>支持分享得次数和次数上限。</td></tr>
+        <tr><td>浏览首页</td><td><code>browse_status/browse_count/browse_limit/browse_limit_rule</code></td><td>支持浏览首页得次数和次数上限。</td></tr>
+        <tr><td>答题场次</td><td><code>period_key</code></td><td>不新增问答场次表，复用活动已有场次/时间段，由后端计算周期标识。</td></tr>
+        <tr><td>答题总次数</td><td><code>answer_total_number</code></td><td>0 不限制；大于 0 表示活动期间每人最多答题次数。</td></tr>
+        <tr><td>次数计算规则</td><td><code>calculation_rules</code></td><td>1 按天，2 按场次；按场次时使用 <code>period_key</code> 隔离上午/下午等场次。</td></tr>
+        <tr><td>门店奖励库存</td><td><code>prize_pool_rules</code></td><td>1 共用库存，2 独立库存；参考抽奖奖品表逻辑处理，不在问答奖励表额外增加门店字段。</td></tr>
+        <tr><td>奖励及答题规则重置</td><td><code>answer_rules_reset</code></td><td>开启后，奖励及答题次数按答题场次/周期重置。</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
+</body>
+</html>

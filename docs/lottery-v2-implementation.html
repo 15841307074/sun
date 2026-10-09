@@ -1,0 +1,145 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>抽奖 V2 改造说明</title><style>:root{--bg:#f3f6fa;--paper:#fff;--ink:#203047;--muted:#617187;--line:#dce4ed;--accent:#1660a8}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.75 "Microsoft YaHei","PingFang SC",Arial,sans-serif}.layout{display:grid;grid-template-columns:250px minmax(0,1fr)}aside{position:sticky;top:0;height:100vh;overflow:auto;background:#173653;color:white;padding:28px 20px}.brand{font-size:20px;font-weight:bold}.sub{font-size:12px;color:#b9d2e6;margin:5px 0 28px}nav a{display:block;color:#dceaf5;text-decoration:none;padding:9px;border-radius:6px;font-size:13px}nav a:hover{background:#295477}main{width:min(1200px,100%);padding:38px 34px 80px;margin:auto}article{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:34px 40px;box-shadow:0 12px 35px #213c5b0d}h1{font-size:30px;margin:0 0 20px;color:#142d47}h2{font-size:22px;border-bottom:2px solid var(--line);padding-bottom:8px;margin:42px 0 20px}h3{font-size:18px;margin:30px 0 12px}blockquote{margin:18px 0 26px;padding:12px 18px;background:#edf6ff;border-left:4px solid var(--accent);color:#35506b}p{margin:12px 0}a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}code{background:#edf2f7;border-radius:4px;padding:2px 5px;font:0.92em Consolas,monospace;overflow-wrap:anywhere}pre{overflow:auto;background:#172b3d;color:#eff7ff;border-radius:8px;padding:16px}pre code{background:none;color:inherit;padding:0}table{border-collapse:collapse;width:100%;margin:18px 0 27px;font-size:13px;display:block;overflow:auto}th,td{border:1px solid var(--line);padding:10px 12px;vertical-align:top;min-width:125px}th{background:#eaf2f9;text-align:left}tr:nth-child(even) td{background:#fbfdff}.flow{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:18px 0 26px}.step{display:flex;gap:12px;min-height:78px;padding:12px 14px;border:1px solid #cbdfea;border-radius:10px;background:#f7fbff}.step b{flex:none;display:grid;place-items:center;width:27px;height:27px;border-radius:50%;background:#1766a9;color:white;font-size:12px}.step small{color:#417197;font-weight:bold}.step div div{font-size:13px;line-height:1.5;margin-top:3px}@media(max-width:850px){.layout{display:block}aside{position:static;height:auto}aside nav{display:none}main{padding:18px}article{padding:22px}.flow{grid-template-columns:1fr}}@media print{body{background:white}.layout{display:block}aside{display:none}main{padding:0;width:100%}article{box-shadow:none;border:0;padding:0}.step{break-inside:avoid}}</style></head><body><div class="layout"><aside><div class="brand">抽奖 V2 改造说明</div><div class="sub">前后差异 · 活动设置 · 并发链路</div><nav><a href="#s1">抽奖 V2 改造说明：前后差异、活动设置与并发链路</a><a href="#s2">一、改造目标和前后差异</a><a href="#s3">二、不同活动设置如何组合</a><a href="#s4">三、一次抽奖的完整并发链路</a><a href="#s8">四、缓存、标签同步与旧数据兼容</a><a href="#s9">五、上线材料与验证边界</a></nav></aside><main><article><h1 id="s1">抽奖 V2 改造说明：前后差异、活动设置与并发链路</h1>
+<blockquote>
+<p>按 2026-09-29 仓库代码整理。本文说明当前实现和设计原因；压测容量、真实微信与生产环境效果仍需部署验证。数据库脚本仅供审核执行。</p>
+</blockquote>
+<h2 id="s2">一、改造目标和前后差异</h2>
+<p>旧流程已有抽奖、任务、奖品、红包等能力，但门店标签、缓存库存、数据库剩余量和远程发奖各自维护状态。请求超时后也难以判断抽奖是否已经受理。V2 把“资格校验 → 快速预占 → 数据库受理 → 异步发奖 → 结果查询”分为清晰的阶段：Redis 承担热点预占和读取，数据库保留最终账本与唯一约束。<strong>抽奖仍有必要的数据库短事务，不是纯 Redis 抽奖。</strong></p>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>原有流程</th>
+<th>V2 当前做法</th>
+<th>这样设计的原因</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>参与范围</td>
+<td>以门店关系为主，标签变化调用原活动同步方法</td>
+<td><code>appScope=0</code> 按门店，<code>1</code> 按标签；保存标签、解析门店，抽奖时再向 system 核对标签</td>
+<td>展示范围可预计算，实际资格随门店标签变化</td>
+</tr>
+<tr>
+<td>活动标识</td>
+<td>活动主表 ID、抽奖配置 ID 在不同缓存中使用</td>
+<td>配置 ID 映射到活动 ID；V2 缓存键包含项目 ID 和活动主表 ID</td>
+<td>避免两套可变库存和跨项目串数据</td>
+</tr>
+<tr>
+<td>奖品与库存</td>
+<td>旧奖品 <code>remain_num</code>、原缓存及日志相互配合</td>
+<td>稳定 <code>code</code> 和库存批次；Redis Lua 预占，<code>lottery_v2_stock</code> 条件更新</td>
+<td>快速挡住热点竞争，Redis 异常后可从账本恢复</td>
+</tr>
+<tr>
+<td>抽奖机会</td>
+<td>旧次数／任务路径</td>
+<td>总量、周期、来源分别建账，条件更新；Redis 保存查询快照</td>
+<td>防并发覆盖，兼容免费、积分、下单、分享、浏览组合</td>
+</tr>
+<tr>
+<td>请求重试</td>
+<td>超时可能再次抽奖</td>
+<td>同一次点击复用 <code>requestId</code>，唯一约束和结果查询防重</td>
+<td>避免重扣机会、重占库存和重复发奖</td>
+</tr>
+<tr>
+<td>发奖</td>
+<td>原同步或共享异步路径</td>
+<td>受理事务只记录流水和待处理任务，有界 worker 异步处理</td>
+<td>不持数据库事务等待微信／会员接口，重启后继续</td>
+</tr>
+<tr>
+<td>红包</td>
+<td>外部超时结果难确认</td>
+<td>商户单号先持久化；查单优先，处理中保留库存，验签回调唤醒任务</td>
+<td>未确认终态前不错误释放或重复转账</td>
+</tr>
+<tr>
+<td>缓存更新</td>
+<td>多入口各自清理／写入</td>
+<td>配置版本发布、持久化刷新任务、提交后更新及失败重试</td>
+<td>防旧任务覆盖新配置，不因范围变化清零库存</td>
+</tr>
+</tbody></table>
+<p>核心代码：<a href="../youdao-module-promotion/youdao-module-promotion-biz/src/main/java/com/htyoudao/youdao/module/promotion/controller/app/lottery/AppLotteryController.java">小程序入口</a>、<a href="../youdao-module-promotion/youdao-module-promotion-biz/src/main/java/com/htyoudao/youdao/module/promotion/service/lottery/v2/impl/LotteryV2ServiceImpl.java">V2 抽奖服务</a>、<a href="../youdao-module-promotion/youdao-module-promotion-biz/src/main/java/com/htyoudao/youdao/module/promotion/service/lottery/v2/impl/LotteryLedgerImpl.java">持久化账本</a>。</p>
+<h2 id="s3">二、不同活动设置如何组合</h2>
+<p>这些设置彼此独立，可组成“标签范围＋独立奖池＋场次次数＋分享机会”等活动。<code>lotteryType=1/2/3/4</code> 分别为转盘、九宫格、福袋、盲盒，主要是展示形态；受理原则相同。管理端新增、修改、详情都携带 <code>appScope</code>、<code>tagIds</code>。</p>
+<table>
+<thead>
+<tr>
+<th>设置</th>
+<th>规则</th>
+<th>对并发／库存的影响</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>范围</td>
+<td><code>appScope=0</code>：原“全部门店”或指定门店；<code>appScope=1</code>：多个标签<strong>命中任意一个</strong>即可</td>
+<td><code>activity_store_tag</code> 存标签配置；解析去重后的门店存 <code>activity_store</code>。标签零命中仍可保存奖品模板</td>
+</tr>
+<tr>
+<td>展示与资格</td>
+<td><code>publicButton=0</code> 的已启用 V2 活动进入门店展示列表；实际抽奖还检查活动日期／时间段、门店和会员人群资格</td>
+<td>列表只用于展示，不能代替抽奖时的最终资格判断</td>
+</tr>
+<tr>
+<td>门店标签变化</td>
+<td>system 提交标签变更后通知原 <code>ActivityApi.updateActivityStoreByTagIdAndStoreId</code>；抽奖实时调用 <code>StoreApi.matchStoreTagCache</code></td>
+<td>退出后停止新参与；同批次重新加入复用原奖品 <code>code</code>、已用量和剩余量；标签核对异常不放行</td>
+</tr>
+<tr>
+<td>奖池</td>
+<td><code>prizePoolRules=1</code> 所有门店共用池（门店池 ID 为 0）；<code>=2</code> 每店独立池</td>
+<td>独立池按门店隔离。切换共用／独立模式时需先确认没有待处理请求，并创建新库存批次</td>
+</tr>
+<tr>
+<td>奖品</td>
+<td>每池必须有且仅有一个保底奖品；普通奖品配置概率、总量、稳定 <code>code</code>，可设城市、是否可重复、<code>minimumNumber</code></td>
+<td>保底不占普通库存；总量不能小于已发放加预占。未到累计开奖门槛不进概率池；选中奖品缺货则回保底</td>
+</tr>
+<tr>
+<td>机会来源</td>
+<td>旧单方式 <code>lotteryMethod=1/2/3</code> 对应免费／积分／下单；开启任意免费、积分、下单、分享、浏览开关则进入组合模式</td>
+<td>组合模式依次尝试免费、下单、分享、浏览、积分；仍受总量和周期限额约束。积分在异步发奖任务中按流水号幂等扣减</td>
+</tr>
+<tr>
+<td>次数周期</td>
+<td><code>lotteryTotalNumber</code> 为会员总次数，<code>lotteryLimit</code> 为日／场次次数；<code>calculationRules=1</code> 按天，<code>=2</code> 按场次时间段</td>
+<td>周期键按日期或日期＋场次隔离；任务来源可按设置使用周期键或 <code>TOTAL</code></td>
+</tr>
+<tr>
+<td>正常场次重置</td>
+<td><code>lotteryRulesReset=1</code> 且活动启用、日期有效、当前不在场次中并满足下场次间隔时，原定时任务触发 V2 <code>reset</code>；<code>lastResetScope</code> 防重复</td>
+<td>新请求进入新 <code>stockEpoch</code>；旧请求的确认、退奖、补偿仍操作旧批次</td>
+</tr>
+<tr>
+<td>停用／再启用</td>
+<td>停止新受理；已受理任务仍继续</td>
+<td>V2 再次启用不清零。旧活动首次停用后重启才初始化新流程</td>
+</tr>
+</tbody></table>
+<p>例子：独立门店某奖品总量 10，已发放 3；门店退出标签后不再参与，重新加入<strong>同一批次</strong>仍只剩 7。修改参与范围只提高 <code>configVersion</code>，不创建新 <code>stockEpoch</code>。</p>
+<p>实现见<a href="../youdao-module-promotion/youdao-module-promotion-biz/src/main/java/com/htyoudao/youdao/module/promotion/service/lottery/v2/impl/LotteryScopeServiceImpl.java">范围与奖品维护</a>、<a href="../youdao-module-promotion/youdao-module-promotion-biz/src/main/java/com/htyoudao/youdao/module/promotion/service/lottery/impl/LotteryMobileServiceImpl.java">机会及场次计算</a>、<a href="../youdao-module-promotion/youdao-module-promotion-biz/src/main/java/com/htyoudao/youdao/module/promotion/service/lottery/v2/LotteryQuota.java">次数计算</a>。</p>
+<h2 id="s4">三、一次抽奖的完整并发链路</h2>
+<div class="flow" aria-label="抽奖并发流程"><div class="step"><b>1</b><div><small>小程序 → 接口与限流</small><div>POST /lottery，携带 requestId</div></div></div><div class="step"><b>2</b><div><small>接口与限流 → 接口与限流</small><div>重试先查结果；新请求检查开关、速率、并发</div></div></div><div class="step"><b>3</b><div><small>接口与限流 → 配置及资格</small><div>检查活动、时间、门店／标签、人群、机会、奖品</div></div></div><div class="step"><b>4</b><div><small>配置及资格 → 接口与限流</small><div>本次抽奖快照、选中奖品与保底</div></div></div><div class="step"><b>5</b><div><small>接口与限流 → Redis 库存</small><div>分区短锁＋Lua 预占，写 pending 令牌</div></div></div><div class="step"><b>6</b><div><small>Redis 库存 → 接口与限流</small><div>成功／售罄／需恢复</div></div></div><div class="step"><b>7</b><div><small>接口与限流 → 数据库短事务</small><div>锁定配置版本，条件占次数与库存，插入流水及任务</div></div></div><div class="step"><b>8</b><div><small>数据库短事务 → 接口与限流</small><div>已受理／重复请求／失败</div></div></div><div class="step"><b>9</b><div><small>接口与限流 → Redis 库存</small><div>确认令牌；异常则按持久化账本核对</div></div></div><div class="step"><b>10</b><div><small>接口与限流 → 小程序</small><div>奖品、grantStatus、requestId</div></div></div><div class="step"><b>11</b><div><small>持久化发奖任务 → 数据库短事务</small><div>领取任务及租约</div></div></div><div class="step"><b>12</b><div><small>持久化发奖任务 → 会员／券／微信</small><div>按流水业务号幂等扣积分／发券／加积分／转红包</div></div></div><div class="step"><b>13</b><div><small>会员／券／微信 → 持久化发奖任务</small><div>成功、明确失败或处理中</div></div></div><div class="step"><b>14</b><div><small>持久化发奖任务 → 数据库短事务</small><div>变更发奖和库存状态，或安排重试／保底</div></div></div><div class="step"><b>15</b><div><small>小程序 → 接口与限流</small><div>POST /result，复用 requestId</div></div></div><div class="step"><b>16</b><div><small>接口与限流 → 数据库短事务</small><div>缓存未命中时查持久化流水</div></div></div><div class="step"><b>17</b><div><small>接口与限流 → 小程序</small><div>最新抽奖与发奖状态</div></div></div></div>
+<h3 id="s5">3.1 入口、限流和资格</h3>
+<p>小程序路径为 <code>/promotion/lottery-mobile/lottery</code> 和 <code>/promotion/lottery-mobile/result</code>。V2 要求 <code>lotteryId</code>、<code>memberId</code>、<code>storeId</code>、<code>requestId</code>；请求号限 8–64 位字母、数字、下划线、短横线。同一次点击的网络重试必须复用它；下一次真实抽奖才生成新值。相同请求号更换门店会拒绝。结果缓存过期后仍查询持久化流水，绝不重新抽奖。</p>
+<p>新抽奖先经过集群、活动、会员速率限制，以及实例并发和数据库连接预算；普通查询、结果查询、任务、回调有独立容量。超限即拒绝，未受理不占次数／库存。Redis 故障时暂停新抽奖，结果查询和回调保留受控本地名额。资格校验复用活动状态、时间、人群、企微及门店判断；标签范围额外实时请求 system。配置缓存缺失时使用短锁和回源并发上限，拥挤时返回繁忙，不让所有请求排队查库。</p>
+<h3 id="s6">3.2 Redis 预占与数据库最终约束</h3>
+<p>库存键形如 <code>lottery:v2:{b&lt;项目ID&gt;:a&lt;活动主表ID&gt;}:stock:&lt;批次&gt;:&lt;门店池&gt;:&lt;奖品code&gt;</code>。同一 Lua 操作的键具有相同 Redis Cluster hash tag。库存 Hash 含 <code>total/used/revision/configVersion/pending</code>；奖品展示缓存不存可作为扣减依据的剩余量。短锁只覆盖单一库存分区的预占与短事务，不覆盖远程发奖。</p>
+<p>Lua 原子检查版本、剩余量、<code>pending</code> 后执行 <code>used+1</code> 并留下令牌。数据库事务再核对 <code>configVersion/stockEpoch/runtimeVersion/state</code>，用条件更新保证 <code>reserved + issued &lt; total</code>；同时条件占总次数、周期次数和机会来源，插入唯一流水及发奖任务。这保证持久化约束 <strong>已发放＋已预占 ≤ 库存总量</strong>。正常热缓存预占／确认不额外读取库存账本，但整次抽奖仍有防重、配置校验和持久化写入。</p>
+<p>Redis 缺失、版本变化、异常值或残留 <code>pending</code> 时，持单分区锁从数据库库存账本恢复；账本缺失就拒绝。事务提交结果不确定时先查同 <code>requestId</code> 流水，已受理不能因 Redis 确认失败回退库存。重复请求返回同一流水；奖品缺货或禁止重复领取时回保底。配置修改只切版本，不重置已有库存、次数和幂等记录。</p>
+<h3 id="s7">3.3 异步发奖和红包</h3>
+<p>受理时写 <code>lottery_v2_request</code>、<code>lottery_v2_job</code> 和固定商户单号；有界 worker 领取任务，租约过期可重领，服务重启后继续。外部会员／优惠券／微信调用均在数据库事务外，使用流水业务号做幂等。当前奖品类型代码中，<code>1</code> 是优惠券、<code>2</code> 是积分、<code>3</code> 是实物、<code>5</code> 是红包；其他类型沿用现有奖品逻辑。实物退奖由独立任务按原流水批次返还一次。</p>
+<p>红包先按持久化商户单号查单，只有微信明确返回 <code>NOT_FOUND</code> 才发起转账。<code>PROCESSING</code>、等待用户确认及超时是未知／处理中：保留库存、安排重试与查单；验签回调唤醒任务。明确成功才将预占转已发放；明确失败才释放或切保底。已发奖后即使日志同步失败，也只重试日志，不能退库存或再发一遍。前端根据 <code>grantStatus</code> 展示“发放处理中”，不把暂时未知当失败。</p>
+<p>实现见<a href="../youdao-module-promotion/youdao-module-promotion-biz/src/main/java/com/htyoudao/youdao/module/promotion/service/lottery/v2/LotteryAdmission.java">准入控制</a>、<a href="../youdao-module-promotion/youdao-module-promotion-biz/src/main/java/com/htyoudao/youdao/module/promotion/service/lottery/v2/LotteryStockCache.java">库存缓存</a>、<a href="../youdao-module-promotion/youdao-module-promotion-biz/src/main/java/com/htyoudao/youdao/module/promotion/service/lottery/v2/LotteryGrantWorker.java">任务执行</a>、<a href="../youdao-module-promotion/youdao-module-promotion-biz/src/main/java/com/htyoudao/youdao/module/promotion/service/lottery/v2/LotteryCashGateway.java">红包网关</a>。</p>
+<h2 id="s8">四、缓存、标签同步与旧数据兼容</h2>
+<p><code>configVersion</code> 表示配置版本，范围或模板变化时推进；<code>stockEpoch</code> 表示库存批次，只在正常场次重置或明确奖池切换时推进。配置 ID 映射、活动配置、门店活动列表、奖品展示、次数快照和请求结果各自缓存；终态结果默认缓存 24 小时，到期回查流水。库存、总次数及处理中请求不能按普通展示缓存 TTL 清理；活动结束且流水结清 7 天后，后台只按登记过的活动键集合分批清理，不全局扫描 Redis。配置更新事务内登记发布任务，提交后刷新，失败重试；旧版本不得覆盖新配置。</p>
+<p><code>system_activity_tag_outbox</code> 不是第二份标签数据。门店标签变更事务内记录待通知事项，提交后刷新 system 标签缓存、调用原有活动更新方法；失败定时重试。营销服务对 V2 活动按当前标签核对并调整 <code>activity_store</code>，旧活动仍由原同步路径处理。这样门店写事务不等待远程接口，也不因一次调用失败永久漏同步。</p>
+<p>历史活动保持 <code>runtime_version=1</code>，不批量营销旧数据，也不改写旧库存和日志；仍启用的旧活动继续走原抽奖、列表、详情和管理逻辑。<strong>旧活动停用后首次重新启用</strong>时，在配置行锁与事务内补齐缺失的奖品 <code>code</code>／模板，按奖品配置总量创建新 <code>stockEpoch</code>，V2 <code>reserved/issued</code> 从零开始；旧 <code>remain_num</code>、日志、任务机会保留，但<strong>旧消耗不导入新账本</strong>。已经是 V2 的活动重复启用或停用再启用不再次清零。若标记旧版却已有 V2 请求／次数／库存，拒绝初始化，避免覆盖。切换前须暂停该活动旧请求、等待旧任务结束并核对历史库存，不能新旧实例并行写同一活动。</p>
+<p>相关代码：<a href="../youdao-module-promotion/youdao-module-promotion-biz/src/main/java/com/htyoudao/youdao/module/promotion/service/lottery/v2/LotteryRuntimeLifecycle.java">生命周期</a>、<a href="../youdao-module-system/youdao-module-system-biz/src/main/java/com/htyoudao/youdao/module/system/service/store/StoreActivityTagOutbox.java">门店通知</a>、<a href="lottery-v2-compatibility.md">兼容记录</a>。</p>
+<h2 id="s9">五、上线材料与验证边界</h2>
+<p>统一发布脚本为 <a href="../sql/lottery_release_all.sql">lottery_release_all.sql</a>。在对应实际库连接中选择 <code>@lottery_release_target</code>：<code>PROMOTION</code> 营销主库、<code>SYSTEM</code> 系统主库、<code>MEMBER</code> 会员物理分片库、<code>LOG</code> 中奖记录物理分片库；每次只执行所选类型，其他内容跳过。已存在的表、字段和索引不会被覆盖；人工补发权限需给角色单独授权。配置见 <a href="lottery-v2-nacos.example.yaml">Nacos 示例</a>。先发布表结构和权限，再发布相关服务；不批量修改历史运行版本或清空库存。</p>
+<p>上线验收至少验证：标签互切和零命中、动态加入退出；共享／独立池与 10 份已耗 3 份后重新加入；最后一份并发争抢、重复请求和重复退奖；Redis 重启、配置版本乱序；红包超时但微信已受理及回调乱序；场次切换时旧批次补偿。监控关注缓存命中／回源、P95/P99、连接等待、限流量、库存恢复次数、任务积压年龄和红包未知状态。已有本地编译与模拟回归记录见<a href="lottery-v2-compatibility.md">兼容记录</a>；本文写作没有连接真实 MySQL、Redis Cluster 或微信，最终吞吐及故障恢复仍须在上线等价环境压测、联调和对账。</p>
+</article></main></div></body></html>

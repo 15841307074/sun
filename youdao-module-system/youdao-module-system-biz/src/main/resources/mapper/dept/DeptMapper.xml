@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.htyoudao.youdao.module.system.dal.mysql.dept.DeptMapper">
+
+    <select id="getUserAndDeptWithOAPage"
+            resultType="com.htyoudao.youdao.module.system.controller.admin.dept.vo.dept.DeptUserOAPageRespVO">
+
+        select
+            su.id,
+            nickname as nickname,
+            mobile as mobile
+        from system_users su
+        left join system_user_dept sud on sud.user_id = su.id
+        where
+            su.deleted = 0
+            and sud.deleted = 0
+            <if test="deptUserOAReqVO.deptId != null">
+                and sud.dept_id = #{deptUserOAReqVO.deptId}
+            </if>
+            <if test="deptUserOAReqVO.nameOrMobile != null">
+                and (nickname like concat('%',#{deptUserOAReqVO.nameOrMobile},'%') or mobile like concat('%',#{deptUserOAReqVO.nameOrMobile},'%'))
+            </if>
+            <if test="deptUserOAReqVO.type != null">
+                and sud.type = #{deptUserOAReqVO.type}
+            </if>
+        group by su.id
+    </select>
+    <select id="getAllUserAndDeptPageWithOA"
+            resultType="com.htyoudao.youdao.module.system.controller.admin.dept.vo.dept.DeptUserOAPageRespVO">
+
+        select
+            su.id,
+            nickname as nickname,
+            mobile as mobile
+        from system_users su
+        left join system_user_dept sud on sud.user_id = su.id
+        where
+        su.deleted = 0
+        and sud.deleted = 0
+        <if test="deptUserOAReqVO.deptId != null">
+            and sud.dept_id = #{deptUserOAReqVO.deptId}
+        </if>
+        <if test="deptUserOAReqVO.nameOrMobile != null">
+            and (nickname like concat('%',#{deptUserOAReqVO.nameOrMobile},'%') or mobile like concat('%',#{deptUserOAReqVO.nameOrMobile},'%'))
+        </if>
+        <if test="deptUserOAReqVO.type != null">
+            and sud.type = #{deptUserOAReqVO.type}
+        </if>
+        group by su.id
+    </select>
+</mapper>

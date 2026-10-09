@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>有奖问答接口文档</title>
+  <style>
+    body { margin: 0; background: #f6f8fb; color: #172033; font: 14px/1.68 "Microsoft YaHei", "PingFang SC", Arial, sans-serif; }
+    header { padding: 34px 44px 28px; background: linear-gradient(135deg, #1f2937 0%, #334155 58%, #f97316 160%); color: #fff; }
+    header h1 { margin: 0 0 8px; font-size: 30px; }
+    header p { margin: 0; color: #e5e7eb; }
+    main { max-width: 1200px; margin: 0 auto; padding: 28px 24px 60px; }
+    section { background: #fff; border: 1px solid #d9e0ea; border-radius: 14px; padding: 22px 24px; margin-bottom: 18px; box-shadow: 0 10px 24px rgba(15, 23, 42, .05); }
+    h2 { margin: 0 0 14px; font-size: 22px; }
+    h3 { margin: 24px 0 10px; font-size: 17px; }
+    h4 { margin: 18px 0 8px; font-size: 15px; }
+    p { margin: 8px 0; }
+    code { background: #eef2f7; color: #0f172a; border-radius: 5px; padding: 2px 5px; font-family: Consolas, "Courier New", monospace; }
+    pre { margin: 10px 0; padding: 14px 16px; border-radius: 10px; background: #0f172a; color: #e5e7eb; overflow: auto; font: 13px/1.55 Consolas, "Courier New", monospace; }
+    table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; table-layout: fixed; }
+    th, td { border: 1px solid #d9e0ea; padding: 8px 10px; vertical-align: top; word-break: break-all; }
+    th { background: #f1f5f9; text-align: left; }
+    .pill { display: inline-block; padding: 2px 9px; border-radius: 999px; background: #fff3e8; color: #c2410c; font-weight: 700; margin-right: 6px; }
+    .method { display: inline-block; min-width: 50px; text-align: center; color: #fff; border-radius: 6px; padding: 1px 7px; font-weight: 700; font-size: 12px; }
+    .get { background: #16a34a; }
+    .post { background: #2563eb; }
+    .path { font-weight: 700; color: #0f172a; }
+    .note { border-left: 4px solid #f97316; background: #fff3e8; padding: 10px 12px; border-radius: 8px; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>有奖问答接口文档</h1>
+  <p>覆盖后台活动配置、数据分析、答题记录、发放记录，以及小程序详情、开始答题、单题提交、任务、我的记录和奖品地址。</p>
+</header>
+<main>
+  <section>
+    <h2>基础约定</h2>
+    <p><span class="pill">后台前缀</span><code>/admin-api/promotion/activityAnswer</code></p>
+    <p><span class="pill">小程序前缀</span><code>/app-api/promotion/activity-answer</code></p>
+    <p><span class="pill">统一响应</span><code>{ "code": 0, "data": {}, "msg": "" }</code>，类型为 <code>CommonResult&lt;T&gt;</code>。</p>
+    <p><span class="pill">活动类型</span><code>ActivityTypeEnum.ANSWER = 9</code>；推广渠道枚举当前代码为 <code>ActivityChannelTypeEnum.DT = 13</code>。</p>
+    <p><span class="pill">会员口径</span>小程序端不依赖前端传 <code>memberId</code>。答题次数、任务次数、继续答题、奖励查询统一按 <code>memberMobile</code> 归属，<code>memberId</code> 仅作为快照字段。</p>
+    <p><span class="pill">答题方式</span><code>/submit</code> 为单题提交接口。每答一题提交一次，最后一题提交后统计正确数并发放奖励。</p>
+    <div class="note">题目配置走缓存；用户当前场次答题记录和明细直接查库。开始答题时会把当时的全部题目写入 <code>activity_answer_record_detail</code>，后续继续答题、题目分析、导出都以这批明细为准。</div>
+  </section>
+
+  <section>
+    <h2>枚举说明</h2>
+    <table>
+      <tr><th>字段</th><th>值</th><th>说明</th></tr>
+      <tr><td>activityStatus</td><td>0 / 1 / 2 / 3</td><td>未开始 / 进行中 / 已结束 / 不在当前场次</td></tr>
+      <tr><td>answerAction</td><td>0 / 1 / 2</td><td>不可答题 / 开始答题 / 继续答题</td></tr>
+      <tr><td>answerStatus</td><td>0 / 1</td><td>未完成 / 已完成</td></tr>
+      <tr><td>questionType</td><td>1</td><td>选择题，现阶段只支持选择题</td></tr>
+      <tr><td>prizeType</td><td>1 / 2 / 3 / 4 / 5</td><td>积分 / 优惠券 / 优惠券包 / 实物奖品 / 现金红包</td></tr>
+      <tr><td>claimStatus</td><td>1 / 2 / 3</td><td>红包未领取 / 已领取 / 已失效</td></tr>
+      <tr><td>taskStatus</td><td>0 / 1 / 2</td><td>未达上限可继续完成 / 已完成(兼容旧值) / 已达上限</td></tr>
+      <tr><td>calculationRules</td><td>1 / 2</td><td>按天计算答题次数 / 按场次计算答题次数</td></tr>
+      <tr><td>prizePoolRules</td><td>1 / 2</td><td>门店共用库存 / 门店独立库存</td></tr>
+      <tr><td>activityStore</td><td>0 / 1</td><td>指定门店 / 全部门店</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>后台接口清单</h2>
+    <table>
+      <tr><th style="width:90px;">方法</th><th>路径</th><th>说明</th></tr>
+      <tr><td><span class="method post">POST</span></td><td class="path">/create</td><td>创建有奖问答活动、题目、奖品和规则。</td></tr>
+      <tr><td><span class="method post">POST</span></td><td class="path">/update</td><td>修改有奖问答活动。启用状态不可修改配置。</td></tr>
+      <tr><td><span class="method get">GET</span></td><td class="path">/delete?id=</td><td>删除有奖问答活动。</td></tr>
+      <tr><td><span class="method post">POST</span></td><td class="path">/copy</td><td>复制有奖问答活动。</td></tr>
+      <tr><td><span class="method get">GET</span></td><td class="path">/selectDetail?id=</td><td>查询活动详情。指定门店返回门店 ID 和名称；全部门店不展开全部关系数据。</td></tr>
+      <tr><td><span class="method post">POST</span></td><td class="path">/page</td><td>分页查询活动列表，过滤已删除数据。</td></tr>
+      <tr><td><span class="method post">POST</span></td><td class="path">/updateState</td><td>启用/停用活动。</td></tr>
+      <tr><td><span class="method get">GET</span></td><td class="path">/selectActivitySpread?id=</td><td>查询推广配置。</td></tr>
+      <tr><td><span class="method post">POST</span></td><td class="path">/updateSpread</td><td>修改推广配置。</td></tr>
+      <tr><td><span class="method get">GET</span></td><td class="path">/getActivityAnswerAnalysis/{id}</td><td>数据概览。</td></tr>
+      <tr><td><span class="method post">POST</span></td><td class="path">/getActivityAnswerDailyAnalysis</td><td>每日趋势，没值日期补 0。</td></tr>
+      <tr><td><span class="method post">POST</span></td><td class="path">/questionAnalysis</td><td>题目分析。</td></tr>
+      <tr><td><span class="method post">POST</span></td><td class="path">/record/page</td><td>答题记录分页。</td></tr>
+      <tr><td><span class="method post">POST</span></td><td class="path">/record/count</td><td>答题人数、答题次数统计。</td></tr>
+      <tr><td><span class="method post">POST</span></td><td class="path">/record/export</td><td>导出答题记录。</td></tr>
+      <tr><td><span class="method post">POST</span></td><td class="path">/reward/page</td><td>奖励发放记录分页。</td></tr>
+      <tr><td><span class="method post">POST</span></td><td class="path">/reward/count</td><td>发放人数、发放次数统计。</td></tr>
+      <tr><td><span class="method post">POST</span></td><td class="path">/reward/export</td><td>导出奖励发放记录。</td></tr>
+      <tr><td><span class="method post">POST</span></td><td class="path">/reward/updateExpress</td><td>实物奖品填写/修改快递信息。</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>后台创建/修改参数</h2>
+    <h3>POST /create、POST /update：ActivityAnswerSaveOrUpdateReqVO</h3>
+    <table>
+      <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td>id</td><td>number</td><td>修改必填</td><td>有奖问答配置 ID。</td></tr>
+      <tr><td>activityId</td><td>number</td><td>修改必填</td><td>活动主表 ID。</td></tr>
+      <tr><td>isEnabled</td><td>number</td><td>否</td><td>是否启用：0禁用，1启用。</td></tr>
+      <tr><td>activityName</td><td>string</td><td>是</td><td>活动名称。</td></tr>
+      <tr><td>activityRules</td><td>string</td><td>否</td><td>活动规则。</td></tr>
+      <tr><td>activityStore</td><td>number</td><td>是</td><td>0指定门店，1全部门店。</td></tr>
+      <tr><td>storeIds</td><td>array&lt;number&gt;</td><td>指定门店必填</td><td>指定门店 ID。全部门店时关系表不插入全部门店数据。</td></tr>
+      <tr><td>startDate / endDate</td><td>date</td><td>是</td><td>活动开始/结束日期，例：2026-07-01。</td></tr>
+      <tr><td>dayNumberList</td><td>array&lt;number&gt;</td><td>否</td><td>指定日期集合，对应活动主表 day_numbers。</td></tr>
+      <tr><td>weekNumberList</td><td>array&lt;number&gt;</td><td>否</td><td>指定周几，按 Calendar.DAY_OF_WEEK：1周日，2周一 ... 7周六。</td></tr>
+      <tr><td>timeRangeList</td><td>array&lt;string&gt;</td><td>否</td><td>答题场次时间段，例：["09:00-11:00","13:00-16:00"]。</td></tr>
+      <tr><td>activityImgUrl</td><td>string</td><td>是</td><td>活动封面图。</td></tr>
+      <tr><td>activityBackground</td><td>string</td><td>是</td><td>活动背景图。</td></tr>
+      <tr><td>buttonImgUrl</td><td>string</td><td>是</td><td>开始答题按钮图。</td></tr>
+      <tr><td>activityDetailLongImage</td><td>string</td><td>否</td><td>活动详情长图。</td></tr>
+      <tr><td>questionBackgroundImage</td><td>string</td><td>否</td><td>答题页面背景图。</td></tr>
+      <tr><td>unselectedOptionImage / selectedOptionImage</td><td>string</td><td>否</td><td>未选择/已选择选项图。</td></tr>
+      <tr><td>previousButtonImage / nextButtonImage / submitButtonImage</td><td>string</td><td>否</td><td>上一题、下一题、确认提交按钮图。</td></tr>
+      <tr><td>backgroundColor</td><td>string</td><td>否</td><td>背景颜色。</td></tr>
+      <tr><td>shareTitle / shareNote / shareImgUrl</td><td>string</td><td>否</td><td>分享标题、内容、图片。</td></tr>
+      <tr><td>shareType</td><td>number</td><td>否</td><td>1不允许转发，2允许转发，3允许复制链接。</td></tr>
+      <tr><td>publicButton</td><td>number</td><td>否</td><td>公共展示：0开启，1关闭。</td></tr>
+      <tr><td>communityFlag</td><td>number</td><td>否</td><td>社群专享：1不开启，2开启。</td></tr>
+      <tr><td>guideImage</td><td>string</td><td>否</td><td>引导图片。</td></tr>
+      <tr><td>answerTotalNumber</td><td>number</td><td>否</td><td>活动期间每人最多可答题次数，0不限制。</td></tr>
+      <tr><td>calculationRules</td><td>number</td><td>是</td><td>1按天计算次数，2按场次计算次数。</td></tr>
+      <tr><td>prizePoolRules</td><td>number</td><td>是</td><td>1门店共用库存，2门店独立库存。独立库存走 Redis 库存缓存。</td></tr>
+      <tr><td>answerRulesReset</td><td>number</td><td>否</td><td>奖励及答题规则重置：0关闭，1开启。</td></tr>
+      <tr><td>freeStatus / freeCount</td><td>number</td><td>否</td><td>免费获得开关和免费答题次数。</td></tr>
+      <tr><td>signStatus / signCount</td><td>number</td><td>否</td><td>每日签到任务开关和获得次数。</td></tr>
+      <tr><td>orderStatus</td><td>number</td><td>否</td><td>下单获得开关：0关闭，1开启。</td></tr>
+      <tr><td>placeOrderType</td><td>number</td><td>否</td><td>下单类型：1按品类限制，2按商品限制。</td></tr>
+      <tr><td>categoryType</td><td>number</td><td>否</td><td>参与品类：1全部，2仅单品，3仅套餐。</td></tr>
+      <tr><td>placeOrderProduct</td><td>number</td><td>否</td><td>下单商品范围：1全部商品，2指定商品。</td></tr>
+      <tr><td>commodityIds</td><td>array&lt;number&gt;</td><td>指定商品必填</td><td>商品 ID 集合，参考抽奖保存逻辑。</td></tr>
+      <tr><td>paymentType / paymentCount</td><td>number</td><td>否</td><td>支付门槛：0不限制，1限制；支付金额。</td></tr>
+      <tr><td>placeOrderAnswer / placeOrderAnswerNumber</td><td>number</td><td>否</td><td>下单任务次数规则和下单可获得答题次数。</td></tr>
+      <tr><td>shareEvent / shareCount</td><td>number</td><td>否</td><td>分享任务开关和分享可获得答题次数。</td></tr>
+      <tr><td>browseType / browseCount</td><td>number</td><td>否</td><td>浏览首页任务开关和浏览可获得答题次数。</td></tr>
+      <tr><td>questions</td><td>array</td><td>是</td><td>题目列表，包含题干、提示文案、选项、正确答案、答题时间。</td></tr>
+      <tr><td>rewards</td><td>array</td><td>是</td><td>奖励档位列表，答对题数 correctCount 不允许重复。</td></tr>
+    </table>
+
+    <h3>questions 子项 ActivityAnswerQuestionReqVO</h3>
+    <table>
+      <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td>id</td><td>number</td><td>否</td><td>题目 ID，新增可不传。</td></tr>
+      <tr><td>questionType</td><td>number</td><td>是</td><td>固定 1选择题。</td></tr>
+      <tr><td>questionTitle</td><td>string</td><td>是</td><td>题干，长度支持到 2000。</td></tr>
+      <tr><td>questionTips</td><td>string</td><td>否</td><td>题目提示文案。</td></tr>
+      <tr><td>optionsJson</td><td>string</td><td>是</td><td>选项 JSON，至少 2 个选项，例如 [{"code":"A","text":"选项A"}]。</td></tr>
+      <tr><td>correctAnswer</td><td>string</td><td>是</td><td>正确答案选项编码，必须且只能有一个正确答案。</td></tr>
+      <tr><td>answerTime</td><td>number</td><td>否</td><td>每题答题时间，单位秒，0表示不限制。</td></tr>
+    </table>
+
+    <h3>rewards 子项 ActivityAnswerRewardReqVO</h3>
+    <table>
+      <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td>id</td><td>number</td><td>否</td><td>奖励档位 ID，新增可不传。</td></tr>
+      <tr><td>correctCount</td><td>number</td><td>是</td><td>答对题数档位，必须唯一，不能大于题目总数。</td></tr>
+      <tr><td>prizeType</td><td>number</td><td>是</td><td>1积分，2优惠券，3优惠券包，4实物，5现金红包。</td></tr>
+      <tr><td>awardId</td><td>number</td><td>否</td><td>奖品 ID，根据类型判断是优惠券 ID、优惠券包 ID 或商品 ID。</td></tr>
+      <tr><td>code</td><td>string</td><td>否</td><td>编码。</td></tr>
+      <tr><td>couponName</td><td>string</td><td>否</td><td>优惠券名称。</td></tr>
+      <tr><td>packageName</td><td>string</td><td>否</td><td>优惠券包名称。</td></tr>
+      <tr><td>prizeName</td><td>string</td><td>是</td><td>奖品名称。</td></tr>
+      <tr><td>prizeImgUrl</td><td>string</td><td>否</td><td>奖品图片。</td></tr>
+      <tr><td>prizeValue</td><td>number</td><td>否</td><td>奖品价值。</td></tr>
+      <tr><td>totalNum</td><td>number</td><td>是</td><td>奖品总库存，0表示不限。</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>后台分析与记录筛选</h2>
+    <table>
+      <tr><th>接口</th><th>主要入参</th><th>说明</th></tr>
+      <tr><td>/questionAnalysis</td><td>activityId、startTime、endTime</td><td>时间可传日期或日期时间；只传日期时按当天 00:00:00 到 23:59:59 处理。以答题记录表筛选，再按 questionId + questionTitle 分组。</td></tr>
+      <tr><td>/record/page、/record/count、/record/export</td><td>activityId、memberMobile、startTime、endTime、storeId、answerStatus、pageNo、pageSize</td><td>联系方式支持手机号模糊搜索；答题状态默认全部，0未完成，1已完成。</td></tr>
+      <tr><td>/reward/page、/reward/count、/reward/export</td><td>activityId、memberMobile、prizeType、activityTime、startTime、endTime、receiveAddressType、trackingType、claimStatus、pageNo、pageSize</td><td>分页、统计和导出共用查询条件；红包状态支持未领取、已领取、已失效，实物支持收货地址和物流单号筛选。</td></tr>
+    </table>
+    <p>答题记录导出：题目列根据筛选到的答题明细动态生成，列头使用明细中的题目名称；每条记录对应题目显示“正确 / 错误 / 未作答”。</p>
+  </section>
+
+  <section>
+    <h2>小程序接口清单</h2>
+    <table>
+      <tr><th style="width:90px;">方法</th><th>路径</th><th>说明</th></tr>
+      <tr><td><span class="method get">GET</span></td><td class="path">/detail</td><td>活动详情，返回图片、题目、任务、可用次数、当前场次作答情况。</td></tr>
+      <tr><td><span class="method post">POST</span></td><td class="path">/chance/count</td><td>查询当前可用答题次数。</td></tr>
+      <tr><td><span class="method post">POST</span></td><td class="path">/join</td><td>开始或继续答题；新开始扣次数，继续同场次未完成记录不扣次数。</td></tr>
+      <tr><td><span class="method post">POST</span></td><td class="path">/submit</td><td>单题提交；最后一题触发统计和奖励发放。</td></tr>
+      <tr><td><span class="method post">POST</span></td><td class="path">/task/getTaskList</td><td>查询任务列表。</td></tr>
+      <tr><td><span class="method post">POST</span></td><td class="path">/task/sign</td><td>完成签到任务。</td></tr>
+      <tr><td><span class="method post">POST</span></td><td class="path">/task/shareCheck</td><td>检测分享任务。</td></tr>
+      <tr><td><span class="method post">POST</span></td><td class="path">/task/share</td><td>完成分享任务。</td></tr>
+      <tr><td><span class="method post">POST</span></td><td class="path">/task/browse</td><td>完成浏览首页任务。</td></tr>
+      <tr><td><span class="method post">POST</span></td><td class="path">/record/my</td><td>我的答题记录。</td></tr>
+      <tr><td><span class="method post">POST</span></td><td class="path">/reward/my</td><td>我的奖励记录。</td></tr>
+      <tr><td><span class="method post">POST</span></td><td class="path">/reward/address/save</td><td>保存实物奖品收货地址。</td></tr>
+    </table>
+  </section>
+
+  <section id="answer-es-event">
+    <h2>小程序浏览埋点：PV / UV</h2>
+    <p><span class="method post">POST</span> <code>/app-api/analysis/event/add</code></p>
+    <p>复用营销通用埋点接口。此路径属于 analysis 服务，不拼接 promotion/activity-answer 前缀；网关前缀沿用项目现有配置。</p>
+    <p>请求头使用 <code>Content-Type: application/json</code>，<code>business-id</code> 与活动归属项目一致，其他登录及租户请求头沿用小程序请求封装。</p>
+    <h3>请求示例</h3>
+    <pre>{
+  "from": 1,
+  "eventType": "answer",
+  "eventId": "190000000000000001",
+  "storeId": "190000000000000002",
+  "memberId": "190000000000000003"
+}</pre>
+    <p>示例ID需替换为当前活动、门店及会员的真实ID；长ID始终按字符串传递，避免JavaScript精度丢失。</p>
+    <table>
+      <tr><th>字段</th><th>类型</th><th>接入要求</th><th>说明</th></tr>
+      <tr><td>from</td><td>Integer</td><td>传入</td><td>微信小程序传1；支付宝传2。</td></tr>
+      <tr><td>eventType</td><td>String</td><td>传入</td><td>固定answer，后台以此统计问答页面PV/UV。虽然现有枚举名称写“参与”，这里代表页面浏览，不要每答一题再发。</td></tr>
+      <tr><td>eventId</td><td>String</td><td>传入</td><td>统一取小程序/detail响应的data.activityId。不要传题目ID、答题记录ID，也不要同时用问答配置ID和活动ID各报一次。</td></tr>
+      <tr><td>storeId</td><td>Long，JSON字符串</td><td>传入</td><td>当前访问门店ID。</td></tr>
+      <tr><td>memberId</td><td>Long，JSON字符串</td><td>传入</td><td>当前会员ID，UV按该字段去重。通用接口不会自动从登录态填充此字段，与答题业务接口的入参规则不同。不要传手机号、openid、空值或统一的0。</td></tr>
+      <tr><td>channel</td><td>String</td><td>可选</td><td>有推广渠道则传实际渠道；不传或空白时后端默认1000000002。</td></tr>
+      <tr><td>timestamp</td><td>Date</td><td>建议不传</td><td>不传时使用服务器当前时间，避免客户端时间偏差和月份索引错位。</td></tr>
+      <tr><td>businessId</td><td>Long</td><td>不需要传</td><td>后端从项目上下文覆盖填充，不能通过请求体切换项目。</td></tr>
+    </table>
+    <p>以上“传入”为本场景的前端接入约定；现有通用BaseEvent没有对这些字段逐项加非空校验。</p>
+    <h3>响应</h3>
+    <pre>{ "code": 0, "data": true, "msg": "" }</pre>
+    <p>成功代表已交给现有批量写入器，不能据此认定ES已经落库。批量刷新间隔默认3秒（可配置），查询还受ES刷新影响，统计可能短暂延迟。</p>
+    <h3>上报时机与统计口径</h3>
+    <ul>
+      <li>活动详情成功加载且页面实际展示、会员ID就绪后，每次访问上报一次。详情轮询、答题提交和普通刷新不重复上报；真正离开再进入可计为新访问。</li>
+      <li>同一会员进入两次：PV增加2，UV增加1；另一位会员进入一次：合计PV为3、UV为2。每日UV按当天去重，活动周期UV按整个查询区间去重，不能把每日UV直接相加。</li>
+      <li>PV和UV使用同一条answer事件，不需要再发送独立的UV事件。UV使用现有ES cardinality聚合，是近似去重统计。</li>
+      <li>现有接口没有请求幂等键，每次上报生成新ES记录；不要在onLoad和onShow同时上报，也不要在请求超时后无限重试。</li>
+      <li>没有会员ID时现有方案无法区分匿名访客。匿名UV需要另行设计稳定访客标识，不能用0代替所有访客。</li>
+      <li>埋点请求独立于详情和答题请求，前端埋点失败不阻止用户继续答题。</li>
+    </ul>
+    <h3>后台查询与联调</h3>
+    <p>后台现有 <code>GET /admin-api/promotion/activityAnswer/getActivityAnswerAnalysis/{id}</code> 返回 <code>pvCount/uvCount</code>（同时提供pv/uv）；<code>POST /admin-api/promotion/activityAnswer/getActivityAnswerDailyAnalysis</code> 返回dateList、pvValues、uvValues。浏览统计查询event_logs_yyyy-MM索引，按businessId、eventType=answer、eventId和时间区间过滤。</p>
+    <p>上报统一使用活动ID，后台查询继续沿用原有配置ID入参约定。概览目前使用活动起止日期作为统计窗口，窗口外的事件不计入概览。</p>
+    <p>联调使用同一活动：会员A访问两次、会员B访问一次，等待批量写入与ES刷新后核对PV增加3、该区间首次访问的UV增加2。需同时确认项目ID、活动ID和统计时间范围一致。</p>
+    <div class="note">现有埋点写入业务直接交给ES批量写入器，不新增MySQL业务查询或事务。当前通用接口允许匿名调用、memberId来自请求体，统计属于客户端上报口径，不作为发奖或扣次数依据。</div>
+  </section>
+
+  <section>
+    <h2>小程序详情：GET /detail</h2>
+    <h3>Query 参数</h3>
+    <table>
+      <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td>activityId</td><td>number</td><td>是</td><td>活动 ID。</td></tr>
+      <tr><td>storeId</td><td>number</td><td>是</td><td>当前门店 ID。</td></tr>
+    </table>
+    <h3>返回 ActivityAnswerAppDetailRespVO</h3>
+    <table>
+      <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+      <tr><td>activityId</td><td>number</td><td>活动 ID。</td></tr>
+      <tr><td>answerTitle / answerRule</td><td>string</td><td>活动标题、活动规则。</td></tr>
+      <tr><td>activityStatus / statusText</td><td>number/string</td><td>活动状态和状态文案。</td></tr>
+      <tr><td>chanceCount</td><td>number</td><td>当前可用答题次数。手机号为空时为 0。</td></tr>
+      <tr><td>unfinishedRecordId</td><td>number</td><td>同场次未完成答题记录 ID。</td></tr>
+      <tr><td>answerAction / answerActionText</td><td>number/string</td><td>0不可答题，1开始答题，2继续答题；以及按钮文案。</td></tr>
+      <tr><td>currentPeriodKey</td><td>string</td><td>当前场次/周期标识。</td></tr>
+      <tr><td>questionCount</td><td>number</td><td>题目总数。</td></tr>
+      <tr><td>currentRecordId</td><td>number</td><td>当前场次答题记录 ID。</td></tr>
+      <tr><td>answerStatus</td><td>number</td><td>0未完成，1已完成。</td></tr>
+      <tr><td>answeredCount / correctCount / wrongCount / accuracy</td><td>number</td><td>已答、正确、错误、正确率。</td></tr>
+      <tr><td>activityImgUrl / activityBackground / buttonImgUrl</td><td>string</td><td>活动封面图、活动背景图、开始答题按钮图。</td></tr>
+      <tr><td>activityDetailLongImage</td><td>string</td><td>活动详情长图。</td></tr>
+      <tr><td>questionBackgroundImage</td><td>string</td><td>答题页面背景图。</td></tr>
+      <tr><td>unselectedOptionImage / selectedOptionImage</td><td>string</td><td>未选择/已选择选项图。</td></tr>
+      <tr><td>previousButtonImage / nextButtonImage / submitButtonImage</td><td>string</td><td>上一题、下一题、确认提交按钮图。</td></tr>
+      <tr><td>shareTitle / shareNote / shareImgUrl / shareType</td><td>string/number</td><td>分享配置。</td></tr>
+      <tr><td>questions</td><td>array</td><td>题目列表，包含正确答案。</td></tr>
+      <tr><td>answerDetails</td><td>array</td><td>当前场次作答明细，来自答题明细表。</td></tr>
+      <tr><td>taskConfig</td><td>object</td><td>任务配置。</td></tr>
+      <tr><td>taskList</td><td>array</td><td>任务列表。</td></tr>
+    </table>
+    <h3>questions 子项</h3>
+    <table>
+      <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+      <tr><td>questionId</td><td>number</td><td>题目 ID。</td></tr>
+      <tr><td>questionType</td><td>number</td><td>1选择题。</td></tr>
+      <tr><td>questionTitle</td><td>string</td><td>题干。</td></tr>
+      <tr><td>questionTips</td><td>string</td><td>提示文案。</td></tr>
+      <tr><td>correctAnswer</td><td>string</td><td>正确答案选项编码。</td></tr>
+      <tr><td>options</td><td>array</td><td>选项列表，子项包含 code、text。</td></tr>
+      <tr><td>answerTime</td><td>number</td><td>单题答题时间，单位秒。</td></tr>
+    </table>
+    <h3>answerDetails 子项</h3>
+    <table>
+      <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+      <tr><td>questionId</td><td>number</td><td>题目 ID。</td></tr>
+      <tr><td>questionTitle</td><td>string</td><td>题目名称。</td></tr>
+      <tr><td>isAnswered</td><td>number</td><td>0未作答，1已作答。</td></tr>
+      <tr><td>selectedAnswer</td><td>string</td><td>用户选择答案编码。</td></tr>
+      <tr><td>answerResult</td><td>number</td><td>0错误，1正确；未作答为空。</td></tr>
+      <tr><td>isCorrect</td><td>boolean</td><td>是否正确。</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>小程序开始答题与提交</h2>
+    <h3>POST /join：开始或继续答题</h3>
+    <p>校验活动、门店、场次、手机号和可用次数。同手机号同场次存在未完成记录时继续答题，不扣次数；新开始时扣减一次答题次数，并把当前活动题目写入答题明细表。</p>
+    <table>
+      <tr><th>请求字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td>activityId</td><td>number</td><td>是</td><td>活动 ID。</td></tr>
+      <tr><td>storeId</td><td>number</td><td>是</td><td>门店 ID。</td></tr>
+    </table>
+    <table>
+      <tr><th>返回字段</th><th>类型</th><th>说明</th></tr>
+      <tr><td>recordId</td><td>number</td><td>答题记录 ID。</td></tr>
+      <tr><td>answerNo</td><td>string</td><td>答题编号。</td></tr>
+      <tr><td>joinType</td><td>number</td><td>1新开始，2继续上次。</td></tr>
+      <tr><td>chanceCount</td><td>number</td><td>剩余答题次数。</td></tr>
+      <tr><td>questionCount</td><td>number</td><td>题目总数，以开始答题时写入明细的题数为准。</td></tr>
+      <tr><td>answeredQuestionIds</td><td>array&lt;number&gt;</td><td>已作答题目 ID。</td></tr>
+      <tr><td>answers</td><td>array</td><td>已作答答案。</td></tr>
+      <tr><td>questions</td><td>array</td><td>题目列表。继续答题返回该记录明细中的题目。</td></tr>
+    </table>
+
+    <h3>POST /submit：单题提交</h3>
+    <p>非最后一题只返回本题对错和下一题信息；最后一题提交后更新主记录、计算正确率、按答对数量匹配奖励并返回奖品信息。</p>
+    <table>
+      <tr><th>请求字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td>activityId</td><td>number</td><td>是</td><td>活动 ID。</td></tr>
+      <tr><td>storeId</td><td>number</td><td>是</td><td>门店 ID。</td></tr>
+      <tr><td>recordId</td><td>number</td><td>是</td><td>答题记录 ID。</td></tr>
+      <tr><td>questionId</td><td>number</td><td>是</td><td>当前提交的题目 ID。</td></tr>
+      <tr><td>selectedAnswer</td><td>string</td><td>是</td><td>用户选择的选项编码。</td></tr>
+    </table>
+    <table>
+      <tr><th>返回字段</th><th>类型</th><th>说明</th></tr>
+      <tr><td>recordId / answerNo</td><td>number/string</td><td>答题记录 ID、答题编号。</td></tr>
+      <tr><td>isCorrect</td><td>boolean</td><td>本题是否回答正确。</td></tr>
+      <tr><td>finished</td><td>boolean</td><td>是否已答完全部题目。</td></tr>
+      <tr><td>answeredCount</td><td>number</td><td>已答题数量。</td></tr>
+      <tr><td>nextQuestionId</td><td>number</td><td>下一题 ID，已答完时为空。</td></tr>
+      <tr><td>questionCount / correctCount / wrongCount / accuracy</td><td>number</td><td>题目总数、正确数量、错误数量、正确率。</td></tr>
+      <tr><td>details</td><td>array</td><td>每题对错明细，包含未作答题。</td></tr>
+      <tr><td>hasReward</td><td>boolean</td><td>是否获得奖励。</td></tr>
+      <tr><td>rewardLogId</td><td>number</td><td>奖励发放记录 ID。</td></tr>
+      <tr><td>rewardCorrectCount</td><td>number</td><td>实际命中奖励档位答对题数，库存不足降级时可能小于 correctCount。</td></tr>
+      <tr><td>prizeType / prizeId / prizeName</td><td>number/string</td><td>奖品类型、奖品 ID、奖品名称。</td></tr>
+      <tr><td>prizeImgUrl / prizeValue</td><td>string/number</td><td>奖品图片、奖品价值。</td></tr>
+      <tr><td>claimStatus</td><td>number</td><td>红包领取状态。</td></tr>
+      <tr><td>packageInfo</td><td>string</td><td>现金红包调起微信领取所需参数；非红包为空。</td></tr>
+      <tr><td>outBillNo</td><td>string</td><td>现金红包商户转账单号；非红包为空。</td></tr>
+      <tr><td>message</td><td>string</td><td>结果文案，例如“很遗憾，奖品已发完”。</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>小程序任务、我的记录、我的奖励</h2>
+    <h3>POST /task/getTaskList</h3>
+    <table>
+      <tr><th>返回字段</th><th>类型</th><th>说明</th></tr>
+      <tr><td>taskType</td><td>string</td><td>free、sign、order、share、browse。</td></tr>
+      <tr><td>taskName</td><td>string</td><td>任务名称。</td></tr>
+      <tr><td>taskStatus</td><td>number</td><td>0未达上限可继续完成，1已完成(兼容旧值)，2已达上限。</td></tr>
+      <tr><td>rewardChance</td><td>number</td><td>完成一次任务可获得答题次数。</td></tr>
+      <tr><td>finishCount</td><td>number</td><td>当前周期已完成次数。</td></tr>
+      <tr><td>limitCount</td><td>number</td><td>最大完成次数。</td></tr>
+    </table>
+    <h3>POST /task/sign、/task/share、/task/browse</h3>
+    <p>请求体使用 <code>activityId</code>、<code>storeId</code>。任务按手机号计数；会员手机号为空时返回“请先授权注册”。</p>
+    <table>
+      <tr><th>返回字段</th><th>类型</th><th>说明</th></tr>
+      <tr><td>success</td><td>boolean</td><td>是否完成成功。</td></tr>
+      <tr><td>addChance</td><td>number</td><td>本次新增答题次数。</td></tr>
+      <tr><td>chanceCount</td><td>number</td><td>完成后的可用答题次数。</td></tr>
+      <tr><td>message</td><td>string</td><td>提示文案。</td></tr>
+    </table>
+    <h3>POST /task/shareCheck</h3>
+    <p>请求体使用 <code>activityId</code>、<code>storeId</code>，返回 <code>Boolean</code>。</p>
+    <h3>POST /record/my</h3>
+    <p>请求体：<code>activityId</code>、<code>storeId</code>、<code>pageNo</code>、<code>pageSize</code>。返回当前手机号的答题记录分页。</p>
+    <h3>POST /reward/my</h3>
+    <p>请求体：<code>activityId</code>、<code>storeId</code>、<code>pageNo</code>、<code>pageSize</code>。返回当前手机号的奖励记录分页，包含奖品、红包、收货、物流信息。</p>
+    <h3>POST /reward/address/save</h3>
+    <table>
+      <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td>activityId</td><td>number</td><td>是</td><td>活动 ID。</td></tr>
+      <tr><td>storeId</td><td>number</td><td>是</td><td>门店 ID。</td></tr>
+      <tr><td>rewardLogId</td><td>number</td><td>是</td><td>奖励记录 ID。</td></tr>
+      <tr><td>receiveUser</td><td>string</td><td>是</td><td>收货人。</td></tr>
+      <tr><td>receiveMobile</td><td>string</td><td>是</td><td>收货手机号。</td></tr>
+      <tr><td>receiveAddress</td><td>string</td><td>是</td><td>收货地址。</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>缓存与并发口径</h2>
+    <table>
+      <tr><th>Key</th><th>说明</th></tr>
+      <tr><td><code>activity_answer:cache:{activityId}</code></td><td>聚合配置缓存，结构参考抽奖 LotterySettingsCacheDataVO，包含活动、门店、商品、题目、奖品和任务规则。</td></tr>
+      <tr><td><code>activity_answer:setting:{activityId}</code></td><td>活动配置缓存。</td></tr>
+      <tr><td><code>activity_answer:questions:{activityId}</code></td><td>题目配置缓存。</td></tr>
+      <tr><td><code>activity_answer:rewards:{activityId}</code></td><td>奖励档位缓存。</td></tr>
+      <tr><td><code>activity_answer:num:{activityId}:{memberMobile}:{periodKey}</code></td><td>次数缓存，按手机号和当前周期。</td></tr>
+      <tr><td><code>activity_answer:reward_stock:{activityId}:...</code></td><td>奖励库存缓存。门店独立库存时包含 storeId。</td></tr>
+      <tr><td><code>activity_answer:task:{activityId}:{memberMobile}:{taskType}:{periodKey}</code></td><td>任务完成次数缓存。</td></tr>
+      <tr><td><code>activity_answer:task_lock:...</code></td><td>任务完成短锁。</td></tr>
+      <tr><td><code>activity_answer:submit_lock:...</code></td><td>开始答题/提交答案短锁，避免同一手机号同一记录并发重复提交。</td></tr>
+    </table>
+    <p>配置类缓存 TTL 最长到活动结束日 23:59:59，最短 60 秒。按天次数过期到当天 23:59:59；按场次次数过期到当前场次结束。</p>
+    <p>奖品发放时按正确数从高到低降级匹配。共用库存走数据库原子扣减；门店独立库存参考抽奖逻辑走 Redis 库存，发放记录落库后同步库存，避免超发。</p>
+  </section>
+
+  <section>
+    <h2>异常提示</h2>
+    <table>
+      <tr><th>场景</th><th>提示</th></tr>
+      <tr><td>未授权手机号</td><td>请先授权注册。</td></tr>
+      <tr><td>活动不存在或已删除</td><td>有奖问答活动不存在。</td></tr>
+      <tr><td>当前门店不可参与</td><td>当前门店不可参与。</td></tr>
+      <tr><td>不在活动时间或场次</td><td>活动未开始、活动已结束或当前不在答题场次内。</td></tr>
+      <tr><td>无可用次数</td><td>暂无可用答题次数。</td></tr>
+      <tr><td>题目配置异常</td><td>题目必须至少包含两个选项，且必须有一个正确答案。</td></tr>
+      <tr><td>奖励档位重复</td><td>相同答对题数只能配置一个奖励档位。</td></tr>
+      <tr><td>奖品全部无库存</td><td>很遗憾，奖品已发完。</td></tr>
+      <tr><td>系统繁忙</td><td>系统繁忙，请稍后再试。</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>关联 SQL 脚本</h2>
+    <table>
+      <tr><th>脚本</th><th>说明</th></tr>
+      <tr><td><code>sql/有奖问答/activity_answer_tables.sql</code></td><td>有奖问答主表、题目表、奖励表、答题记录表、答题明细表、发放记录表等建表脚本。</td></tr>
+      <tr><td><code>sql/有奖问答/activity_answer_task.sql</code></td><td>任务记录表。</td></tr>
+      <tr><td><code>sql/有奖问答/activity_answer_reward_award_fields.sql</code></td><td>奖励表字段调整：award_id、code、coupon_name。</td></tr>
+      <tr><td><code>sql/有奖问答/activity_answer_record_detail_question_fields.sql</code></td><td>答题明细表补充题目当次记录字段、是否作答字段和索引。</td></tr>
+      <tr><td><code>sql/有奖问答/activity_answer_member_mobile_bigint.sql</code></td><td>手机号字段调整为 Long/BigInt 相关脚本。</td></tr>
+      <tr><td><code>sql/有奖问答/activity_answer_sharding_tables.sql</code></td><td>答题记录、答题明细、发放记录、任务记录分表脚本。</td></tr>
+    </table>
+  </section>
+</main>
+</body>
+</html>

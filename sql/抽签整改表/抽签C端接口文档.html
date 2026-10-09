@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>抽签 C 端接口文档</title>
+    <style>
+        :root {
+            --bg: #f6f8fb;
+            --card: #ffffff;
+            --text: #1f2937;
+            --muted: #6b7280;
+            --line: #e5e7eb;
+            --head: #0f172a;
+            --accent: #0f766e;
+            --th: #f0fdfa;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+            background: linear-gradient(180deg, #f0fdfa 0%, var(--bg) 280px);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        .wrap {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 32px 20px 56px;
+        }
+
+        .hero {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            padding: 28px 32px;
+            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
+            margin-bottom: 24px;
+        }
+
+        h1, h2, h3 {
+            color: var(--head);
+            margin: 0 0 12px;
+        }
+
+        h1 {
+            font-size: 32px;
+        }
+
+        h2 {
+            font-size: 24px;
+            margin-top: 36px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--line);
+        }
+
+        h3 {
+            font-size: 18px;
+            margin-top: 24px;
+        }
+
+        p, li {
+            color: var(--text);
+        }
+
+        .muted {
+            color: var(--muted);
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            padding: 24px 28px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+        }
+
+        code {
+            background: #f3f4f6;
+            border-radius: 6px;
+            padding: 2px 6px;
+            font-family: Menlo, Monaco, Consolas, monospace;
+            font-size: 13px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 12px 0 16px;
+            background: #fff;
+        }
+
+        th, td {
+            border: 1px solid var(--line);
+            padding: 10px 12px;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        th {
+            background: var(--th);
+            color: var(--head);
+            font-weight: 600;
+        }
+
+        ul {
+            margin: 8px 0 16px 20px;
+            padding: 0;
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 999px;
+            background: #ccfbf1;
+            color: var(--accent);
+            font-size: 12px;
+            font-weight: 600;
+            margin-right: 8px;
+        }
+
+        .path {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--accent);
+        }
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <div class="hero">
+        <div class="tag">抽签</div>
+        <div class="tag">C 端接口</div>
+        <h1>抽签 C 端接口文档</h1>
+        <p class="muted">接口前缀：<code>/promotion/activity-cq</code></p>
+        <p class="muted">返回包装：<code>CommonResult&lt;T&gt;</code>，分页返回：<code>PageResult&lt;T&gt;</code></p>
+        <p>当前抽签玩法为“任务直接发签码”，不再保留手动抽签发码流程。</p>
+    </div>
+
+    <div class="card">
+        <h2>1. 已废弃接口</h2>
+        <ul>
+            <li><code>draw/verify</code></li>
+            <li><code>draw/count</code></li>
+            <li><code>draw</code></li>
+            <li><code>getActivityCqList</code></li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h2>2. 活动详情</h2>
+
+        <h3>2.1 获取抽签活动详情</h3>
+        <p class="path">GET /getActivityCqDetail</p>
+
+        <p>请求参数</p>
+        <table>
+            <thead>
+            <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+            <tr><td>activityId</td><td>Long</td><td>是</td><td>活动 ID</td></tr>
+            <tr><td>memberId</td><td>Long</td><td>否</td><td>用户 ID</td></tr>
+            </tbody>
+        </table>
+
+        <p>返回字段</p>
+        <table>
+            <thead>
+            <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+            <tr><td>activityId</td><td>Long</td><td>活动 ID</td></tr>
+            <tr><td>activityTitle</td><td>String</td><td>活动标题</td></tr>
+            <tr><td>activityCoverImage</td><td>String</td><td>活动封面图</td></tr>
+            <tr><td>activityBackgroundImage</td><td>String</td><td>活动背景图</td></tr>
+            <tr><td>activityDetailsImage</td><td>String</td><td>活动详情图</td></tr>
+            <tr><td>buttonBackgroundColor</td><td>String</td><td>按钮背景色</td></tr>
+            <tr><td>activityStartTime</td><td>Date</td><td>活动开始时间</td></tr>
+            <tr><td>activityEndTime</td><td>Date</td><td>活动结束时间</td></tr>
+            <tr><td>activityRule</td><td>String</td><td>活动规则</td></tr>
+            <tr><td>shareTitle</td><td>String</td><td>分享标题</td></tr>
+            <tr><td>shareNote</td><td>String</td><td>分享内容</td></tr>
+            <tr><td>shareImgUrl</td><td>String</td><td>分享图片</td></tr>
+            <tr><td>dailyAttendance</td><td>Integer</td><td>签到开关，1 开启</td></tr>
+            <tr><td>freeEvent</td><td>Integer</td><td>免费集签开关，1 开启</td></tr>
+            <tr><td>freeCount</td><td>Integer</td><td>免费抽签次数</td></tr>
+            <tr><td>placeOrderStatus</td><td>Integer</td><td>下单开关，1 开启</td></tr>
+            <tr><td>shareEvent</td><td>Integer</td><td>分享开关，1 开启</td></tr>
+            <tr><td>browseHomeEvent</td><td>Integer</td><td>浏览首页集签开关，1 开启</td></tr>
+            <tr><td>browseHomeCount</td><td>Integer</td><td>浏览首页每人每天上限获得次数</td></tr>
+            <tr><td>activityStatus</td><td>Integer</td><td>活动状态，0未开始 1已开始 2已开奖</td></tr>
+            <tr><td>paymentThreshold</td><td>BigDecimal</td><td>下单金额门槛</td></tr>
+            <tr><td>placeOrderCodeNumber</td><td>Integer</td><td>下单得码次数</td></tr>
+            <tr><td>shareCount</td><td>Integer</td><td>分享得码次数</td></tr>
+            <tr><td>resultPublishTime</td><td>LocalDateTime</td><td>开奖公布时间</td></tr>
+            <tr><td>drawStatus</td><td>Integer</td><td>开奖状态，0未开奖 1开奖中 2已开奖</td></tr>
+            <tr><td>joined</td><td>Boolean</td><td>是否已参与</td></tr>
+            <tr><td>prizeList</td><td>List&lt;PrizeVO&gt;</td><td>奖品列表</td></tr>
+            </tbody>
+        </table>
+
+        <p>PrizeVO</p>
+        <table>
+            <thead>
+            <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+            <tr><td>id</td><td>Long</td><td>奖品 ID</td></tr>
+            <tr><td>prizeType</td><td>Integer</td><td>奖品类型</td></tr>
+            <tr><td>prizeName</td><td>String</td><td>奖品名称</td></tr>
+            <tr><td>prizeImgUrl</td><td>String</td><td>奖品图片</td></tr>
+            <tr><td>prizeValue</td><td>BigDecimal</td><td>奖品价值</td></tr>
+            <tr><td>totalStock</td><td>Integer</td><td>总库存</td></tr>
+            <tr><td>usedStock</td><td>Integer</td><td>已发放库存</td></tr>
+            <tr><td>remainStock</td><td>Integer</td><td>剩余库存</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <h2>3. 任务相关</h2>
+
+        <h3>3.1 获取任务列表</h3>
+        <p class="path">POST /task/getTaskList</p>
+        <table>
+            <thead>
+            <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+            <tr><td>activityId</td><td>Long</td><td>是</td><td>活动 ID</td></tr>
+            <tr><td>memberId</td><td>Long</td><td>是</td><td>用户 ID</td></tr>
+            <tr><td>storeId</td><td>Long</td><td>否</td><td>门店 ID</td></tr>
+            </tbody>
+        </table>
+        <p>返回 <code>List&lt;TaskVO&gt;</code></p>
+        <table>
+            <thead>
+            <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+            <tr><td>taskType</td><td>Integer</td><td>任务类型，1签到 2下单 3分享 4免费集签 5浏览首页</td></tr>
+            <tr><td>amount</td><td>BigDecimal</td><td>下单金额门槛</td></tr>
+            <tr><td>taskLimit</td><td>Integer</td><td>完成上限</td></tr>
+            <tr><td>finishCount</td><td>Integer</td><td>已完成数量</td></tr>
+            </tbody>
+        </table>
+
+        <h3>3.1.1 参与抽签活动</h3>
+        <p class="path">POST /join</p>
+        <table>
+            <thead>
+            <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+            <tr><td>activityId</td><td>Long</td><td>是</td><td>活动 ID</td></tr>
+            <tr><td>memberId</td><td>Long</td><td>是</td><td>用户 ID</td></tr>
+            <tr><td>storeId</td><td>Long</td><td>否</td><td>门店 ID</td></tr>
+            </tbody>
+        </table>
+        <ul>
+            <li>用户首次点击“立即参与抽签”时调用。</li>
+            <li>接口会复用活动缓存做活动校验。</li>
+            <li>已参与过时直接返回成功，接口幂等。</li>
+            <li>参与成功后，详情接口会返回 <code>joined=true</code>。</li>
+        </ul>
+
+        <h3>3.2 完成签到任务</h3>
+        <p class="path">POST /task/sign</p>
+        <table>
+            <thead>
+            <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+            <tr><td>activityId</td><td>Long</td><td>是</td><td>活动 ID</td></tr>
+            <tr><td>memberId</td><td>Long</td><td>是</td><td>用户 ID</td></tr>
+            <tr><td>storeId</td><td>Long</td><td>否</td><td>门店 ID</td></tr>
+            </tbody>
+        </table>
+        <ul>
+            <li>签到成功后直接生成签码。</li>
+            <li>会校验任务开关和签到上限。</li>
+            <li>已到开奖时间或活动已开奖时不可再签到得码。</li>
+        </ul>
+
+        <h3>3.2.1 完成普通分享任务</h3>
+        <p class="path">POST /task/share/simple</p>
+        <table>
+            <thead>
+            <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+            <tr><td>activityId</td><td>Long</td><td>是</td><td>活动 ID</td></tr>
+            <tr><td>memberId</td><td>Long</td><td>是</td><td>当前用户 ID</td></tr>
+            <tr><td>storeId</td><td>Long</td><td>否</td><td>门店 ID</td></tr>
+            </tbody>
+        </table>
+        <ul>
+            <li>当前抽签活动推荐使用该接口完成分享任务。</li>
+            <li>用户只要完成一次普通分享，即可累计一次分享任务并获得签码。</li>
+            <li>不依赖 <code>activity_help</code> 助力关系表。</li>
+            <li>会校验用户是否已参与活动，以及分享任务次数上限。</li>
+        </ul>
+
+        <h3>3.2.2 完成浏览首页任务</h3>
+        <p class="path">POST /task/browse/home</p>
+        <table>
+            <thead>
+            <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+            <tr><td>activityId</td><td>Long</td><td>是</td><td>活动 ID</td></tr>
+            <tr><td>memberId</td><td>Long</td><td>是</td><td>当前用户 ID</td></tr>
+            <tr><td>storeId</td><td>Long</td><td>否</td><td>门店 ID</td></tr>
+            </tbody>
+        </table>
+        <p>返回 <code>List&lt;String&gt;</code>，表示本次新增的抽签码列表。</p>
+        <ul>
+            <li>浏览首页成功后直接生成签码。</li>
+            <li>会校验用户是否已参与活动。</li>
+            <li>会校验浏览首页任务开关和当日次数上限。</li>
+            <li>已到开奖时间或活动已开奖时不可再获得签码。</li>
+        </ul>
+
+        <h3>3.3 分享助力预校验</h3>
+        <p class="path">POST /task/shareCheck</p>
+        <table>
+            <thead>
+            <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+            <tr><td>activityId</td><td>Long</td><td>是</td><td>活动 ID</td></tr>
+            <tr><td>memberId</td><td>Long</td><td>是</td><td>助力人用户 ID</td></tr>
+            <tr><td>inviterMemberId</td><td>Long</td><td>是</td><td>被助力人用户 ID</td></tr>
+            <tr><td>storeId</td><td>Long</td><td>否</td><td>门店 ID</td></tr>
+            </tbody>
+        </table>
+        <ul>
+            <li>校验是否允许助力。</li>
+            <li>校验是否重复助力。</li>
+            <li>校验单日助力上限。</li>
+            <li>该接口为历史助力模型保留，不作为当前抽签玩法主入口。</li>
+        </ul>
+
+        <h3>3.4 完成分享助力任务</h3>
+        <p class="path">POST /task/share</p>
+        <table>
+            <thead>
+            <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+            <tr><td>activityId</td><td>Long</td><td>是</td><td>活动 ID</td></tr>
+            <tr><td>memberId</td><td>Long</td><td>是</td><td>助力人用户 ID</td></tr>
+            <tr><td>inviterMemberId</td><td>Long</td><td>是</td><td>被助力人用户 ID</td></tr>
+            <tr><td>storeId</td><td>Long</td><td>否</td><td>门店 ID</td></tr>
+            </tbody>
+        </table>
+        <ul>
+            <li>分享助力成功后，给 <code>inviterMemberId</code> 发签码。</li>
+            <li>新会员助力时当前实现会额外奖励签码。</li>
+            <li>已到开奖时间或活动已开奖时不可再分享得码。</li>
+            <li>该接口为历史助力模型保留，不作为当前抽签玩法主入口。</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h2>4. 奖品相关</h2>
+
+        <h3>4.1 获取奖品列表</h3>
+        <p class="path">POST /prize/list</p>
+        <table>
+            <thead>
+            <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+            <tr><td>activityId</td><td>Long</td><td>是</td><td>活动 ID</td></tr>
+            </tbody>
+        </table>
+        <p>返回 <code>ActivityCqPrizeListVO</code>，字段为 <code>prizeList</code>。</p>
+
+        <h3>4.2 填写收货地址</h3>
+        <p class="path">POST /prize/address/save</p>
+        <table>
+            <thead>
+            <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+            <tr><td>id</td><td>Long</td><td>是</td><td>中奖记录 ID</td></tr>
+            <tr><td>memberId</td><td>Long</td><td>是</td><td>用户 ID</td></tr>
+            <tr><td>receiveUser</td><td>String</td><td>否</td><td>收件人</td></tr>
+            <tr><td>receiveMobile</td><td>String</td><td>否</td><td>收件联系方式</td></tr>
+            <tr><td>receiveAddress</td><td>String</td><td>否</td><td>收件地址</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <h2>5. 签码与结果查询</h2>
+
+        <h3>5.1 获取抽签记录</h3>
+        <p class="path">POST /record/draw</p>
+        <table>
+            <thead>
+            <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+            <tr><td>activityId</td><td>Long</td><td>是</td><td>活动 ID</td></tr>
+            <tr><td>memberId</td><td>Long</td><td>是</td><td>用户 ID</td></tr>
+            <tr><td>pageNo</td><td>Integer</td><td>是</td><td>页码</td></tr>
+            <tr><td>pageSize</td><td>Integer</td><td>是</td><td>每页数量</td></tr>
+            </tbody>
+        </table>
+        <p>返回 <code>PageResult&lt;DrawRecordVO&gt;</code></p>
+        <table>
+            <thead>
+            <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+            <tr><td>id</td><td>Long</td><td>记录 ID</td></tr>
+            <tr><td>signCode</td><td>String</td><td>签码</td></tr>
+            <tr><td>obtainType</td><td>Integer</td><td>获取方式，1签到 2下单 3分享</td></tr>
+            <tr><td>resultStatus</td><td>Integer</td><td>结果状态，0待开奖 1未中签 2已中签</td></tr>
+            <tr><td>prizeId</td><td>Long</td><td>奖品 ID</td></tr>
+            <tr><td>prizeType</td><td>Integer</td><td>奖品类型</td></tr>
+            <tr><td>prizeContent</td><td>String</td><td>奖品内容</td></tr>
+            <tr><td>prizeImgUrl</td><td>String</td><td>奖品图片</td></tr>
+            <tr><td>prizeState</td><td>Integer</td><td>奖品状态</td></tr>
+            <tr><td>drawTime</td><td>LocalDateTime</td><td>签码生成时间</td></tr>
+            </tbody>
+        </table>
+
+        <h3>5.2 获取我的抽签码汇总</h3>
+        <p class="path">POST /code/my</p>
+        <table>
+            <thead>
+            <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+            <tr><td>activityId</td><td>Long</td><td>是</td><td>活动 ID</td></tr>
+            <tr><td>memberId</td><td>Long</td><td>是</td><td>用户 ID</td></tr>
+            </tbody>
+        </table>
+        <p>返回 <code>MyCodeVO</code></p>
+        <table>
+            <thead>
+            <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+            <tr><td>totalCount</td><td>Integer</td><td>总签码数</td></tr>
+            <tr><td>pendingCount</td><td>Integer</td><td>待开奖数</td></tr>
+            <tr><td>winningCount</td><td>Integer</td><td>中奖数</td></tr>
+            <tr><td>loseCount</td><td>Integer</td><td>未中奖数</td></tr>
+            <tr><td>signCount</td><td>Integer</td><td>签到获得数</td></tr>
+            <tr><td>orderCount</td><td>Integer</td><td>下单获得数</td></tr>
+            <tr><td>shareCount</td><td>Integer</td><td>分享获得数</td></tr>
+            </tbody>
+        </table>
+
+        <h3>5.3 获取我的抽签结果</h3>
+        <p class="path">POST /record/myResult</p>
+        <table>
+            <thead>
+            <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+            <tr><td>activityId</td><td>Long</td><td>是</td><td>活动 ID</td></tr>
+            <tr><td>memberId</td><td>Long</td><td>是</td><td>用户 ID</td></tr>
+            <tr><td>pageNo</td><td>Integer</td><td>是</td><td>页码</td></tr>
+            <tr><td>pageSize</td><td>Integer</td><td>是</td><td>每页数量</td></tr>
+            </tbody>
+        </table>
+        <p>返回 <code>PageResult&lt;MyResultVO&gt;</code></p>
+
+        <h3>5.4 获取中奖公示列表</h3>
+        <p class="path">POST /record/winning</p>
+        <table>
+            <thead>
+            <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+            <tr><td>activityId</td><td>Long</td><td>是</td><td>活动 ID</td></tr>
+            <tr><td>pageNo</td><td>Integer</td><td>是</td><td>页码</td></tr>
+            <tr><td>pageSize</td><td>Integer</td><td>是</td><td>每页数量</td></tr>
+            </tbody>
+        </table>
+        <p>返回 <code>PageResult&lt;WinningRecordVO&gt;</code></p>
+    </div>
+
+    <div class="card">
+        <h2>6. 状态口径</h2>
+        <ul>
+            <li><code>activityStatus</code>：0未开始 1已开始 2已开奖</li>
+            <li><code>drawStatus</code>：0未开奖 1开奖中 2已开奖</li>
+            <li><code>resultStatus</code>：0待开奖 1未中签 2已中签</li>
+            <li><code>prizeType</code>：1兜底 2积分 3优惠券 4实物 5现金红包</li>
+            <li><code>prizeState</code>：0已发放 1未填写收货地址 2已填写地址待发货 3已发货 9已退回</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h2>7. 业务补充</h2>
+        <ul>
+            <li>用户签码来源只有三类：签到、分享助力、下单。</li>
+            <li>不存在 C 端用户主动抽签生成签码的动作。</li>
+            <li><code>activity_cq_log</code> 一条记录代表一张签码，同时承载最终开奖结果。</li>
+            <li>开奖为统一批处理，不由 C 端触发。</li>
+        </ul>
+    </div>
+</div>
+</body>
+</html>

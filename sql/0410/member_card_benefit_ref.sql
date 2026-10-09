@@ -1,0 +1,20 @@
+CREATE TABLE `wx_member_card_benefit_ref` (
+  `id` bigint(20) NOT NULL COMMENT '关联ID',
+  `member_card_id` bigint(20) NOT NULL COMMENT '会员卡ID',
+  `benefit_scene` int(11) NOT NULL COMMENT '权益场景 1=会员权益 2=生日礼',
+  `coupon_type` int(11) NOT NULL COMMENT '券类型 1=优惠券 2=券包',
+  `coupon_id` bigint(20) NOT NULL COMMENT '券/券包ID',
+  `send_num` int(11) NOT NULL COMMENT '发放数量',
+  `repeat_type` int(11) DEFAULT NULL COMMENT '重复周期 1=按周 2=按月',
+  `issue_value` int(11) DEFAULT NULL COMMENT '发放日期值，按周=1~7，按月=1~31',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `business_id` bigint(20) DEFAULT NULL COMMENT '项目ID',
+  `creator` varchar(64) DEFAULT NULL COMMENT '创建人',
+  `updater` varchar(64) DEFAULT NULL COMMENT '修改人',
+  `deleted` bit(1) NOT NULL DEFAULT b'0' COMMENT '删除标识',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_member_card_scene_coupon_deleted` (`member_card_id`, `benefit_scene`, `coupon_type`, `coupon_id`, `deleted`),
+  KEY `idx_member_card_scene` (`member_card_id`, `benefit_scene`),
+  KEY `idx_coupon` (`coupon_type`, `coupon_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='会员卡权益关联表';

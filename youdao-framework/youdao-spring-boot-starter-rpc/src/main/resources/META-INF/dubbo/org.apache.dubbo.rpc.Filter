@@ -1,0 +1,2 @@
+dubboRequestFilter=com.htyoudao.youdao.framework.rpc.core.filter.DubboRequestFilter
+youDaoExceptionFilter=com.htyoudao.youdao.framework.rpc.core.filter.YouDaoExceptionFilter

@@ -1,0 +1,2 @@
+com.htyoudao.youdao.framework.quartz.config.YoudaoXxlJobAutoConfiguration
+com.htyoudao.youdao.framework.quartz.config.YoudaoAsyncAutoConfiguration

@@ -1,0 +1,2 @@
+com.htyoudao.youdao.framework.redis.config.YoudaoRedisAutoConfiguration
+com.htyoudao.youdao.framework.redis.config.YoudaoCacheAutoConfiguration

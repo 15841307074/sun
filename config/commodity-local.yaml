@@ -1,0 +1,52 @@
+--- #################### youdao相关配置 ####################
+
+youdao:
+  cache:
+    redis-scan-batch-size: 1000
+  info:
+    base-package: com.htyoudao.youdao.module.commodity
+  swagger:
+    title: 管理后台
+    description: 提供会员管理的所有功能
+    version: ${youdao.info.version}
+version: v3.1.3
+
+--- #################### MQ相关配置 ####################
+spring:
+  rabbitmq:
+    # 集群节点地址列表（逗号分隔）
+    addresses: 192.168.31.141:5672,192.168.31.142:5672,192.168.31.143:5672
+    username: admin
+    password: ${CLOUD_COMMODITY_LOCAL_PASSWORD_L20:}
+    virtual-host: saas_prod_vhost
+    # 连接池配置
+    connection-timeout: 3000
+    cache:
+      channel:
+        size: 50  # 通道缓存数量
+      connection:
+        mode: CONNECTION  # 连接缓存模式
+    # 消息确认配置
+    publisher-confirm-type: correlated  # 发布确认
+    publisher-returns: true  # 返回模式
+    listener:
+      simple:
+        acknowledge-mode: manual  # 手动ACK
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 2000
+
+#businessID => projectCode
+businessid:
+  mapping:
+    10: 1
+    9: 20
+    5: 5
+    4: 4
+    3: 3
+    2: 2
+
+commodity:
+  afterOrder:
+    number: 100

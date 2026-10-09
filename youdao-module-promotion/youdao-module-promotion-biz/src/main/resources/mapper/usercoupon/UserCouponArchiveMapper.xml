@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.htyoudao.youdao.module.promotion.dal.mysql.usercoupon.UserCouponArchiveMapper">
+
+    <!--
+        第一步：从指定在线分表中锁定一批待归档记录。
+        仅选择同业务线、同 couponId 且发放时间早于截止时间的数据；
+        ORDER BY id + LIMIT 控制每次事务大小，FOR UPDATE 防止并发任务重复处理。
+    -->
+    <select id="selectEligibleSourceIds" resultType="java.lang.Long">
+        SELECT id
+        FROM user_coupon_${shard}
+        WHERE coupon_id = #{couponId}
+          AND business_id = #{businessId}
+          AND coupon_create_time &lt; #{cutoff}
+        ORDER BY id ASC
+        LIMIT #{batchSize}
+        FOR UPDATE
+    </select>
+
+    <!--
+        第二步：完整复制来源记录到对应备份分表。
+        user_coupon_bak_N 通过 CREATE TABLE LIKE 保留了来源表的全部字段；
+        最后一列额外写入来源主键，和备份表尾部的 source_user_coupon_id 对应。
+        这里使用普通 INSERT，任何重复键或字段异常都会抛错并触发事务回滚。
+    -->
+    <insert id="insertBackupBySourceIds">
+        INSERT INTO user_coupon_bak_${shard}
+        SELECT source.*, source.id AS source_user_coupon_id
+        FROM user_coupon_${shard} source
+        WHERE source.id IN
+        <foreach collection="sourceIds" item="sourceId" open="(" separator="," close=")">
+            #{sourceId}
+        </foreach>
+    </insert>
+
+    <!--
+        第三步：删除已经完整写入备份表的在线记录。
+        除 ID 集合外重复限定业务线、couponId 和截止时间，确保删除范围与第一步一致。
+    -->
+    <delete id="deleteSourceByIds">
+        DELETE FROM user_coupon_${shard}
+        WHERE coupon_id = #{couponId}
+          AND business_id = #{businessId}
+          AND coupon_create_time &lt; #{cutoff}
+          AND id IN
+        <foreach collection="sourceIds" item="sourceId" open="(" separator="," close=")">
+            #{sourceId}
+        </foreach>
+    </delete>
+
+    <!--
+        人工历史归档：按用户券实际过期时间选取固定小批次。
+        expiration_time、id 建议建立联合索引；一张物理表始终由一个线程串行处理。
+    -->
+    <select id="selectExpiredSourceIds" resultType="java.lang.Long">
+        SELECT id
+        FROM user_coupon_${shard}
+        WHERE expiration_time &lt;= #{expirationTime}
+        ORDER BY expiration_time ASC, id ASC
+        LIMIT #{batchSize}
+        FOR UPDATE
+    </select>
+
+    <!-- 删除条件重复校验过期时间，避免选取后数据被并发修改时误删。 -->
+    <delete id="deleteExpiredSourceByIds">
+        DELETE FROM user_coupon_${shard}
+        WHERE expiration_time &lt;= #{expirationTime}
+          AND id IN
+        <foreach collection="sourceIds" item="sourceId" open="(" separator="," close=")">
+            #{sourceId}
+        </foreach>
+    </delete>
+
+</mapper>

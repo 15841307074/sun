@@ -1,0 +1,6 @@
+com.htyoudao.youdao.framework.apilog.config.YoudaoApiLogAutoConfiguration
+com.htyoudao.youdao.framework.jackson.config.YoudaoJacksonAutoConfiguration
+com.htyoudao.youdao.framework.swagger.config.YoudaoSwaggerAutoConfiguration
+com.htyoudao.youdao.framework.web.config.YoudaoWebAutoConfiguration
+com.htyoudao.youdao.framework.banner.config.YoudaoBannerAutoConfiguration
+com.htyoudao.youdao.framework.web.config.UndertowAutoConfig

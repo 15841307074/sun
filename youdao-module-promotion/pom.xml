@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.htyoudao.cloud</groupId>
+        <artifactId>youdao</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <artifactId>youdao-module-promotion</artifactId>
+    <packaging>pom</packaging>
+    <name>${project.artifactId}</name>
+    <description>
+        promotion 模块下，主要放营销、推广相关业务。
+        例如说：拼单、优惠券、短信营销等等
+    </description>
+    <modules>
+        <module>youdao-module-promotion-api</module>
+        <module>youdao-module-promotion-biz</module>
+    </modules>
+
+
+</project>

@@ -1,0 +1,2 @@
+providerHeaderFilter=com.htyoudao.youdao.framework.web.core.filter.ProviderHeaderFilter
+consumerHeaderFilter=com.htyoudao.youdao.framework.web.core.filter.ConsumerHeaderFilter

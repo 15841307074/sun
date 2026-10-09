@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.htyoudao.youdao.module.analysis.dal.mysql.BzOrderMapper">
+
+    <select id="productSonList"
+         resultType="com.htyoudao.youdao.module.analysis.controller.admin.vo.res.product.ProductSingleResult">
+        <foreach item="tableFix" collection="tableFixs" separator=" union all ">
+            select
+                bop.commodity_id,
+                bop.goods_name,
+                bop.goods_image,
+                sum(bop.goods_num) as salesVolume
+            from bz_order_product_son${tableFix} bop
+            left join bz_order${tableFix} bo on bop.order_sn = bo.order_sn
+            where bo.order_state in (10)
+            <if test="storeIds != null and storeIds.size() > 0">
+                and bo.store_id in
+                <foreach collection="storeIds" item="storeId" open="(" separator="," close=")">
+                    #{storeId}
+                </foreach>
+            </if>
+            and bo.create_time between #{currentTimeStart} and #{currentTimeEnd}
+            and bop.parent_goods_id = #{commodityId}
+        </foreach>
+    </select>
+
+
+
+</mapper>

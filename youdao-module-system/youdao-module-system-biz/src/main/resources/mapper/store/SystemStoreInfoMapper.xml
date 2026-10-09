@@ -1,0 +1,403 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.htyoudao.youdao.module.system.dal.mysql.store.SystemStoreInfoMapper">
+
+
+    <select id="selectStoreOrgIds" resultType="java.lang.Long">
+        select
+        distinct org_id
+        from system_store_info
+        where deleted = b'0'
+        and store_source = 0
+        and store_id in
+        <foreach collection="storeIds" item="storeId" open="(" separator="," close=")">
+            #{storeId}
+        </foreach>
+        and org_id != 0
+    </select>
+    <select id="getNodeStoreNum"
+            resultType="com.htyoudao.youdao.module.system.controller.admin.org.vo.OrgStoreNum">
+        select
+        org_id as orgId,
+        count(store_id) as storeNum
+        from system_store_info
+        where deleted = b'0'
+        and store_source = 0
+        and org_id in
+        <foreach collection="unionIds" item="unionId" open="(" separator="," close=")">
+            #{unionId}
+        </foreach>
+        group by org_id
+
+    </select>
+    <select id="selectPageList" resultType="com.htyoudao.youdao.module.system.controller.admin.store.vo.StoreResVO">
+        SELECT DISTINCT
+        a.*
+        FROM
+        system_store_info a
+        LEFT JOIN system_store_user su ON a.store_id = su.store_id AND su.type = 1 AND su.deleted = b'0'
+        LEFT JOIN system_users u ON su.user_id = u.id AND u.deleted = b'0'
+        WHERE
+        a.deleted = b'0'
+        AND a.store_source = 0
+        <choose>
+            <!-- 新版多标签筛选：type 不为空时优先于旧版 tagId。 -->
+            <when test="record.type != null">
+                <choose>
+                    <when test="record.type == 1 and record.tagIds != null and record.tagIds.size() > 0">
+                        <bind name="selectedTagCount" value="record.tagIds.size()"/>
+                        AND a.store_id IN (
+                            SELECT st.store_id
+                            FROM system_store_tag st
+                            WHERE st.deleted = B'0'
+                              AND st.tag_id IN
+                              <foreach collection="record.tagIds" item="tagId" open="(" separator="," close=")">
+                                  #{tagId}
+                              </foreach>
+                            GROUP BY st.store_id
+                            HAVING COUNT(DISTINCT st.tag_id) = #{selectedTagCount}
+                        )
+                    </when>
+                    <when test="record.type == 2 and record.tagIds != null and record.tagIds.size() > 0">
+                        AND EXISTS (
+                            SELECT 1
+                            FROM system_store_tag st
+                            WHERE st.store_id = a.store_id
+                              AND st.deleted = B'0'
+                              AND st.tag_id IN
+                              <foreach collection="record.tagIds" item="tagId" open="(" separator="," close=")">
+                                  #{tagId}
+                              </foreach>
+                        )
+                    </when>
+                    <when test="record.type == 3">
+                        AND NOT EXISTS (
+                            SELECT 1
+                            FROM system_store_tag st
+                            WHERE st.store_id = a.store_id
+                              AND st.deleted = B'0'
+                        )
+                    </when>
+                </choose>
+            </when>
+            <!-- 兼容旧版单标签筛选和 tagId=-1 的无标签筛选。 -->
+            <otherwise>
+                <if test="record.tagId != null and record.tagId != -1">
+                    AND EXISTS (
+                        SELECT 1
+                        FROM system_store_tag st
+                        WHERE st.store_id = a.store_id
+                          AND st.deleted = B'0'
+                          AND st.tag_id = #{record.tagId}
+                    )
+                </if>
+                <if test="record.tagId != null and record.tagId == -1">
+                    AND NOT EXISTS (
+                        SELECT 1
+                        FROM system_store_tag st
+                        WHERE st.store_id = a.store_id
+                          AND st.deleted = B'0'
+                    )
+                </if>
+            </otherwise>
+        </choose>
+        <if test="record.text != null and record.text != ''">
+            AND (
+            a.store_name LIKE CONCAT('%', #{record.text}, '%')
+            OR a.store_id LIKE CONCAT('%', #{record.text}, '%')
+            )
+        </if>
+        <if test="record.leaderText != null and record.leaderText != ''">
+            AND (
+            u.nickname LIKE CONCAT('%', #{record.leaderText}, '%')
+            OR u.mobile LIKE CONCAT('%', #{record.leaderText}, '%')
+            )
+        </if>
+        <if test="record.storeStatus != null">
+            AND a.store_status = #{record.storeStatus}
+        </if>
+        <if test="record.openStatus != null">
+            AND a.open_status = #{record.openStatus}
+        </if>
+        <if test="record.campusDeliveryStatus != null">
+            AND a.campus_delivery_status = #{record.campusDeliveryStatus}
+        </if>
+        <if test="businessId != null">
+            AND a.business_id = #{businessId}
+        </if>
+        AND (
+        <if test="record.orgIds != null and record.orgIds.size() > 0">
+            a.org_id IN
+            <foreach collection="record.orgIds" item="orgId" open="(" separator="," close=")">
+                #{orgId}
+            </foreach>
+        </if>
+        <if test="record.orgIds == null or record.orgIds.size() == 0">
+            1=1
+        </if>
+        <if test="userId != null and userId != '' and record.text == null and record.openStatus == null and record.storeStatus == null and record.leaderText == null">
+            OR su.user_id = #{userId}
+        </if>
+        )
+        ORDER BY
+        a.create_time DESC
+    </select>
+    <select id="selectStoreByTag"  resultType="com.htyoudao.youdao.module.system.controller.admin.store.vo.StoreResVO">
+        select
+        distinct
+        a.*
+        from system_store_info a
+        <if test="type != 3">
+        left join system_store_tag b on a.store_id = b.store_id
+        </if>
+        where a.deleted = b'0'
+        and a.store_status = 0
+        and a.store_source = 0
+        and a.business_id = #{businessId}
+        <if test="orgIds != null and orgIds.size() > 0">
+            AND a.org_id IN
+            <foreach collection="orgIds" item="orgId" open="(" separator="," close=")">
+                #{orgId}
+            </foreach>
+        </if>
+        <if test="type != 3">
+        and b.deleted = b'0'
+        </if>
+        <choose>
+            <when test="type == 1">
+                and b.tag_id in
+                <foreach collection="tagIds" item="tagId" open="(" separator="," close=")">
+                    #{tagId}
+                </foreach>
+            </when>
+            <when test="type == 2 and tagIds != null and tagIds.size() > 0">
+                AND a.store_id IN (
+                SELECT store_id
+                FROM system_store_tag
+                WHERE
+                deleted = B'0'
+                and
+                tag_id IN
+                <foreach collection="tagIds" item="tagId" open="(" separator="," close=")">
+                    #{tagId}
+                </foreach>
+
+                GROUP BY store_id
+                HAVING COUNT(DISTINCT tag_id) = #{tagIdSize}
+                )
+
+            </when>
+            <when test="type == 3">
+                and a.store_id not in (
+                select store_id
+                from system_store_tag
+                where  deleted = B'0'
+                )
+            </when>
+        </choose>
+
+        ORDER BY a.create_time DESC
+    </select>
+    <select id="selectCityList" resultType="com.htyoudao.youdao.module.system.dal.dataobject.org.OrgDO">
+        select store_city as  name from system_store_info where store_city is not null
+        and  store_city != ''
+        and  store_source = 0
+        <if test="dept.name != null">
+            and store_city = #{dept.name}
+        </if>
+    </select>
+
+
+    <select id="selectStorePageList"  resultType="com.htyoudao.youdao.module.system.controller.admin.store.vo.StorePageResVO">
+        select
+        a.*
+        from system_store_info a
+        <if test="record.tagId != null and record.tagId != ''">
+            left join system_store_tag b on a.store_id = b.store_id
+        </if>
+        where a.deleted = '0'
+        and a.store_source = 0
+        <if test="record.storeName != null and record.storeName != ''">
+            and a.store_name like concat('%', #{record.storeName}, '%')
+        </if>
+        <if test="record.openStatus != null">
+            and a.open_status = #{record.openStatus}
+        </if>
+        <if test="record.userId != null">
+            and a.user_id = #{record.userId}
+        </if>
+        <if test="record.orgIds != null and record.orgIds.size() > 0">
+            and a.org_id in
+            <foreach collection="record.orgIds" item="oo" open="(" separator="," close=")">
+                #{oo}
+            </foreach>
+        </if>
+
+        <if test="record.storeIds != null and record.storeIds.size() > 0">
+            and a.store_id not in
+            <foreach collection="record.storeIds" item="aa" open="(" separator="," close=")">
+                #{aa}
+            </foreach>
+        </if>
+        <if test="record.tagId != null and record.tagId != ''">
+            and b.tag_id = #{record.tagId}
+        </if>
+        ORDER BY a.create_time DESC
+    </select>
+
+
+    <select id="selectStorePageListTwo"  resultType="com.htyoudao.youdao.module.system.controller.admin.store.vo.StorePageResVO">
+        select
+        a.*
+        from system_store_info a
+        <if test="record.tagId != null and record.tagId != ''">
+            left join system_store_tag b on a.store_id = b.store_id
+        </if>
+        where a.deleted = '0'
+        and a.store_source = 0
+        <if test="record.storeName != null and record.storeName != ''">
+            and a.store_name like concat('%', #{record.storeName}, '%')
+        </if>
+        <if test="record.openStatus != null">
+            and a.open_status = #{record.openStatus}
+        </if>
+        <if test="record.userId != null">
+            and a.user_id = #{record.userId}
+        </if>
+        <if test="record.orgIds != null and record.orgIds.size() > 0">
+            and a.org_id in
+            <foreach collection="record.orgIds" item="oo" open="(" separator="," close=")">
+                #{oo}
+            </foreach>
+        </if>
+
+        <if test="record.storeIds != null and record.storeIds.size() > 0">
+            and a.store_id in
+            <foreach collection="record.storeIds" item="aa" open="(" separator="," close=")">
+                #{aa}
+            </foreach>
+        </if>
+        <if test="record.tagId != null and record.tagId.size() > 0">
+            and b.tag_id in
+            <foreach collection="record.tagId" item="rr" open="(" separator="," close=")">
+                #{rr}
+            </foreach>
+        </if>
+        ORDER BY a.create_time DESC
+    </select>
+    <select id="selectWecomPageList"  resultType="com.htyoudao.youdao.module.system.controller.admin.wxstore.vo.StoreWecomConfigRespVO">
+        select
+        distinct  a.* , b.qr_type ,b.qr_code ,b.qr_community_code
+        from system_store_info a
+        left join store_wecom_config b on a.store_id = b.store_id
+        left join system_store_user c on a.store_id = c.store_id
+        LEFT JOIN system_store_tag d ON a.store_id = d.store_id AND d.deleted = b'0'
+        where a.deleted = b'0'
+        and a.store_source = 0
+        and a.store_status = 0
+        <if test="record.text != null and record.text != ''">
+            and a.store_name like concat('%', #{record.text}, '%')
+        </if>
+        <if test="businessId != null">
+            and a.business_id = #{businessId}
+        </if>
+        <if test="record.isUpload != null ">
+            <choose>
+                <when test="record.isUpload == 0">
+                    AND ((b.qr_code IS NOT NULL AND b.qr_code != '' ) or ( b.qr_community_code IS NOT NULL AND b.qr_community_code != ''))
+                </when>
+                <when test="record.isUpload == 1">
+                    AND ((
+                    b.qr_code IS NULL
+                    OR b.qr_code = ''
+                    ) )
+                    AND ((
+                    b.qr_community_code IS NULL
+                    OR b.qr_community_code = ''
+                    ) )
+
+                </when>
+            </choose>
+        </if>
+        <if test="record.orgIds != null and record.orgIds.size() > 0">
+            and a.org_id in
+            <foreach collection="record.orgIds" item="orgId" open="(" separator="," close=")">
+                #{orgId}
+            </foreach>
+        </if>
+        <if test="record.text == null and record.orgId == null and record.isUpload == null and userId != null and userId != ''">
+            or c.user_id  = #{userId}
+        </if>
+        <if test="record.tagId != null and record.tagId.size() > 0">
+            and d.tag_id in
+            <foreach collection="record.tagId" item="rr" open="(" separator="," close=")">
+                #{rr}
+            </foreach>
+        </if>
+        ORDER BY a.create_time DESC
+    </select>
+    <select id="getOrgIdsByStoreIds"
+            resultType="com.htyoudao.youdao.module.system.controller.admin.org.vo.OrgStoreDTO">
+        select
+            a.org_id,
+            a.store_id
+        from system_store_info a
+        where a.deleted = '0'
+        and a.store_source = 0
+        <if test="storeIds != null and storeIds.size() > 0">
+            and a.store_id in
+            <foreach collection="storeIds" item="storeId" open="(" separator="," close=")">
+                #{storeId}
+            </foreach>
+        </if>
+    </select>
+    <select id="selectUserAllOrgStoreIds" resultType="java.lang.Long">
+        SELECT
+            DISTINCT a.store_id
+        FROM system_store_info a
+        JOIN system_org g
+            ON a.org_id = g.id
+            AND g.deleted = b'0'
+        JOIN system_org_user rr
+            ON FIND_IN_SET(rr.org_id, g.ancestors) > 0
+            AND rr.deleted = b'0'
+        WHERE rr.user_id = #{userId}
+            AND a.store_source = 0
+            AND a.deleted = b'0'
+    </select>
+
+    <select id="getStoreIdsByAllOrgId" resultType="java.lang.Long">
+        SELECT
+            DISTINCT a.store_id
+        FROM system_store_info a
+        JOIN system_org g
+        ON a.org_id = g.id
+        AND g.deleted = b'0'
+        WHERE (a.org_id = #{orgId} OR FIND_IN_SET(#{orgId}, g.ancestors) > 0)
+          AND a.deleted = b'0'
+    </select>
+
+
+    <select id="selectUserAllOrgStoreIds1111" resultType="java.lang.Long">
+        select
+            a.store_id
+        from system_store_info a
+        where
+            a.deleted = b'0'
+        AND a.org_id in (
+            SELECT g.id
+            FROM system_org g
+            WHERE
+                g.deleted = b'0'
+            AND
+                EXISTS (
+                    SELECT 1
+                    FROM system_org_user rr
+                    WHERE rr.deleted = b'0'
+                      AND rr.user_id = #{userId}
+                      AND FIND_IN_SET(rr.org_id, g.ancestors) > 0
+                )
+        )
+    </select>
+
+</mapper>

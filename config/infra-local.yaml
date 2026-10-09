@@ -1,0 +1,40 @@
+--- #################### youdao相关配置 ####################
+# youdao配置项，设置当前项目所有自定义的配置
+youdao:
+  info:
+    base-package: com.htyoudao.youdao.module.infra
+  websocket:
+    enable: false # websocket的开关
+    path: /infra/ws # 路径
+    sender-type: local # 消息发送的类型，可选值为 local、redis、rocketmq、kafka、rabbitmq
+    sender-rabbitmq:
+      exchange: ${spring.application.name}-websocket-exchange # 消息发送的 RabbitMQ Exchange
+      queue: ${spring.application.name}-websocket-queue-temp # 消息发送的 RabbitMQ Queue
+      routing-key-prefix: websocket.message
+  swagger:
+    title: 管理后台
+    description: 提供管理员管理的所有功能
+    version: ${youdao.info.version}
+  codegen:
+    base-package: com.htyoudao.youdao
+    db-schemas: ${spring.datasource.dynamic.datasource.master.name}
+    front-type: 20 # 前端模版的类型，参见 CodegenFrontTypeEnum 枚举类
+    unit-test-enable: false # 是否生成单元测试
+
+  aliyun-green: #oss图片鉴黄
+    enabled: false
+    region-id: cn-shanghai
+    endpoint: green-cip.cn-shanghai.aliyuncs.com
+    access-key-id: ${CLOUD_INFRA_LOCAL_ACCESS_KEY_ID_L28:}
+    access-key-secret: ${CLOUD_INFRA_LOCAL_ACCESS_KEY_SECRET_L29:}
+    internal: false
+
+# 日志文件配置
+logging:
+  level:
+    # 配置自己写的 MyBatis Mapper 打印日志
+    com.htyoudao.youdao.module.infra.dal.mysql: debug
+    com.htyoudao.youdao.module.infra.dal.mysql.logger.ApiErrorLogMapper: INFO # 配置 ApiErrorLogMapper 的日志级别为 info，避免和 GlobalExceptionHandler 重复打印
+    com.htyoudao.youdao.module.infra.dal.mysql.file.FileConfigMapper: INFO # 配置 FileConfigMapper 的日志级别为 info
+    org.springframework.context.support.PostProcessorRegistrationDelegate: ERROR # TODO 0090：先禁用，Spring Boot 3.X 存在部分错误的 WARN 提示
+

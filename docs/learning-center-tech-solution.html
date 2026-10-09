@@ -1,0 +1,2827 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>学习任务技术文档</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f6f8;
+      --paper: #ffffff;
+      --text: #1f2937;
+      --muted: #667085;
+      --line: #dfe3e8;
+      --accent: #e85d24;
+      --accent-soft: #fff3ed;
+      --code: #f6f8fa;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 15px/1.72 "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow: auto;
+      padding: 28px 22px;
+      border-right: 1px solid var(--line);
+      background: var(--paper);
+    }
+
+    .sidebar-title {
+      margin: 0 0 18px;
+      color: #111827;
+      font-size: 17px;
+      font-weight: 700;
+    }
+
+    #toc { display: grid; gap: 3px; }
+
+    #toc a {
+      display: block;
+      padding: 5px 8px;
+      color: var(--muted);
+      text-decoration: none;
+      border-left: 2px solid transparent;
+    }
+
+    #toc a:hover {
+      color: var(--accent);
+      border-left-color: var(--accent);
+      background: var(--accent-soft);
+    }
+
+    #toc .level-3 { padding-left: 22px; font-size: 13px; }
+
+    main { min-width: 0; padding: 36px clamp(22px, 5vw, 72px) 64px; }
+
+    article {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 42px 48px 64px;
+      border: 1px solid var(--line);
+      background: var(--paper);
+      box-shadow: 0 8px 30px rgba(16, 24, 40, 0.06);
+    }
+
+    h1, h2, h3 { color: #111827; line-height: 1.35; }
+    h1 { margin: 0 0 32px; font-size: 30px; }
+    h2 { margin: 42px 0 18px; padding-bottom: 10px; border-bottom: 2px solid var(--accent); font-size: 23px; }
+    h3 { margin: 30px 0 14px; font-size: 18px; }
+    p { margin: 10px 0; }
+    a { color: #1677c8; }
+
+    table {
+      width: 100%;
+      margin: 14px 0 24px;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th, td {
+      padding: 9px 11px;
+      border: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+      overflow-wrap: anywhere;
+    }
+
+    th { background: #f0f2f5; color: #344054; font-weight: 700; }
+    tbody tr:nth-child(even) { background: #fafbfc; }
+
+    code {
+      padding: 2px 5px;
+      border-radius: 4px;
+      background: var(--code);
+      color: #b42318;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.92em;
+    }
+
+    pre {
+      overflow: auto;
+      margin: 14px 0 24px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #111827;
+      color: #e5e7eb;
+      line-height: 1.55;
+    }
+
+    pre code { padding: 0; background: transparent; color: inherit; }
+    li { margin: 5px 0; }
+
+    @media (max-width: 900px) {
+      .layout { display: block; }
+      .sidebar { position: static; width: auto; height: auto; border-right: 0; border-bottom: 1px solid var(--line); }
+      main { padding: 16px; }
+      article { padding: 28px 20px 44px; }
+      table { display: block; overflow-x: auto; white-space: nowrap; }
+    }
+
+    @media print {
+      @page { margin: 16mm; }
+      body { background: #fff; font-size: 11pt; }
+      .layout { display: block; }
+      .sidebar { display: none; }
+      main, article { max-width: none; margin: 0; padding: 0; border: 0; box-shadow: none; }
+      h2, h3 { break-after: avoid; }
+      table, pre { break-inside: avoid; }
+      a { color: inherit; text-decoration: none; }
+    }
+  </style>
+</head>
+<body>
+  <div style="padding:12px 16px;margin:16px;background:#fff3cd;border:1px solid #ffe69c;color:#664d03">历史草案：其中按门店复制完整进度、MySQL访问流水和外部fileId/fileVersion设计已废弃。当前实现请以 learning-task-api.html、learning-task-risk-notes.md 与 sql/bpm_learning_task.sql 为准。</div>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sidebar-title">学习任务技术文档</div>
+      <nav id="toc" aria-label="文档目录"></nav>
+    </aside>
+    <main>
+      <article id="document">
+<h1 id="section">学习任务技术文档</h1>
+<h2 id="section-1">1. 数据库表结构</h2>
+<p>完整 SQL：<a href="../sql/bpm_learning_task.sql">bpm_learning_task.sql</a>。共 9 张表，采用逻辑删除，不建立数据库外键，由 Service 事务保证一致性。</p>
+<h3 id="section-2">1.1 公共字段</h3>
+<p>以下字段存在于全部 9 张表中：</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>默认值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>creator</code></td>
+<td>varchar(64)</td>
+<td><code>''</code></td>
+<td>创建人账号或用户标识</td>
+</tr>
+<tr>
+<td><code>create_time</code></td>
+<td>timestamp</td>
+<td>当前时间</td>
+<td>记录创建时间</td>
+</tr>
+<tr>
+<td><code>updater</code></td>
+<td>varchar(64)</td>
+<td><code>''</code></td>
+<td>最后修改人账号或用户标识</td>
+</tr>
+<tr>
+<td><code>update_time</code></td>
+<td>timestamp</td>
+<td>当前时间并自动更新</td>
+<td>最后修改时间</td>
+</tr>
+<tr>
+<td><code>deleted</code></td>
+<td>bit(1)</td>
+<td><code>0</code></td>
+<td>逻辑删除：<code>0未删除、1已删除</code></td>
+</tr>
+<tr>
+<td><code>tenant_id</code></td>
+<td>bigint</td>
+<td><code>0</code></td>
+<td>租户编号，用于租户隔离</td>
+</tr>
+<tr>
+<td><code>business_id</code></td>
+<td>bigint</td>
+<td><code>NULL</code></td>
+<td>业务线或项目 ID，用于项目隔离</td>
+</tr>
+</tbody>
+</table>
+<h3 id="bpm_learning_task">1.2 <code>bpm_learning_task</code> 学习任务主表</h3>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>允许空</th>
+<th>默认值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>task_id</code></td>
+<td>bigint</td>
+<td>否</td>
+<td>无</td>
+<td>学习任务主键，雪花 ID</td>
+</tr>
+<tr>
+<td><code>task_name</code></td>
+<td>varchar(50)</td>
+<td>否</td>
+<td>无</td>
+<td>任务名称，最多 50 字</td>
+</tr>
+<tr>
+<td><code>cover_image_url</code></td>
+<td>varchar(500)</td>
+<td>否</td>
+<td>无</td>
+<td>任务封面图地址</td>
+</tr>
+<tr>
+<td><code>start_time</code></td>
+<td>datetime</td>
+<td>否</td>
+<td>无</td>
+<td>任务开始时间</td>
+</tr>
+<tr>
+<td><code>end_time</code></td>
+<td>datetime</td>
+<td>否</td>
+<td>无</td>
+<td>任务结束时间，必须晚于开始时间</td>
+</tr>
+<tr>
+<td><code>task_description</code></td>
+<td>varchar(500)</td>
+<td>是</td>
+<td><code>NULL</code></td>
+<td>任务描述，最多 500 字</td>
+</tr>
+<tr>
+<td><code>apply_scope</code></td>
+<td>tinyint</td>
+<td>否</td>
+<td>无</td>
+<td>应用范围：<code>1按门店、2按标签</code></td>
+</tr>
+<tr>
+<td><code>store_scope</code></td>
+<td>tinyint</td>
+<td>是</td>
+<td><code>NULL</code></td>
+<td>按门店时：<code>1全部门店、2部分门店</code>；按标签时为空</td>
+</tr>
+<tr>
+<td><code>order_limit_type</code></td>
+<td>tinyint</td>
+<td>否</td>
+<td><code>0</code></td>
+<td><code>0不限制订货、1任务开始N天后未完成禁止订货</code></td>
+</tr>
+<tr>
+<td><code>order_limit_days</code></td>
+<td>smallint</td>
+<td>是</td>
+<td><code>NULL</code></td>
+<td>限制订货等待天数，范围 3 至 365</td>
+</tr>
+<tr>
+<td><code>online_status</code></td>
+<td>tinyint</td>
+<td>否</td>
+<td><code>0</code></td>
+<td><code>0下架、1上架</code></td>
+</tr>
+</tbody>
+</table>
+<p>索引：主键 <code>task_id</code>；<code>online_status + start_time + end_time + deleted</code> 查询任务状态；<code>business_id + deleted + create_time</code> 支持项目内分页。</p>
+<h3 id="bpm_learning_task_attachment">1.3 <code>bpm_learning_task_attachment</code> 任务详情附件表</h3>
+<p>保存任务介绍图片或视频，与学习资料的 <code>files</code> 不是同一类附件，每个任务最多 5 条。</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>允许空</th>
+<th>默认值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>attachment_id</code></td>
+<td>bigint</td>
+<td>否</td>
+<td>无</td>
+<td>任务附件主键</td>
+</tr>
+<tr>
+<td><code>task_id</code></td>
+<td>bigint</td>
+<td>否</td>
+<td>无</td>
+<td>所属学习任务 ID</td>
+</tr>
+<tr>
+<td><code>attachment_url</code></td>
+<td>varchar(500)</td>
+<td>否</td>
+<td>无</td>
+<td>附件访问地址</td>
+</tr>
+<tr>
+<td><code>attachment_type</code></td>
+<td>tinyint</td>
+<td>否</td>
+<td>无</td>
+<td><code>1视频、2图片</code></td>
+</tr>
+<tr>
+<td><code>sort</code></td>
+<td>int</td>
+<td>否</td>
+<td><code>0</code></td>
+<td>排序，数值越小越靠前</td>
+</tr>
+</tbody>
+</table>
+<p>索引：<code>task_id + deleted + sort</code>，用于按顺序查询任务附件。</p>
+<h3 id="bpm_learning_task_store">1.4 <code>bpm_learning_task_store</code> 任务指定门店关系表</h3>
+<p><code>apply_scope=1</code> 且 <code>store_scope=2</code> 时保存指定门店。</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>允许空</th>
+<th>默认值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>bigint</td>
+<td>否</td>
+<td>无</td>
+<td>关系主键</td>
+</tr>
+<tr>
+<td><code>task_id</code></td>
+<td>bigint</td>
+<td>否</td>
+<td>无</td>
+<td>学习任务 ID</td>
+</tr>
+<tr>
+<td><code>store_id</code></td>
+<td>bigint</td>
+<td>否</td>
+<td>无</td>
+<td>被投放的门店 ID</td>
+</tr>
+</tbody>
+</table>
+<p>索引：唯一索引 <code>task_id + store_id</code> 防止重复；<code>store_id + deleted + task_id</code> 反查门店任务。</p>
+<h3 id="bpm_learning_task_tag">1.5 <code>bpm_learning_task_tag</code> 任务门店标签关系表</h3>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>允许空</th>
+<th>默认值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>bigint</td>
+<td>否</td>
+<td>无</td>
+<td>关系主键</td>
+</tr>
+<tr>
+<td><code>task_id</code></td>
+<td>bigint</td>
+<td>否</td>
+<td>无</td>
+<td>学习任务 ID</td>
+</tr>
+<tr>
+<td><code>tag_id</code></td>
+<td>bigint</td>
+<td>否</td>
+<td>无</td>
+<td>门店标签 ID，多个标签按并集匹配门店</td>
+</tr>
+</tbody>
+</table>
+<p>索引：唯一索引 <code>task_id + tag_id</code> 防止重复；<code>tag_id + deleted + task_id</code> 按标签匹配任务。</p>
+<h3 id="bpm_learning_task_material">1.6 <code>bpm_learning_task_material</code> 任务学习资料关系表</h3>
+<p>只保存学习资料 ID、任务内规则和排序。资料名称、分类及附件由资料 JSON 提供。</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>允许空</th>
+<th>默认值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>task_material_id</code></td>
+<td>bigint</td>
+<td>否</td>
+<td>无</td>
+<td>任务资料关系主键；删除重加时生成新 ID</td>
+</tr>
+<tr>
+<td><code>task_id</code></td>
+<td>bigint</td>
+<td>否</td>
+<td>无</td>
+<td>所属学习任务 ID</td>
+</tr>
+<tr>
+<td><code>material_id</code></td>
+<td>bigint</td>
+<td>否</td>
+<td>无</td>
+<td>资料 JSON 中的资料 ID</td>
+</tr>
+<tr>
+<td><code>document_browse_limit_type</code></td>
+<td>tinyint</td>
+<td>否</td>
+<td><code>0</code></td>
+<td><code>0不限制、1限制最少有效浏览时长</code></td>
+</tr>
+<tr>
+<td><code>min_document_browse_seconds</code></td>
+<td>int</td>
+<td>是</td>
+<td><code>NULL</code></td>
+<td>文档至少有效浏览秒数；不限制时为空</td>
+</tr>
+<tr>
+<td><code>video_speed_allowed</code></td>
+<td>bit(1)</td>
+<td>否</td>
+<td><code>0</code></td>
+<td><code>0不允许倍速、1允许倍速</code></td>
+</tr>
+<tr>
+<td><code>required_flag</code></td>
+<td>bit(1)</td>
+<td>否</td>
+<td><code>1</code></td>
+<td><code>0非必学、1必学</code></td>
+</tr>
+<tr>
+<td><code>sort</code></td>
+<td>int</td>
+<td>否</td>
+<td><code>0</code></td>
+<td>资料在任务中的排序</td>
+</tr>
+</tbody>
+</table>
+<p>索引：<code>task_id + deleted + sort</code> 查询任务资料；<code>material_id + deleted</code> 按资料反查任务引用。</p>
+<h3 id="bpm_learning_task_visit_log">1.7 <code>bpm_learning_task_visit_log</code> 任务访问记录表</h3>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>允许空</th>
+<th>默认值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>visit_id</code></td>
+<td>bigint</td>
+<td>否</td>
+<td>无</td>
+<td>访问记录主键</td>
+</tr>
+<tr>
+<td><code>task_id</code></td>
+<td>bigint</td>
+<td>否</td>
+<td>无</td>
+<td>被访问的任务 ID</td>
+</tr>
+<tr>
+<td><code>store_id</code></td>
+<td>bigint</td>
+<td>否</td>
+<td>无</td>
+<td>本次访问计入的门店 ID</td>
+</tr>
+<tr>
+<td><code>learner_user_id</code></td>
+<td>bigint</td>
+<td>否</td>
+<td>无</td>
+<td>学习店长用户 ID</td>
+</tr>
+<tr>
+<td><code>visit_time</code></td>
+<td>datetime</td>
+<td>否</td>
+<td>无</td>
+<td>实际访问时间</td>
+</tr>
+</tbody>
+</table>
+<p>索引：<code>task_id + deleted + visit_time</code> 统计任务访问；<code>task_id + store_id + learner_user_id + deleted</code> 查询个人访问。</p>
+<h3 id="bpm_learning_task_learner_progress">1.8 <code>bpm_learning_task_learner_progress</code> 任务整体进度表</h3>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>允许空</th>
+<th>默认值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>progress_id</code></td>
+<td>bigint</td>
+<td>否</td>
+<td>无</td>
+<td>任务进度主键</td>
+</tr>
+<tr>
+<td><code>task_id</code></td>
+<td>bigint</td>
+<td>否</td>
+<td>无</td>
+<td>学习任务 ID</td>
+</tr>
+<tr>
+<td><code>store_id</code></td>
+<td>bigint</td>
+<td>否</td>
+<td>无</td>
+<td>进度所属门店 ID</td>
+</tr>
+<tr>
+<td><code>learner_user_id</code></td>
+<td>bigint</td>
+<td>否</td>
+<td>无</td>
+<td>学习店长用户 ID</td>
+</tr>
+<tr>
+<td><code>study_status</code></td>
+<td>tinyint</td>
+<td>否</td>
+<td><code>0</code></td>
+<td><code>0未开始、1进行中、2已完成</code></td>
+</tr>
+<tr>
+<td><code>progress_rate</code></td>
+<td>decimal(5,2)</td>
+<td>否</td>
+<td><code>0.00</code></td>
+<td>任务学习进度百分比</td>
+</tr>
+<tr>
+<td><code>required_material_count</code></td>
+<td>int</td>
+<td>否</td>
+<td><code>0</code></td>
+<td>当前有效必学资料总数</td>
+</tr>
+<tr>
+<td><code>completed_material_count</code></td>
+<td>int</td>
+<td>否</td>
+<td><code>0</code></td>
+<td>已完成必学资料数量</td>
+</tr>
+<tr>
+<td><code>valid_study_seconds</code></td>
+<td>bigint</td>
+<td>否</td>
+<td><code>0</code></td>
+<td>任务累计有效学习秒数</td>
+</tr>
+<tr>
+<td><code>start_time</code></td>
+<td>datetime</td>
+<td>是</td>
+<td><code>NULL</code></td>
+<td>首次开始学习时间</td>
+</tr>
+<tr>
+<td><code>last_study_time</code></td>
+<td>datetime</td>
+<td>是</td>
+<td><code>NULL</code></td>
+<td>最近有效学习时间</td>
+</tr>
+<tr>
+<td><code>completed_time</code></td>
+<td>datetime</td>
+<td>是</td>
+<td><code>NULL</code></td>
+<td>首次完成任务时间</td>
+</tr>
+</tbody>
+</table>
+<p>索引：唯一索引 <code>task_id + store_id + learner_user_id</code>；<code>task_id + study_status + deleted</code> 支持状态统计。</p>
+<h3 id="bpm_learning_task_material_progress">1.9 <code>bpm_learning_task_material_progress</code> 单资料进度表</h3>
+<p>资料进度按该资料当前有效附件的完成数量计算。</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>允许空</th>
+<th>默认值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>progress_id</code></td>
+<td>bigint</td>
+<td>否</td>
+<td>无</td>
+<td>资料进度主键</td>
+</tr>
+<tr>
+<td><code>task_id</code></td>
+<td>bigint</td>
+<td>否</td>
+<td>无</td>
+<td>学习任务 ID</td>
+</tr>
+<tr>
+<td><code>task_material_id</code></td>
+<td>bigint</td>
+<td>否</td>
+<td>无</td>
+<td>任务资料关系 ID</td>
+</tr>
+<tr>
+<td><code>material_id</code></td>
+<td>bigint</td>
+<td>否</td>
+<td>无</td>
+<td>外部学习资料 ID</td>
+</tr>
+<tr>
+<td><code>store_id</code></td>
+<td>bigint</td>
+<td>否</td>
+<td>无</td>
+<td>进度所属门店 ID</td>
+</tr>
+<tr>
+<td><code>learner_user_id</code></td>
+<td>bigint</td>
+<td>否</td>
+<td>无</td>
+<td>学习店长用户 ID</td>
+</tr>
+<tr>
+<td><code>study_status</code></td>
+<td>tinyint</td>
+<td>否</td>
+<td><code>0</code></td>
+<td><code>0未开始、1进行中、2已完成</code></td>
+</tr>
+<tr>
+<td><code>progress_rate</code></td>
+<td>decimal(5,2)</td>
+<td>否</td>
+<td><code>0.00</code></td>
+<td>已完成附件数占当前有效附件总数的百分比</td>
+</tr>
+<tr>
+<td><code>valid_study_seconds</code></td>
+<td>bigint</td>
+<td>否</td>
+<td><code>0</code></td>
+<td>资料下全部当前有效附件的累计学习秒数</td>
+</tr>
+<tr>
+<td><code>start_time</code></td>
+<td>datetime</td>
+<td>是</td>
+<td><code>NULL</code></td>
+<td>首次开始资料学习时间</td>
+</tr>
+<tr>
+<td><code>last_study_time</code></td>
+<td>datetime</td>
+<td>是</td>
+<td><code>NULL</code></td>
+<td>最近有效学习时间</td>
+</tr>
+<tr>
+<td><code>completed_time</code></td>
+<td>datetime</td>
+<td>是</td>
+<td><code>NULL</code></td>
+<td>首次完成资料时间</td>
+</tr>
+</tbody>
+</table>
+<p>索引：唯一索引 <code>task_material_id + store_id + learner_user_id</code>；<code>task_id + store_id + learner_user_id + deleted</code> 支持任务汇总。</p>
+<h3 id="bpm_learning_task_file_progress">1.10 <code>bpm_learning_task_file_progress</code> 单附件进度表</h3>
+<p>资料 JSON 的 <code>files</code> 即附件列表，<code>external_file_id</code> 保存每个附件的 <code>fileId</code>。每个附件独立记录是否完成。</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>允许空</th>
+<th>默认值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>file_progress_id</code></td>
+<td>bigint</td>
+<td>否</td>
+<td>无</td>
+<td>附件进度主键</td>
+</tr>
+<tr>
+<td><code>task_id</code></td>
+<td>bigint</td>
+<td>否</td>
+<td>无</td>
+<td>学习任务 ID</td>
+</tr>
+<tr>
+<td><code>task_material_id</code></td>
+<td>bigint</td>
+<td>否</td>
+<td>无</td>
+<td>任务资料关系 ID</td>
+</tr>
+<tr>
+<td><code>material_id</code></td>
+<td>bigint</td>
+<td>否</td>
+<td>无</td>
+<td>外部学习资料 ID</td>
+</tr>
+<tr>
+<td><code>store_id</code></td>
+<td>bigint</td>
+<td>否</td>
+<td>无</td>
+<td>进度所属门店 ID</td>
+</tr>
+<tr>
+<td><code>learner_user_id</code></td>
+<td>bigint</td>
+<td>否</td>
+<td>无</td>
+<td>学习店长用户 ID</td>
+</tr>
+<tr>
+<td><code>external_file_id</code></td>
+<td>bigint</td>
+<td>否</td>
+<td>无</td>
+<td>资料 JSON 中附件的 <code>fileId</code></td>
+</tr>
+<tr>
+<td><code>file_type</code></td>
+<td>tinyint</td>
+<td>否</td>
+<td>无</td>
+<td>附件类型编码，沿用资料系统定义</td>
+</tr>
+<tr>
+<td><code>file_version</code></td>
+<td>varchar(64)</td>
+<td>否</td>
+<td>无</td>
+<td>附件内容版本，内容变化时必须更新</td>
+</tr>
+<tr>
+<td><code>valid_study_seconds</code></td>
+<td>bigint</td>
+<td>否</td>
+<td><code>0</code></td>
+<td>服务端根据心跳累计的有效学习秒数</td>
+</tr>
+<tr>
+<td><code>last_position_seconds</code></td>
+<td>bigint</td>
+<td>否</td>
+<td><code>0</code></td>
+<td>视频最后有效播放位置；非视频为 0</td>
+</tr>
+<tr>
+<td><code>completed_flag</code></td>
+<td>bit(1)</td>
+<td>否</td>
+<td><code>0</code></td>
+<td>当前附件是否完成：<code>0未完成、1已完成</code></td>
+</tr>
+<tr>
+<td><code>start_time</code></td>
+<td>datetime</td>
+<td>是</td>
+<td><code>NULL</code></td>
+<td>首次打开附件时间</td>
+</tr>
+<tr>
+<td><code>last_study_time</code></td>
+<td>datetime</td>
+<td>是</td>
+<td><code>NULL</code></td>
+<td>最近有效学习时间</td>
+</tr>
+<tr>
+<td><code>completed_time</code></td>
+<td>datetime</td>
+<td>是</td>
+<td><code>NULL</code></td>
+<td>首次完成附件时间</td>
+</tr>
+</tbody>
+</table>
+<p>索引：唯一索引 <code>task_material_id + store_id + learner_user_id + external_file_id + file_version</code>，保证一个附件版本只有一条进度；<code>task_id + store_id + learner_user_id + deleted</code> 查询任务内附件进度。</p>
+<h2 id="pc-swagger">2. PC 管理后台接口（Swagger 风格）</h2>
+<p><strong>Tag：</strong> <code>管理后台 - 学习任务</code><br />
+<strong>Base URL：</strong> <code>/bpm/learning-task</code><br />
+<strong>Content-Type：</strong> GET 使用 Query 参数，POST/PUT 使用 <code>application/json</code>。</p>
+<p>所有接口统一返回 <code>CommonResult&lt;T&gt;</code>：</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>必返</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>code</code></td>
+<td>Integer</td>
+<td>是</td>
+<td>业务状态码，成功为 <code>0</code></td>
+</tr>
+<tr>
+<td><code>data</code></td>
+<td>T</td>
+<td>是</td>
+<td>业务数据；无数据时可为 <code>null</code></td>
+</tr>
+<tr>
+<td><code>msg</code></td>
+<td>String</td>
+<td>是</td>
+<td>状态说明</td>
+</tr>
+</tbody>
+</table>
+<p>分页数据统一为 <code>PageResult&lt;T&gt;</code>：<code>data.list</code> 为数据数组，<code>data.total</code> 为总记录数。</p>
+<h3 id="get-page">2.1 GET <code>/page</code> 分页查询学习任务</h3>
+<p><strong>OperationId：</strong> <code>getLearningTaskPage</code><br />
+<strong>Response：</strong> <code>CommonResult&lt;PageResult&lt;LearningTaskPageRespVO&gt;&gt;</code></p>
+<p>Query 参数：</p>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>类型</th>
+<th>必填</th>
+<th>示例</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pageNo</code></td>
+<td>Integer</td>
+<td>否</td>
+<td><code>1</code></td>
+<td>页码，从 1 开始</td>
+</tr>
+<tr>
+<td><code>pageSize</code></td>
+<td>Integer</td>
+<td>否</td>
+<td><code>10</code></td>
+<td>每页条数</td>
+</tr>
+<tr>
+<td><code>taskName</code></td>
+<td>String</td>
+<td>否</td>
+<td><code>食品制作</code></td>
+<td>任务名称模糊查询</td>
+</tr>
+<tr>
+<td><code>storeId</code></td>
+<td>Long</td>
+<td>否</td>
+<td><code>10001</code></td>
+<td>学习门店 ID</td>
+</tr>
+<tr>
+<td><code>taskPeriod</code></td>
+<td>LocalDateTime[]</td>
+<td>否</td>
+<td><code>2026-09-01,2026-09-30</code></td>
+<td>任务周期起止范围，共 2 个时间</td>
+</tr>
+<tr>
+<td><code>taskStatus</code></td>
+<td>Integer</td>
+<td>否</td>
+<td><code>1</code></td>
+<td>周期状态：<code>0未开始、1进行中、2已结束</code></td>
+</tr>
+<tr>
+<td><code>onlineStatus</code></td>
+<td>Integer</td>
+<td>否</td>
+<td><code>1</code></td>
+<td>上下架：<code>0下架、1上架</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>LearningTaskPageRespVO</code>：</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>taskId</code></td>
+<td>Long</td>
+<td>学习任务 ID</td>
+</tr>
+<tr>
+<td><code>taskName</code></td>
+<td>String</td>
+<td>任务名称</td>
+</tr>
+<tr>
+<td><code>taskDescription</code></td>
+<td>String</td>
+<td>任务描述</td>
+</tr>
+<tr>
+<td><code>startTime</code></td>
+<td>LocalDateTime</td>
+<td>开始时间</td>
+</tr>
+<tr>
+<td><code>endTime</code></td>
+<td>LocalDateTime</td>
+<td>结束时间</td>
+</tr>
+<tr>
+<td><code>taskStatus</code></td>
+<td>Integer</td>
+<td><code>0未开始、1进行中、2已结束</code></td>
+</tr>
+<tr>
+<td><code>applyScope</code></td>
+<td>Integer</td>
+<td><code>1按门店、2按标签</code></td>
+</tr>
+<tr>
+<td><code>storeScope</code></td>
+<td>Integer</td>
+<td><code>1全部门店、2部分门店</code></td>
+</tr>
+<tr>
+<td><code>storeIds</code></td>
+<td>Long[]</td>
+<td>指定门店 ID 列表</td>
+</tr>
+<tr>
+<td><code>storeNames</code></td>
+<td>String[]</td>
+<td>指定门店名称列表</td>
+</tr>
+<tr>
+<td><code>tagIds</code></td>
+<td>Long[]</td>
+<td>标签 ID 列表</td>
+</tr>
+<tr>
+<td><code>tagNames</code></td>
+<td>String[]</td>
+<td>标签名称列表</td>
+</tr>
+<tr>
+<td><code>targetStoreCount</code></td>
+<td>Integer</td>
+<td>最终命中的门店数</td>
+</tr>
+<tr>
+<td><code>onlineStatus</code></td>
+<td>Integer</td>
+<td><code>0下架、1上架</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="get-get">2.2 GET <code>/get</code> 查询学习任务详情</h3>
+<p><strong>OperationId：</strong> <code>getLearningTask</code><br />
+<strong>Response：</strong> <code>CommonResult&lt;LearningTaskDetailRespVO&gt;</code></p>
+<table>
+<thead>
+<tr>
+<th>参数位置</th>
+<th>参数</th>
+<th>类型</th>
+<th>必填</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Query</td>
+<td><code>id</code></td>
+<td>Long</td>
+<td>是</td>
+<td>学习任务 ID</td>
+</tr>
+</tbody>
+</table>
+<p><code>LearningTaskDetailRespVO</code>：</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>taskId</code></td>
+<td>Long</td>
+<td>学习任务 ID</td>
+</tr>
+<tr>
+<td><code>taskName</code></td>
+<td>String</td>
+<td>任务名称</td>
+</tr>
+<tr>
+<td><code>coverImageUrl</code></td>
+<td>String</td>
+<td>任务封面图</td>
+</tr>
+<tr>
+<td><code>detailAttachments</code></td>
+<td>AttachmentRespVO[]</td>
+<td>任务介绍附件，最多 5 个</td>
+</tr>
+<tr>
+<td><code>startTime</code> / <code>endTime</code></td>
+<td>LocalDateTime</td>
+<td>任务周期</td>
+</tr>
+<tr>
+<td><code>taskDescription</code></td>
+<td>String</td>
+<td>任务描述</td>
+</tr>
+<tr>
+<td><code>applyScope</code></td>
+<td>Integer</td>
+<td><code>1按门店、2按标签</code></td>
+</tr>
+<tr>
+<td><code>storeScope</code></td>
+<td>Integer</td>
+<td><code>1全部门店、2部分门店</code></td>
+</tr>
+<tr>
+<td><code>storeIds</code></td>
+<td>Long[]</td>
+<td>指定门店 ID</td>
+</tr>
+<tr>
+<td><code>tagIds</code></td>
+<td>Long[]</td>
+<td>指定标签 ID</td>
+</tr>
+<tr>
+<td><code>orderLimitType</code></td>
+<td>Integer</td>
+<td><code>0不限制、1限制订货</code></td>
+</tr>
+<tr>
+<td><code>orderLimitDays</code></td>
+<td>Integer</td>
+<td>开始 N 天未完成后限制订货</td>
+</tr>
+<tr>
+<td><code>taskStatus</code></td>
+<td>Integer</td>
+<td><code>0未开始、1进行中、2已结束</code></td>
+</tr>
+<tr>
+<td><code>onlineStatus</code></td>
+<td>Integer</td>
+<td><code>0下架、1上架</code></td>
+</tr>
+<tr>
+<td><code>materialGroups</code></td>
+<td>LearningTaskMaterialGroupRespVO[]</td>
+<td>按项目大类分组的资料</td>
+</tr>
+</tbody>
+</table>
+<p><code>AttachmentRespVO</code>：<code>attachmentId: Long</code>、<code>attachmentUrl: String</code>、<code>attachmentType: Integer（1视频、2图片）</code>、<code>sort: Integer</code>。</p>
+<h3 id="post-create">2.3 POST <code>/create</code> 创建学习任务</h3>
+<p><strong>OperationId：</strong> <code>createLearningTask</code><br />
+<strong>Request Body：</strong> <code>LearningTaskSaveReqVO</code><br />
+<strong>Response：</strong> <code>CommonResult&lt;Long&gt;</code>，<code>data</code> 为新任务 ID。</p>
+<h3 id="put-update">2.4 PUT <code>/update</code> 修改学习任务</h3>
+<p><strong>OperationId：</strong> <code>updateLearningTask</code><br />
+<strong>Request Body：</strong> <code>LearningTaskSaveReqVO</code>，修改时 <code>taskId</code> 必填。<br />
+<strong>Response：</strong> <code>CommonResult&lt;Boolean&gt;</code>，成功时 <code>data=true</code>。</p>
+<p><code>LearningTaskSaveReqVO</code> 字段：</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>创建必填</th>
+<th>修改必填</th>
+<th>规则</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>taskId</code></td>
+<td>Long</td>
+<td>否</td>
+<td>是</td>
+<td>学习任务 ID</td>
+</tr>
+<tr>
+<td><code>taskName</code></td>
+<td>String</td>
+<td>是</td>
+<td>是</td>
+<td>最多 50 个字符</td>
+</tr>
+<tr>
+<td><code>coverImageUrl</code></td>
+<td>String</td>
+<td>是</td>
+<td>是</td>
+<td>任务封面图地址</td>
+</tr>
+<tr>
+<td><code>detailAttachments</code></td>
+<td>AttachmentReqVO[]</td>
+<td>否</td>
+<td>否</td>
+<td>最多 5 个</td>
+</tr>
+<tr>
+<td><code>startTime</code></td>
+<td>LocalDateTime</td>
+<td>是</td>
+<td>是</td>
+<td>格式 <code>yyyy-MM-dd'T'HH:mm:ss</code></td>
+</tr>
+<tr>
+<td><code>endTime</code></td>
+<td>LocalDateTime</td>
+<td>是</td>
+<td>是</td>
+<td>必须晚于开始时间</td>
+</tr>
+<tr>
+<td><code>taskDescription</code></td>
+<td>String</td>
+<td>否</td>
+<td>否</td>
+<td>最多 500 个字符</td>
+</tr>
+<tr>
+<td><code>applyScope</code></td>
+<td>Integer</td>
+<td>是</td>
+<td>是</td>
+<td><code>1按门店、2按标签</code></td>
+</tr>
+<tr>
+<td><code>storeScope</code></td>
+<td>Integer</td>
+<td>条件必填</td>
+<td>条件必填</td>
+<td>按门店时必填：<code>1全部、2部分</code></td>
+</tr>
+<tr>
+<td><code>storeIds</code></td>
+<td>Long[]</td>
+<td>条件必填</td>
+<td>条件必填</td>
+<td><code>applyScope=1 &amp;&amp; storeScope=2</code> 时非空</td>
+</tr>
+<tr>
+<td><code>tagIds</code></td>
+<td>Long[]</td>
+<td>条件必填</td>
+<td>条件必填</td>
+<td><code>applyScope=2</code> 时非空，多个标签按并集</td>
+</tr>
+<tr>
+<td><code>orderLimitType</code></td>
+<td>Integer</td>
+<td>是</td>
+<td>是</td>
+<td><code>0不限制、1限制</code></td>
+</tr>
+<tr>
+<td><code>orderLimitDays</code></td>
+<td>Integer</td>
+<td>条件必填</td>
+<td>条件必填</td>
+<td>限制时为 3 至 365</td>
+</tr>
+<tr>
+<td><code>materialItems</code></td>
+<td>MaterialReqVO[]</td>
+<td>是</td>
+<td>是</td>
+<td>至少 1 条，只提交资料 ID、规则和排序</td>
+</tr>
+</tbody>
+</table>
+<p><code>AttachmentReqVO</code>：</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>必填</th>
+<th>规则</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>attachmentUrl</code></td>
+<td>String</td>
+<td>是</td>
+<td>任务详情附件地址</td>
+</tr>
+<tr>
+<td><code>attachmentType</code></td>
+<td>Integer</td>
+<td>是</td>
+<td><code>1视频、2图片</code></td>
+</tr>
+<tr>
+<td><code>sort</code></td>
+<td>Integer</td>
+<td>是</td>
+<td>大于等于 0</td>
+</tr>
+</tbody>
+</table>
+<p><code>MaterialReqVO</code>：</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>必填</th>
+<th>规则</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>taskMaterialId</code></td>
+<td>Long</td>
+<td>否</td>
+<td>修改已有关系时传；新增关系不传</td>
+</tr>
+<tr>
+<td><code>materialId</code></td>
+<td>Long</td>
+<td>是</td>
+<td>外部学习资料 ID</td>
+</tr>
+<tr>
+<td><code>documentBrowseLimitType</code></td>
+<td>Integer</td>
+<td>是</td>
+<td><code>0不限制、1限制浏览时长</code></td>
+</tr>
+<tr>
+<td><code>minDocumentBrowseSeconds</code></td>
+<td>Integer</td>
+<td>条件必填</td>
+<td>限制浏览时必须大于 0</td>
+</tr>
+<tr>
+<td><code>videoSpeedAllowed</code></td>
+<td>Boolean</td>
+<td>是</td>
+<td>视频是否允许倍速</td>
+</tr>
+<tr>
+<td><code>requiredFlag</code></td>
+<td>Boolean</td>
+<td>是</td>
+<td>是否必学</td>
+</tr>
+<tr>
+<td><code>sort</code></td>
+<td>Integer</td>
+<td>是</td>
+<td>大于等于 0</td>
+</tr>
+</tbody>
+</table>
+<p>请求示例：</p>
+<pre><code class="language-json">{
+  &quot;taskId&quot;: 208900000000000001,
+  &quot;taskName&quot;: &quot;食品制作与卫生清洁&quot;,
+  &quot;coverImageUrl&quot;: &quot;https://example.com/task-cover.png&quot;,
+  &quot;detailAttachments&quot;: [
+    {&quot;attachmentUrl&quot;: &quot;https://example.com/intro.mp4&quot;, &quot;attachmentType&quot;: 1, &quot;sort&quot;: 0}
+  ],
+  &quot;startTime&quot;: &quot;2026-09-01T00:00:00&quot;,
+  &quot;endTime&quot;: &quot;2026-09-30T23:59:59&quot;,
+  &quot;taskDescription&quot;: &quot;学习任务说明&quot;,
+  &quot;applyScope&quot;: 1,
+  &quot;storeScope&quot;: 2,
+  &quot;storeIds&quot;: [10001, 10002],
+  &quot;tagIds&quot;: [],
+  &quot;orderLimitType&quot;: 1,
+  &quot;orderLimitDays&quot;: 7,
+  &quot;materialItems&quot;: [
+    {
+      &quot;taskMaterialId&quot;: 208900000000000101,
+      &quot;materialId&quot;: 20001,
+      &quot;documentBrowseLimitType&quot;: 1,
+      &quot;minDocumentBrowseSeconds&quot;: 10,
+      &quot;videoSpeedAllowed&quot;: false,
+      &quot;requiredFlag&quot;: true,
+      &quot;sort&quot;: 0
+    }
+  ]
+}
+</code></pre>
+<h3 id="put-update-online-status">2.5 PUT <code>/update-online-status</code> 修改上下架状态</h3>
+<p><strong>OperationId：</strong> <code>updateOnlineStatus</code><br />
+<strong>Request Body：</strong> <code>LearningTaskOnlineStatusReqVO</code><br />
+<strong>Response：</strong> <code>CommonResult&lt;Boolean&gt;</code>。</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>必填</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>taskId</code></td>
+<td>Long</td>
+<td>是</td>
+<td>学习任务 ID</td>
+</tr>
+<tr>
+<td><code>onlineStatus</code></td>
+<td>Integer</td>
+<td>是</td>
+<td><code>0下架、1上架</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="delete-delete">2.6 DELETE <code>/delete</code> 删除学习任务</h3>
+<p><strong>OperationId：</strong> <code>deleteLearningTask</code><br />
+<strong>Response：</strong> <code>CommonResult&lt;Boolean&gt;</code>。</p>
+<table>
+<thead>
+<tr>
+<th>参数位置</th>
+<th>参数</th>
+<th>类型</th>
+<th>必填</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Query</td>
+<td><code>id</code></td>
+<td>Long</td>
+<td>是</td>
+<td>学习任务 ID，执行逻辑删除</td>
+</tr>
+</tbody>
+</table>
+<h3 id="get-material-page">2.7 GET <code>/material-page</code> 分页查询可添加资料</h3>
+<p><strong>OperationId：</strong> <code>getMaterialPage</code><br />
+<strong>Response：</strong> <code>CommonResult&lt;PageResult&lt;ExternalLearningMaterialVO&gt;&gt;</code>。</p>
+<table>
+<thead>
+<tr>
+<th>Query 参数</th>
+<th>类型</th>
+<th>必填</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pageNo</code></td>
+<td>Integer</td>
+<td>否</td>
+<td>页码</td>
+</tr>
+<tr>
+<td><code>pageSize</code></td>
+<td>Integer</td>
+<td>否</td>
+<td>每页条数</td>
+</tr>
+<tr>
+<td><code>materialName</code></td>
+<td>String</td>
+<td>否</td>
+<td>资料名称模糊查询</td>
+</tr>
+<tr>
+<td><code>projectCategoryId</code></td>
+<td>Long</td>
+<td>否</td>
+<td>项目大类 ID</td>
+</tr>
+<tr>
+<td><code>secondaryCategoryId</code></td>
+<td>Long</td>
+<td>否</td>
+<td>二级分类 ID</td>
+</tr>
+</tbody>
+</table>
+<p><code>ExternalLearningMaterialVO</code>：</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>materialId</code></td>
+<td>Long</td>
+<td>外部资料 ID</td>
+</tr>
+<tr>
+<td><code>materialName</code></td>
+<td>String</td>
+<td>资料名称</td>
+</tr>
+<tr>
+<td><code>materialType</code> / <code>materialTypeName</code></td>
+<td>Integer / String</td>
+<td>资料类型编码及名称</td>
+</tr>
+<tr>
+<td><code>projectCategoryId</code> / <code>projectCategoryName</code></td>
+<td>Long / String</td>
+<td>项目大类</td>
+</tr>
+<tr>
+<td><code>secondaryCategoryId</code> / <code>secondaryCategoryName</code></td>
+<td>Long / String</td>
+<td>二级分类</td>
+</tr>
+<tr>
+<td><code>documentCount</code></td>
+<td>Integer</td>
+<td>文档及图片数量</td>
+</tr>
+<tr>
+<td><code>videoCount</code></td>
+<td>Integer</td>
+<td>视频数量</td>
+</tr>
+<tr>
+<td><code>enabledStatus</code></td>
+<td>Integer</td>
+<td>外部资料启用状态</td>
+</tr>
+<tr>
+<td><code>files</code></td>
+<td>ExternalLearningMaterialFileVO[]</td>
+<td>资料附件 JSON</td>
+</tr>
+</tbody>
+</table>
+<p><code>ExternalLearningMaterialFileVO</code>：<code>fileId: Long</code>、<code>fileType: Integer</code>、<code>fileName: String</code>、<code>fileUrl: String</code>、<code>fileVersion: String</code>。</p>
+<h3 id="get-statisticsoverview">2.8 GET <code>/statistics/overview</code> 查询统计概览</h3>
+<p><strong>OperationId：</strong> <code>getStatisticsOverview</code><br />
+<strong>Response：</strong> <code>CommonResult&lt;LearningTaskStatisticsOverviewRespVO&gt;</code>。</p>
+<table>
+<thead>
+<tr>
+<th>参数位置</th>
+<th>参数</th>
+<th>类型</th>
+<th>必填</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Query</td>
+<td><code>taskId</code></td>
+<td>Long</td>
+<td>是</td>
+<td>学习任务 ID</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>响应字段</th>
+<th>类型</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>totalVisitCount</code></td>
+<td>Long</td>
+<td>总访问次数</td>
+</tr>
+<tr>
+<td><code>visitorCount</code></td>
+<td>Long</td>
+<td>去重访问人数</td>
+</tr>
+<tr>
+<td><code>totalLearnerCount</code></td>
+<td>Long</td>
+<td>应学习总人数</td>
+</tr>
+<tr>
+<td><code>startedLearnerCount</code></td>
+<td>Long</td>
+<td>已开始人数</td>
+</tr>
+<tr>
+<td><code>unstartedLearnerCount</code></td>
+<td>Long</td>
+<td>未开始人数</td>
+</tr>
+<tr>
+<td><code>completedLearnerCount</code></td>
+<td>Long</td>
+<td>已完成人数</td>
+</tr>
+<tr>
+<td><code>completionRate</code></td>
+<td>BigDecimal</td>
+<td>任务完成人数占比，百分比</td>
+</tr>
+</tbody>
+</table>
+<h3 id="get-statisticsstore-page">2.9 GET <code>/statistics/store-page</code> 分页查询门店进度</h3>
+<p><strong>OperationId：</strong> <code>getStatisticsStorePage</code><br />
+<strong>Response：</strong> <code>CommonResult&lt;PageResult&lt;LearningTaskStorePageRespVO&gt;&gt;</code>。</p>
+<table>
+<thead>
+<tr>
+<th>Query 参数</th>
+<th>类型</th>
+<th>必填</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>taskId</code></td>
+<td>Long</td>
+<td>是</td>
+<td>学习任务 ID</td>
+</tr>
+<tr>
+<td><code>orgId</code></td>
+<td>Long</td>
+<td>否</td>
+<td>上级组织 ID</td>
+</tr>
+<tr>
+<td><code>storeId</code></td>
+<td>Long</td>
+<td>否</td>
+<td>门店 ID</td>
+</tr>
+<tr>
+<td><code>studyStatus</code></td>
+<td>Integer</td>
+<td>否</td>
+<td><code>0未开始、1进行中、2已完成</code></td>
+</tr>
+<tr>
+<td><code>pageNo</code></td>
+<td>Integer</td>
+<td>否</td>
+<td>页码</td>
+</tr>
+<tr>
+<td><code>pageSize</code></td>
+<td>Integer</td>
+<td>否</td>
+<td>每页条数</td>
+</tr>
+</tbody>
+</table>
+<p><code>LearningTaskStorePageRespVO</code>：</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>storeId</code> / <code>storeName</code></td>
+<td>Long / String</td>
+<td>门店 ID、名称</td>
+</tr>
+<tr>
+<td><code>managerUserId</code></td>
+<td>Long</td>
+<td>店长用户 ID</td>
+</tr>
+<tr>
+<td><code>managerName</code> / <code>managerMobile</code></td>
+<td>String / String</td>
+<td>店长姓名、手机号</td>
+</tr>
+<tr>
+<td><code>orgId</code> / <code>orgName</code></td>
+<td>Long / String</td>
+<td>上级组织 ID、名称</td>
+</tr>
+<tr>
+<td><code>progressRate</code></td>
+<td>BigDecimal</td>
+<td>任务学习进度百分比</td>
+</tr>
+<tr>
+<td><code>studyStatus</code></td>
+<td>Integer</td>
+<td><code>0未开始、1进行中、2已完成</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="get-statisticsstore-detail">2.10 GET <code>/statistics/store-detail</code> 查询门店学习详情</h3>
+<p><strong>OperationId：</strong> <code>getStatisticsStoreDetail</code><br />
+<strong>Response：</strong> <code>CommonResult&lt;LearningTaskStoreDetailRespVO&gt;</code>。</p>
+<table>
+<thead>
+<tr>
+<th>Query 参数</th>
+<th>类型</th>
+<th>必填</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>taskId</code></td>
+<td>Long</td>
+<td>是</td>
+<td>学习任务 ID</td>
+</tr>
+<tr>
+<td><code>storeId</code></td>
+<td>Long</td>
+<td>是</td>
+<td>门店 ID</td>
+</tr>
+<tr>
+<td><code>learnerUserId</code></td>
+<td>Long</td>
+<td>否</td>
+<td>学习人 ID；不传时取当前门店店长</td>
+</tr>
+</tbody>
+</table>
+<p>响应字段：<code>taskId</code>、门店信息、店长信息、组织信息、<code>progressRate</code>、<code>studyStatus</code>、<code>materialGroups</code>。</p>
+<h3 id="post-statisticsexport">2.11 POST <code>/statistics/export</code> 导出门店进度</h3>
+<p><strong>OperationId：</strong> <code>exportStatistics</code><br />
+<strong>Request Body：</strong> <code>LearningTaskStorePageReqVO</code>，字段同 2.9。<br />
+<strong>Response：</strong> <code>CommonResult&lt;Boolean&gt;</code>；当前接口契约返回是否受理成功。</p>
+<h3 id="pc">2.12 PC 资料分组响应模型</h3>
+<p><code>LearningTaskMaterialGroupRespVO</code>：</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>projectCategoryId</code></td>
+<td>Long</td>
+<td>项目大类 ID</td>
+</tr>
+<tr>
+<td><code>projectCategoryName</code></td>
+<td>String</td>
+<td>项目大类名称</td>
+</tr>
+<tr>
+<td><code>materialCount</code></td>
+<td>Integer</td>
+<td>组内资料数量</td>
+</tr>
+<tr>
+<td><code>materials</code></td>
+<td>MaterialRespVO[]</td>
+<td>组内资料列表</td>
+</tr>
+</tbody>
+</table>
+<p><code>MaterialRespVO</code>：</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>taskMaterialId</code></td>
+<td>Long</td>
+<td>任务资料关系 ID</td>
+</tr>
+<tr>
+<td><code>materialId</code></td>
+<td>Long</td>
+<td>外部资料 ID</td>
+</tr>
+<tr>
+<td><code>materialName</code></td>
+<td>String</td>
+<td>资料名称</td>
+</tr>
+<tr>
+<td><code>materialType</code> / <code>materialTypeName</code></td>
+<td>Integer / String</td>
+<td>资料类型</td>
+</tr>
+<tr>
+<td><code>secondaryCategoryId</code> / <code>secondaryCategoryName</code></td>
+<td>Long / String</td>
+<td>二级分类</td>
+</tr>
+<tr>
+<td><code>documentCount</code> / <code>videoCount</code></td>
+<td>Integer / Integer</td>
+<td>文档数、视频数</td>
+</tr>
+<tr>
+<td><code>documentBrowseLimitType</code></td>
+<td>Integer</td>
+<td><code>0不限制、1限制</code></td>
+</tr>
+<tr>
+<td><code>minDocumentBrowseSeconds</code></td>
+<td>Integer</td>
+<td>最少浏览秒数</td>
+</tr>
+<tr>
+<td><code>videoSpeedAllowed</code></td>
+<td>Boolean</td>
+<td>是否允许倍速</td>
+</tr>
+<tr>
+<td><code>requiredFlag</code></td>
+<td>Boolean</td>
+<td>是否必学</td>
+</tr>
+<tr>
+<td><code>sort</code></td>
+<td>Integer</td>
+<td>资料排序</td>
+</tr>
+<tr>
+<td><code>studyStatus</code></td>
+<td>Integer</td>
+<td><code>0未开始、1进行中、2已完成</code></td>
+</tr>
+<tr>
+<td><code>validStudySeconds</code></td>
+<td>Long</td>
+<td>有效学习秒数</td>
+</tr>
+<tr>
+<td><code>materialAvailable</code></td>
+<td>Boolean</td>
+<td>外部资料是否存在且有效</td>
+</tr>
+<tr>
+<td><code>files</code></td>
+<td>ExternalLearningMaterialFileVO[]</td>
+<td>外部资料附件 JSON</td>
+</tr>
+</tbody>
+</table>
+<h2 id="swagger">3. 小程序接口（Swagger 风格）</h2>
+<p><strong>Tag：</strong> <code>小程序 - 学习中心</code><br />
+<strong>Base URL：</strong> <code>/bpm/learning-center</code><br />
+<strong>身份参数：</strong> <code>learnerUserId</code> 从登录态获取；前端不提交用户 ID 和门店 ID。<br />
+<strong>统一响应：</strong> <code>CommonResult&lt;T&gt;</code>，分页结构同 PC 接口。</p>
+<h3 id="get-materialcategory-list">3.1 GET <code>/material/category-list</code> 查询资料分类树</h3>
+<p><strong>OperationId：</strong> <code>getMaterialCategoryList</code><br />
+<strong>Request：</strong> 无<br />
+<strong>Response：</strong> <code>CommonResult&lt;List&lt;AppLearningCategoryRespVO&gt;&gt;</code></p>
+<table>
+<thead>
+<tr>
+<th>响应字段</th>
+<th>类型</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>categoryId</code></td>
+<td>Long</td>
+<td>分类 ID</td>
+</tr>
+<tr>
+<td><code>categoryName</code></td>
+<td>String</td>
+<td>分类名称</td>
+</tr>
+<tr>
+<td><code>sort</code></td>
+<td>Integer</td>
+<td>分类排序</td>
+</tr>
+<tr>
+<td><code>children</code></td>
+<td>AppLearningCategoryRespVO[]</td>
+<td>二级分类列表</td>
+</tr>
+</tbody>
+</table>
+<h3 id="get-materialpage">3.2 GET <code>/material/page</code> 分页查询学习资料</h3>
+<p><strong>OperationId：</strong> <code>getMaterialPage</code><br />
+<strong>Response：</strong> <code>CommonResult&lt;PageResult&lt;AppLearningMaterialPageRespVO&gt;&gt;</code></p>
+<table>
+<thead>
+<tr>
+<th>Query 参数</th>
+<th>类型</th>
+<th>必填</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>keyword</code></td>
+<td>String</td>
+<td>否</td>
+<td>资料标题、内容模糊搜索</td>
+</tr>
+<tr>
+<td><code>projectCategoryId</code></td>
+<td>Long</td>
+<td>否</td>
+<td>项目大类 ID</td>
+</tr>
+<tr>
+<td><code>secondaryCategoryId</code></td>
+<td>Long</td>
+<td>否</td>
+<td>二级分类 ID</td>
+</tr>
+<tr>
+<td><code>pageNo</code></td>
+<td>Integer</td>
+<td>否</td>
+<td>页码</td>
+</tr>
+<tr>
+<td><code>pageSize</code></td>
+<td>Integer</td>
+<td>否</td>
+<td>每页条数</td>
+</tr>
+</tbody>
+</table>
+<p><code>AppLearningMaterialPageRespVO</code>：</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>materialId</code></td>
+<td>Long</td>
+<td>外部学习资料 ID</td>
+</tr>
+<tr>
+<td><code>materialName</code></td>
+<td>String</td>
+<td>资料名称</td>
+</tr>
+<tr>
+<td><code>summary</code></td>
+<td>String</td>
+<td>资料摘要</td>
+</tr>
+<tr>
+<td><code>coverImageUrl</code></td>
+<td>String</td>
+<td>资料封面图</td>
+</tr>
+<tr>
+<td><code>materialType</code> / <code>materialTypeName</code></td>
+<td>Integer / String</td>
+<td>外部资料类型编码及名称</td>
+</tr>
+<tr>
+<td><code>projectCategoryId</code> / <code>projectCategoryName</code></td>
+<td>Long / String</td>
+<td>项目大类</td>
+</tr>
+<tr>
+<td><code>secondaryCategoryId</code> / <code>secondaryCategoryName</code></td>
+<td>Long / String</td>
+<td>二级分类</td>
+</tr>
+<tr>
+<td><code>viewerCount</code></td>
+<td>Long</td>
+<td>按用户去重的看过人数</td>
+</tr>
+<tr>
+<td><code>createTime</code></td>
+<td>LocalDateTime</td>
+<td>资料创建时间</td>
+</tr>
+</tbody>
+</table>
+<h3 id="get-materialget">3.3 GET <code>/material/get</code> 查询学习资料详情</h3>
+<p><strong>OperationId：</strong> <code>getMaterial</code><br />
+<strong>Response：</strong> <code>CommonResult&lt;AppLearningMaterialDetailRespVO&gt;</code></p>
+<table>
+<thead>
+<tr>
+<th>参数位置</th>
+<th>参数</th>
+<th>类型</th>
+<th>必填</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Query</td>
+<td><code>id</code></td>
+<td>Long</td>
+<td>是</td>
+<td>外部学习资料 ID</td>
+</tr>
+</tbody>
+</table>
+<p>响应包含 3.2 的资料字段，并增加：</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>content</code></td>
+<td>String</td>
+<td>资料富文本内容</td>
+</tr>
+<tr>
+<td><code>downloadAllowed</code></td>
+<td>Boolean</td>
+<td>固定 <code>false</code>，禁止下载保存</td>
+</tr>
+<tr>
+<td><code>files</code></td>
+<td>AppLearningMaterialFileRespVO[]</td>
+<td>资料附件 JSON；字段见 3.10</td>
+</tr>
+</tbody>
+</table>
+<h3 id="post-materialvisit">3.4 POST <code>/material/visit</code> 记录资料访问</h3>
+<p><strong>OperationId：</strong> <code>recordMaterialVisit</code><br />
+<strong>Request Body：</strong> <code>AppLearningMaterialVisitReqVO</code><br />
+<strong>Response：</strong> <code>CommonResult&lt;Boolean&gt;</code>。</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>必填</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>materialId</code></td>
+<td>Long</td>
+<td>是</td>
+<td>外部学习资料 ID；看过人数按用户去重</td>
+</tr>
+</tbody>
+</table>
+<h3 id="get-taskpage">3.5 GET <code>/task/page</code> 分页查询我的学习任务</h3>
+<p><strong>OperationId：</strong> <code>getTaskPage</code><br />
+<strong>Response：</strong> <code>CommonResult&lt;PageResult&lt;AppLearningTaskPageRespVO&gt;&gt;</code></p>
+<table>
+<thead>
+<tr>
+<th>Query 参数</th>
+<th>类型</th>
+<th>必填</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>keyword</code></td>
+<td>String</td>
+<td>否</td>
+<td>学习任务名称模糊搜索</td>
+</tr>
+<tr>
+<td><code>studyStatus</code></td>
+<td>Integer</td>
+<td>否</td>
+<td><code>0未开始、1进行中、2已完成</code>；不传查全部</td>
+</tr>
+<tr>
+<td><code>pageNo</code></td>
+<td>Integer</td>
+<td>否</td>
+<td>页码</td>
+</tr>
+<tr>
+<td><code>pageSize</code></td>
+<td>Integer</td>
+<td>否</td>
+<td>每页条数</td>
+</tr>
+</tbody>
+</table>
+<p><code>AppLearningTaskPageRespVO</code>：</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>taskId</code></td>
+<td>Long</td>
+<td>学习任务 ID</td>
+</tr>
+<tr>
+<td><code>taskName</code></td>
+<td>String</td>
+<td>任务名称</td>
+</tr>
+<tr>
+<td><code>coverImageUrl</code></td>
+<td>String</td>
+<td>任务封面</td>
+</tr>
+<tr>
+<td><code>taskDescription</code></td>
+<td>String</td>
+<td>任务描述</td>
+</tr>
+<tr>
+<td><code>startTime</code> / <code>endTime</code></td>
+<td>LocalDateTime</td>
+<td>任务周期</td>
+</tr>
+<tr>
+<td><code>taskStatus</code></td>
+<td>Integer</td>
+<td>周期状态：<code>0未开始、1进行中、2已结束</code></td>
+</tr>
+<tr>
+<td><code>studyStatus</code></td>
+<td>Integer</td>
+<td>个人状态：<code>0未开始、1进行中、2已完成</code></td>
+</tr>
+<tr>
+<td><code>progressRate</code></td>
+<td>BigDecimal</td>
+<td>个人任务进度百分比</td>
+</tr>
+<tr>
+<td><code>actionType</code></td>
+<td>Integer</td>
+<td><code>1开始学习、2查看任务</code></td>
+</tr>
+<tr>
+<td><code>learningAllowed</code></td>
+<td>Boolean</td>
+<td>是否允许学习；过期任务仍为 <code>true</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="get-taskget">3.6 GET <code>/task/get</code> 查询学习任务详情</h3>
+<p><strong>OperationId：</strong> <code>getTask</code><br />
+<strong>Response：</strong> <code>CommonResult&lt;AppLearningTaskDetailRespVO&gt;</code></p>
+<table>
+<thead>
+<tr>
+<th>Query 参数</th>
+<th>类型</th>
+<th>必填</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>taskId</code></td>
+<td>Long</td>
+<td>是</td>
+<td>学习任务 ID</td>
+</tr>
+<tr>
+<td><code>studyStatus</code></td>
+<td>Integer</td>
+<td>否</td>
+<td>筛选资料：<code>0未开始、1进行中、2已完成</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>AppLearningTaskDetailRespVO</code>：</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>taskId</code> / <code>taskName</code></td>
+<td>Long / String</td>
+<td>任务 ID、名称</td>
+</tr>
+<tr>
+<td><code>coverImageUrl</code></td>
+<td>String</td>
+<td>任务封面</td>
+</tr>
+<tr>
+<td><code>detailAttachments</code></td>
+<td>AttachmentRespVO[]</td>
+<td>任务介绍图片或视频</td>
+</tr>
+<tr>
+<td><code>startTime</code> / <code>endTime</code></td>
+<td>LocalDateTime</td>
+<td>任务周期</td>
+</tr>
+<tr>
+<td><code>taskDescription</code></td>
+<td>String</td>
+<td>任务描述</td>
+</tr>
+<tr>
+<td><code>orderLimitType</code> / <code>orderLimitDays</code></td>
+<td>Integer / Integer</td>
+<td>订货限制及天数</td>
+</tr>
+<tr>
+<td><code>taskStatus</code></td>
+<td>Integer</td>
+<td><code>0未开始、1进行中、2已结束</code></td>
+</tr>
+<tr>
+<td><code>studyStatus</code></td>
+<td>Integer</td>
+<td><code>0未开始、1进行中、2已完成</code></td>
+</tr>
+<tr>
+<td><code>progressRate</code></td>
+<td>BigDecimal</td>
+<td>当前用户任务进度</td>
+</tr>
+<tr>
+<td><code>learningAllowed</code></td>
+<td>Boolean</td>
+<td>是否允许继续学习</td>
+</tr>
+<tr>
+<td><code>allCount</code></td>
+<td>Integer</td>
+<td>当前任务全部资料数</td>
+</tr>
+<tr>
+<td><code>unstartedCount</code></td>
+<td>Integer</td>
+<td>未开始资料数</td>
+</tr>
+<tr>
+<td><code>studyingCount</code></td>
+<td>Integer</td>
+<td>进行中资料数</td>
+</tr>
+<tr>
+<td><code>completedCount</code></td>
+<td>Integer</td>
+<td>已完成资料数</td>
+</tr>
+<tr>
+<td><code>materialGroups</code></td>
+<td>AppLearningTaskMaterialGroupRespVO[]</td>
+<td>按项目大类分组的资料</td>
+</tr>
+</tbody>
+</table>
+<p>资料分组对象：</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>projectCategoryId</code> / <code>projectCategoryName</code></td>
+<td>Long / String</td>
+<td>项目大类</td>
+</tr>
+<tr>
+<td><code>materialCount</code></td>
+<td>Integer</td>
+<td>组内资料数</td>
+</tr>
+<tr>
+<td><code>materials</code></td>
+<td>MaterialRespVO[]</td>
+<td>组内资料</td>
+</tr>
+</tbody>
+</table>
+<p>组内 <code>MaterialRespVO</code>：<code>taskMaterialId</code>、<code>materialId</code>、<code>materialName</code>、<code>summary</code>、<code>coverImageUrl</code>、资料类型、二级分类、<code>requiredFlag</code>、<code>sort</code>、<code>studyStatus</code>、<code>progressRate</code>、<code>materialAvailable</code>。</p>
+<h3 id="get-taskmaterialget">3.7 GET <code>/task/material/get</code> 查询任务中的资料详情</h3>
+<p><strong>OperationId：</strong> <code>getTaskMaterial</code><br />
+<strong>Response：</strong> <code>CommonResult&lt;AppLearningTaskMaterialDetailRespVO&gt;</code></p>
+<table>
+<thead>
+<tr>
+<th>参数位置</th>
+<th>参数</th>
+<th>类型</th>
+<th>必填</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Query</td>
+<td><code>taskMaterialId</code></td>
+<td>Long</td>
+<td>是</td>
+<td>任务资料关系 ID，不是外部资料 ID</td>
+</tr>
+</tbody>
+</table>
+<p><code>AppLearningTaskMaterialDetailRespVO</code>：</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>taskId</code></td>
+<td>Long</td>
+<td>学习任务 ID</td>
+</tr>
+<tr>
+<td><code>taskMaterialId</code></td>
+<td>Long</td>
+<td>任务资料关系 ID</td>
+</tr>
+<tr>
+<td><code>materialId</code></td>
+<td>Long</td>
+<td>外部资料 ID</td>
+</tr>
+<tr>
+<td><code>materialName</code> / <code>summary</code></td>
+<td>String / String</td>
+<td>资料名称、摘要</td>
+</tr>
+<tr>
+<td><code>content</code></td>
+<td>String</td>
+<td>富文本内容</td>
+</tr>
+<tr>
+<td><code>coverImageUrl</code></td>
+<td>String</td>
+<td>资料封面</td>
+</tr>
+<tr>
+<td><code>materialType</code> / <code>materialTypeName</code></td>
+<td>Integer / String</td>
+<td>资料类型</td>
+</tr>
+<tr>
+<td><code>projectCategoryId</code> / <code>projectCategoryName</code></td>
+<td>Long / String</td>
+<td>项目大类</td>
+</tr>
+<tr>
+<td><code>secondaryCategoryId</code> / <code>secondaryCategoryName</code></td>
+<td>Long / String</td>
+<td>二级分类</td>
+</tr>
+<tr>
+<td><code>requiredFlag</code></td>
+<td>Boolean</td>
+<td>是否必学</td>
+</tr>
+<tr>
+<td><code>documentBrowseLimitType</code></td>
+<td>Integer</td>
+<td><code>0不限制、1限制时长</code></td>
+</tr>
+<tr>
+<td><code>minDocumentBrowseSeconds</code></td>
+<td>Integer</td>
+<td>最少有效浏览秒数</td>
+</tr>
+<tr>
+<td><code>videoSpeedAllowed</code></td>
+<td>Boolean</td>
+<td>是否允许视频倍速</td>
+</tr>
+<tr>
+<td><code>studyStatus</code></td>
+<td>Integer</td>
+<td><code>0未开始、1进行中、2已完成</code></td>
+</tr>
+<tr>
+<td><code>progressRate</code></td>
+<td>BigDecimal</td>
+<td>已完成附件数占当前有效附件数的百分比</td>
+</tr>
+<tr>
+<td><code>downloadAllowed</code></td>
+<td>Boolean</td>
+<td>固定 <code>false</code></td>
+</tr>
+<tr>
+<td><code>learningAllowed</code></td>
+<td>Boolean</td>
+<td>过期任务仍为 <code>true</code></td>
+</tr>
+<tr>
+<td><code>materialAvailable</code></td>
+<td>Boolean</td>
+<td>外部资料是否有效；失效时仍保留资料 ID</td>
+</tr>
+<tr>
+<td><code>files</code></td>
+<td>AppLearningMaterialFileRespVO[]</td>
+<td>附件及每个附件的学习状态</td>
+</tr>
+</tbody>
+</table>
+<p>服务端生成响应 JSON 的步骤：</p>
+<ol>
+<li>根据 <code>taskMaterialId</code> 查询任务资料关系和学习规则。</li>
+<li>使用关系中的 <code>materialId</code> 获取资料 JSON，其中 <code>files</code> 包含该资料的全部附件 ID。</li>
+<li>按当前登录店长、命中门店、<code>fileId + fileVersion</code> 查询每个附件的学习记录。</li>
+<li>合并资料 JSON、任务规则和附件进度，计算资料进度后返回。</li>
+</ol>
+<p>完整 <code>data</code> 示例：</p>
+<pre><code class="language-json">{
+  &quot;taskId&quot;: 208900000000000001,
+  &quot;taskMaterialId&quot;: 208900000000000101,
+  &quot;materialId&quot;: 20001,
+  &quot;materialName&quot;: &quot;鸡腿汉堡制作标准&quot;,
+  &quot;summary&quot;: &quot;制作步骤和质量标准&quot;,
+  &quot;content&quot;: &quot;&lt;p&gt;资料正文&lt;/p&gt;&quot;,
+  &quot;coverImageUrl&quot;: &quot;https://example.com/cover.jpg&quot;,
+  &quot;materialType&quot;: 1,
+  &quot;materialTypeName&quot;: &quot;图文视频&quot;,
+  &quot;projectCategoryId&quot;: 100,
+  &quot;projectCategoryName&quot;: &quot;食材制作&quot;,
+  &quot;secondaryCategoryId&quot;: 101,
+  &quot;secondaryCategoryName&quot;: &quot;主食制作&quot;,
+  &quot;requiredFlag&quot;: true,
+  &quot;documentBrowseLimitType&quot;: 1,
+  &quot;minDocumentBrowseSeconds&quot;: 10,
+  &quot;videoSpeedAllowed&quot;: false,
+  &quot;studyStatus&quot;: 1,
+  &quot;progressRate&quot;: 50.00,
+  &quot;downloadAllowed&quot;: false,
+  &quot;learningAllowed&quot;: true,
+  &quot;materialAvailable&quot;: true,
+  &quot;files&quot;: [
+    {
+      &quot;fileId&quot;: 30001,
+      &quot;fileType&quot;: 1,
+      &quot;fileTypeName&quot;: &quot;视频&quot;,
+      &quot;fileName&quot;: &quot;制作视频.mp4&quot;,
+      &quot;fileUrl&quot;: &quot;https://example.com/a.mp4&quot;,
+      &quot;fileVersion&quot;: &quot;v1&quot;,
+      &quot;sort&quot;: 0,
+      &quot;studyStatus&quot;: 2,
+      &quot;validStudySeconds&quot;: 180,
+      &quot;lastPositionSeconds&quot;: 180,
+      &quot;reachedBottom&quot;: false
+    },
+    {
+      &quot;fileId&quot;: 30002,
+      &quot;fileType&quot;: 2,
+      &quot;fileTypeName&quot;: &quot;图片&quot;,
+      &quot;fileName&quot;: &quot;成品标准.jpg&quot;,
+      &quot;fileUrl&quot;: &quot;https://example.com/b.jpg&quot;,
+      &quot;fileVersion&quot;: &quot;v1&quot;,
+      &quot;sort&quot;: 1,
+      &quot;studyStatus&quot;: 0,
+      &quot;validStudySeconds&quot;: 0,
+      &quot;lastPositionSeconds&quot;: 0,
+      &quot;reachedBottom&quot;: false
+    }
+  ]
+}
+</code></pre>
+<h3 id="post-taskvisit">3.8 POST <code>/task/visit</code> 记录任务访问</h3>
+<p><strong>OperationId：</strong> <code>recordTaskVisit</code><br />
+<strong>Request Body：</strong> <code>AppLearningTaskVisitReqVO</code><br />
+<strong>Response：</strong> <code>CommonResult&lt;Boolean&gt;</code>。</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>必填</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>taskId</code></td>
+<td>Long</td>
+<td>是</td>
+<td>学习任务 ID</td>
+</tr>
+</tbody>
+</table>
+<h3 id="post-taskfile-progressreport">3.9 POST <code>/task/file-progress/report</code> 上报附件学习进度</h3>
+<p><strong>OperationId：</strong> <code>reportFileProgress</code><br />
+<strong>Request Body：</strong> <code>AppLearningFileProgressReportReqVO</code><br />
+<strong>Response：</strong> <code>CommonResult&lt;AppLearningProgressRespVO&gt;</code>。</p>
+<p>请求字段：</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>必填</th>
+<th>规则与说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>taskMaterialId</code></td>
+<td>Long</td>
+<td>是</td>
+<td>任务资料关系 ID</td>
+</tr>
+<tr>
+<td><code>fileId</code></td>
+<td>Long</td>
+<td>条件必填</td>
+<td>外部附件 ID；无附件富文本学习时不传</td>
+</tr>
+<tr>
+<td><code>fileVersion</code></td>
+<td>String</td>
+<td>条件必填</td>
+<td>有附件时提交当前内容版本</td>
+</tr>
+<tr>
+<td><code>eventType</code></td>
+<td>Integer</td>
+<td>是</td>
+<td><code>1打开、2心跳、3结束或完成申报</code></td>
+</tr>
+<tr>
+<td><code>currentPositionSeconds</code></td>
+<td>Long</td>
+<td>否</td>
+<td>视频当前播放位置，大于等于 0</td>
+</tr>
+<tr>
+<td><code>reachedBottom</code></td>
+<td>Boolean</td>
+<td>否</td>
+<td>文档、图片或富文本是否浏览到底部</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="language-json">{
+  &quot;taskMaterialId&quot;: 208900000000000101,
+  &quot;fileId&quot;: 30001,
+  &quot;fileVersion&quot;: &quot;v1&quot;,
+  &quot;eventType&quot;: 2,
+  &quot;currentPositionSeconds&quot;: 35,
+  &quot;reachedBottom&quot;: false
+}
+</code></pre>
+<p><code>AppLearningProgressRespVO</code>：</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>taskId</code></td>
+<td>Long</td>
+<td>学习任务 ID</td>
+</tr>
+<tr>
+<td><code>taskMaterialId</code></td>
+<td>Long</td>
+<td>任务资料关系 ID</td>
+</tr>
+<tr>
+<td><code>fileId</code></td>
+<td>Long</td>
+<td>本次上报附件 ID</td>
+</tr>
+<tr>
+<td><code>fileStudyStatus</code></td>
+<td>Integer</td>
+<td>附件状态：<code>0未学习、1学习中、2已学习</code></td>
+</tr>
+<tr>
+<td><code>materialStudyStatus</code></td>
+<td>Integer</td>
+<td>资料状态：<code>0未开始、1进行中、2已完成</code></td>
+</tr>
+<tr>
+<td><code>taskStudyStatus</code></td>
+<td>Integer</td>
+<td>任务状态：<code>0未开始、1进行中、2已完成</code></td>
+</tr>
+<tr>
+<td><code>fileValidStudySeconds</code></td>
+<td>Long</td>
+<td>当前附件有效学习秒数</td>
+</tr>
+<tr>
+<td><code>materialValidStudySeconds</code></td>
+<td>Long</td>
+<td>当前资料累计有效学习秒数</td>
+</tr>
+<tr>
+<td><code>materialProgressRate</code></td>
+<td>BigDecimal</td>
+<td>当前资料进度百分比</td>
+</tr>
+<tr>
+<td><code>taskProgressRate</code></td>
+<td>BigDecimal</td>
+<td>当前任务进度百分比</td>
+</tr>
+</tbody>
+</table>
+<p>响应示例：</p>
+<pre><code class="language-json">{
+  &quot;code&quot;: 0,
+  &quot;data&quot;: {
+    &quot;taskId&quot;: 208900000000000001,
+    &quot;taskMaterialId&quot;: 208900000000000101,
+    &quot;fileId&quot;: 30001,
+    &quot;fileStudyStatus&quot;: 1,
+    &quot;materialStudyStatus&quot;: 1,
+    &quot;taskStudyStatus&quot;: 1,
+    &quot;fileValidStudySeconds&quot;: 35,
+    &quot;materialValidStudySeconds&quot;: 215,
+    &quot;materialProgressRate&quot;: 50.00,
+    &quot;taskProgressRate&quot;: 25.00
+  },
+  &quot;msg&quot;: &quot;&quot;
+}
+</code></pre>
+<h3 id="section-3">3.10 小程序附件响应模型</h3>
+<p><code>AppLearningMaterialFileRespVO</code>：</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>fileId</code></td>
+<td>Long</td>
+<td>外部附件 ID</td>
+</tr>
+<tr>
+<td><code>fileType</code></td>
+<td>Integer</td>
+<td>类型编码，沿用外部资料系统</td>
+</tr>
+<tr>
+<td><code>fileTypeName</code></td>
+<td>String</td>
+<td>视频、图片、Word、PPT、PDF 等</td>
+</tr>
+<tr>
+<td><code>fileName</code></td>
+<td>String</td>
+<td>附件名称</td>
+</tr>
+<tr>
+<td><code>fileUrl</code></td>
+<td>String</td>
+<td>在线预览地址</td>
+</tr>
+<tr>
+<td><code>fileVersion</code></td>
+<td>String</td>
+<td>内容版本；内容变化必须更新</td>
+</tr>
+<tr>
+<td><code>sort</code></td>
+<td>Integer</td>
+<td>附件排序</td>
+</tr>
+<tr>
+<td><code>coverImageUrl</code></td>
+<td>String</td>
+<td>附件封面或预览图</td>
+</tr>
+<tr>
+<td><code>durationSeconds</code></td>
+<td>Long</td>
+<td>视频总时长，秒</td>
+</tr>
+<tr>
+<td><code>fileSize</code></td>
+<td>Long</td>
+<td>文件大小，字节</td>
+</tr>
+<tr>
+<td><code>fileSuffix</code></td>
+<td>String</td>
+<td>文件后缀</td>
+</tr>
+<tr>
+<td><code>studyStatus</code></td>
+<td>Integer</td>
+<td><code>0未学习、1学习中、2已学习</code></td>
+</tr>
+<tr>
+<td><code>validStudySeconds</code></td>
+<td>Long</td>
+<td>当前附件有效学习秒数</td>
+</tr>
+<tr>
+<td><code>lastPositionSeconds</code></td>
+<td>Long</td>
+<td>视频最后有效播放位置</td>
+</tr>
+<tr>
+<td><code>reachedBottom</code></td>
+<td>Boolean</td>
+<td>图片、文档是否浏览到底部</td>
+</tr>
+</tbody>
+</table>
+<h2 id="section-4">4. 附件与资料进度计算</h2>
+<h3 id="section-5">4.1 单附件记录</h3>
+<ul>
+<li>每个资料可以有多个附件，每个附件 ID 分别保存一条学习进度。</li>
+<li>唯一维度：<code>taskMaterialId + storeId + learnerUserId + fileId + fileVersion</code>。</li>
+<li>视频根据心跳、播放位置和视频总时长判断完成。</li>
+<li>图片、Word、PPT、PDF 根据有效浏览时长及 <code>reachedBottom</code> 判断完成。</li>
+<li>附件完成后：<code>completed_flag=1</code>，接口返回 <code>studyStatus=2</code>。</li>
+<li>文件内容变化必须更新 <code>fileVersion</code>；新版本重新学习，旧版本记录保留但不参与当前进度。</li>
+</ul>
+<h3 id="section-6">4.2 单资料进度</h3>
+<p>设当前资料 JSON 中有效附件总数为 <code>N</code>，其中当前版本已完成附件数为 <code>M</code>：</p>
+<pre><code class="language-text">资料进度 progressRate = M / N * 100
+</code></pre>
+<p>计算示例：资料包含 5 个附件，完成 3 个，资料进度为 <code>60.00%</code>。</p>
+<ul>
+<li><code>N &gt; 0 &amp;&amp; M = 0</code>：资料状态为未开始或进行中，取决于是否已有打开/心跳记录。</li>
+<li><code>N &gt; 0 &amp;&amp; 0 &lt; M &lt; N</code>：资料状态为进行中。</li>
+<li><code>N &gt; 0 &amp;&amp; M = N</code>：资料状态为已完成。</li>
+<li><code>N = 0</code>：按无附件富文本规则判断；未满足规则为 <code>0%</code>，满足规则为 <code>100%</code>。</li>
+<li>JSON 中新增附件：<code>N</code> 增加，新附件从 0 开始，资料进度重新计算。</li>
+<li>JSON 中移除附件：该附件历史进度保留，但不再计入 <code>N</code> 和 <code>M</code>。</li>
+<li>只修改资料名称或分类、不改变 <code>fileId + fileVersion</code>：附件及资料进度保持不变。</li>
+</ul>
+<h3 id="section-7">4.3 任务进度</h3>
+<p>任务进度只统计当前有效的必学资料：</p>
+<pre><code class="language-text">任务进度 = 已完成必学资料数 / 当前必学资料总数 * 100
+</code></pre>
+<p>非必学资料保留个人学习状态，但不影响任务是否完成。同一店长管理多家命中门店时，附件、资料和任务三级进度同步写入全部命中门店。</p>
+      </article>
+    </main>
+  </div>
+  <script>
+    const headings = document.querySelectorAll('#document h2, #document h3');
+    const toc = document.getElementById('toc');
+    headings.forEach((heading, index) => {
+      heading.id = `heading-${index + 1}`;
+      const link = document.createElement('a');
+      link.href = `#${heading.id}`;
+      link.className = `level-${heading.tagName.slice(1)}`;
+      link.textContent = heading.textContent;
+      toc.appendChild(link);
+    });
+  </script>
+</body>
+</html>

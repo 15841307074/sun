@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.htyoudao.youdao.module.commodity.dal.mysql.CommodityStoreSpuMapper">
+
+
+    <select id="saleStoreCountByCommodityIds" resultType="com.htyoudao.youdao.module.commodity.api.DTO.StoreSpuCountDTO">
+            select commodity_id as commodityId, count(1)  as storeCount
+            from commodity_store_spu where
+            (commodity_store_spu_applet_status = 1 or commodity_store_spu_machine_status = 1)
+            <if test="storeIds != null  and storeIds.size() > 0">
+                and
+                store_id in
+                <foreach collection="storeIds" item="storeId" open="(" separator="," close=")">
+                    #{storeId}
+                </foreach>
+            </if>
+            and deleted = 0
+            group by commodity_id
+    </select>
+
+
+</mapper>

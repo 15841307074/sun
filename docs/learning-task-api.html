@@ -1,0 +1,907 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>学习任务接口文档</title>
+  <style>
+    :root{--bg:#f5f7fa;--panel:#fff;--text:#1f2937;--muted:#64748b;--line:#dfe5ec;--brand:#ec6d20;--nav:#202b36;--get:#16825d;--post:#2878c8;--put:#b86b00;--delete:#c43f45;--code:#17212b;--note:#fff8e8;--warn:#fff1f2}
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.65 "Microsoft YaHei","PingFang SC",Arial,sans-serif}
+    header{position:sticky;top:0;z-index:10;display:flex;align-items:center;justify-content:space-between;min-height:62px;padding:10px 24px;color:#fff;background:var(--nav);border-bottom:3px solid var(--brand)}
+    header h1{margin:0;font-size:21px}header span{color:#cbd5e1;font-size:12px}.layout{display:grid;grid-template-columns:280px minmax(0,1fr);min-height:calc(100vh - 62px)}
+    nav{position:sticky;top:62px;height:calc(100vh - 62px);overflow:auto;padding:16px 12px;background:#edf1f5;border-right:1px solid var(--line)}nav strong{display:block;margin:14px 10px 5px;color:#657180;font-size:12px}nav a{display:block;padding:6px 10px;color:#263747;text-decoration:none;border-left:3px solid transparent}nav a:hover{color:var(--brand);background:#fff;border-left-color:var(--brand)}
+    main{width:min(1280px,100%);padding:28px 34px 70px}section{scroll-margin-top:76px}h2{margin:34px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line);font-size:22px}h3{margin:24px 0 10px;font-size:17px}h4{margin:18px 0 8px;font-size:15px}p{margin:8px 0}.muted{color:var(--muted)}
+    code{font-family:Consolas,"Courier New",monospace}.inline,td code,p code,li code{padding:2px 5px;color:#8b3c0c;background:#fff3e8;border-radius:3px}pre{margin:9px 0 16px;padding:14px;overflow:auto;color:#e7edf3;background:var(--code);border-radius:5px;line-height:1.55;tab-size:2}
+    table{width:100%;margin:8px 0 18px;border-collapse:collapse;background:#fff}th,td{padding:8px 10px;text-align:left;vertical-align:top;border:1px solid var(--line)}th{background:#eef2f6;white-space:nowrap}.required{color:#d33;font-weight:700}.optional{color:#64748b}.nowrap{white-space:nowrap}
+    .note,.warning{margin:12px 0;padding:12px 14px;border-left:4px solid var(--brand);background:var(--note)}.warning{border-left-color:#d33;background:var(--warn)}.chips{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}.chip{padding:3px 8px;background:#e9eef4;border-radius:12px;color:#475569;font-size:12px}
+    .endpoint{margin:15px 0 22px;overflow:hidden;background:var(--panel);border:1px solid var(--line);border-radius:7px;box-shadow:0 1px 2px rgba(0,0,0,.03)}.endpoint>summary{display:grid;grid-template-columns:68px minmax(300px,auto) 1fr;gap:12px;align-items:center;padding:13px 15px;cursor:pointer;list-style:none}.endpoint>summary::-webkit-details-marker{display:none}.endpoint[open]>summary{border-bottom:1px solid var(--line)}.method{display:inline-flex;align-items:center;justify-content:center;width:62px;height:28px;color:#fff;border-radius:4px;font-size:12px;font-weight:700}.get{background:var(--get)}.post{background:var(--post)}.put{background:var(--put)}.delete{background:var(--delete)}.path{font-weight:700;overflow-wrap:anywhere}.summary{color:var(--muted)}.content{padding:16px}.meta{margin-bottom:12px;color:#475569}.meta b{color:#1f2937}.toc-count{float:right;color:#94a3b8}
+    ul,ol{padding-left:22px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}.legend td:first-child{font-weight:700}.small{font-size:12px}.ok{color:#18794e;font-weight:700}
+    @media(max-width:900px){header{position:static;align-items:flex-start;flex-direction:column}.layout{display:block}nav{position:static;width:100%;height:auto;border-right:0;border-bottom:1px solid var(--line)}main{padding:20px 13px 50px}.endpoint>summary{grid-template-columns:68px 1fr}.summary{grid-column:1/-1}.grid2{grid-template-columns:1fr}table{display:block;overflow-x:auto;white-space:nowrap}}
+  </style>
+</head>
+<body>
+<header><h1>学习任务接口文档</h1><span>按当前后端代码整理 · 版本 2.3 · 2026-09-16</span></header>
+<div class="layout">
+  <nav>
+    <strong>接入说明</strong>
+    <a href="#overview">接口概览</a><a href="#common">公共约定</a><a href="#enums">枚举与标识</a><a href="#flow">推荐调用流程</a>
+    <strong>管理端 <span class="toc-count">11</span></strong>
+    <a href="#admin-page">1. 任务分页</a><a href="#admin-get">2. 任务详情</a><a href="#admin-create">3. 创建任务</a><a href="#admin-update">4. 修改任务</a><a href="#admin-online">5. 上下架</a><a href="#admin-delete">6. 删除任务</a><a href="#admin-material-page">7. 可选资料分页</a><a href="#admin-overview">8. 统计概览</a><a href="#admin-store-page">9. 门店进度分页</a><a href="#admin-store-detail">10. 门店学习详情</a><a href="#admin-export">11. 导出进度</a>
+    <strong>小程序端 <span class="toc-count">11</span></strong>
+    <a href="#app-category">1. 资料分类树</a><a href="#app-material-page">2. 普通资料分页</a><a href="#app-material-get">3. 普通资料详情</a><a href="#app-material-visit">4. 普通资料访问</a><a href="#app-task-page">5. 我的任务</a><a href="#app-task-get">6. 任务详情</a><a href="#app-task-material">7. 任务资料详情</a><a href="#app-task-visit">8. 任务访问</a><a href="#app-progress">9. 学习进度上报</a>
+    <a href="#app-material-time">10. 资料时长上报</a><a href="#app-order-check">11. 剩余天数与订货权限</a><a href="#order-nacos">店长 userId 放行配置</a>
+    <strong>公共模型</strong>
+    <a href="#schema-material">资料与文件</a><a href="#schema-task-material">任务资料分组</a><a href="#errors">错误码</a><a href="#rules">关键业务规则</a>
+  </nav>
+  <main>
+    <section id="overview">
+      <h2>一、接口概览</h2>
+      <p>模块路径为 <code>bpm</code>，管理端接口前缀为 <code>/admin-api/bpm/learning-task</code>，小程序端接口前缀为 <code>/app-api/bpm/learning-center</code>。</p>
+      <div class="chips"><span class="chip">管理端 11 个接口</span><span class="chip">小程序端 11 个接口</span><span class="chip">统一 CommonResult&lt;T&gt;</span><span class="chip">分页最大 100 条</span><span class="chip">时间 yyyy-MM-dd HH:mm:ss</span></div>
+      <div class="note"><b>前端重点：</b>资料列表返回的 <code>materialId</code> 用于创建任务；任务详情中的 <code>taskMaterialId</code> 用于打开任务资料、上报进度。上报附件时直接使用任务资料详情 <code>text</code> 中的附件 URL，并带上详情返回的 <code>progressRevision</code>。</div>
+    </section>
+
+    <section id="common">
+      <h2>二、公共约定</h2>
+      <h3>2.1 请求约定</h3>
+      <table><thead><tr><th>项目</th><th>约定</th></tr></thead><tbody>
+        <tr><td>认证</td><td>沿用平台登录态。学习接口从登录态取得当前用户 ID，调用方不传 <code>learnerUserId</code>。营销通用埋点另按约定由前端传 memberId=店长userId。</td></tr>
+        <tr><td>项目隔离</td><td>所有接口依赖当前项目/业务上下文 <code>businessId</code>，不允许跨项目访问。</td></tr>
+        <tr><td>GET/DELETE</td><td>参数放 Query String；数组参数使用同名参数重复传递，例如 <code>taskPeriod=开始时间&amp;taskPeriod=结束时间</code>。</td></tr>
+        <tr><td>POST/PUT</td><td><code>Content-Type: application/json</code>，参数放 JSON Body。</td></tr>
+        <tr><td>时间</td><td><code>LocalDateTime</code> 按 <code>yyyy-MM-dd HH:mm:ss</code> 传递，例如 <code>2026-09-15 00:00:00</code>。</td></tr>
+        <tr><td>Long 精度</td><td>所有 ID 的后端类型为 <code>Long</code>。JavaScript 端建议按字符串保存和透传，避免超过 <code>Number.MAX_SAFE_INTEGER</code> 后精度丢失。</td></tr>
+        <tr><td>百分比</td><td><code>progressRate</code>、<code>completionRate</code> 返回 0～100 的数值，保留两位小数，不是 0～1 的小数。</td></tr>
+      </tbody></table>
+      <h3>2.2 公共响应</h3>
+      <pre><code>{
+  "code": 0,
+  "data": {},
+  "msg": ""
+}</code></pre>
+      <table><thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead><tbody>
+        <tr><td><code>code</code></td><td>Integer</td><td><code>0</code> 表示成功，非 0 表示校验或业务异常。</td></tr>
+        <tr><td><code>data</code></td><td>Object / Array / Boolean / Long</td><td>实际接口数据；类型以各接口说明为准。</td></tr>
+        <tr><td><code>msg</code></td><td>String</td><td>成功或异常提示文案，前端失败时可直接展示。</td></tr>
+      </tbody></table>
+      <h3>2.3 分页响应</h3>
+      <pre><code>{
+  "code": 0,
+  "data": {
+    "list": [],
+    "total": 0
+  },
+  "msg": ""
+}</code></pre>
+      <table><thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead><tbody>
+        <tr><td><code>pageNo</code></td><td>Integer</td><td>请求字段，页码从 1 开始，默认 1。</td></tr>
+        <tr><td><code>pageSize</code></td><td>Integer</td><td>请求字段，每页 1～100 条，默认 10。</td></tr>
+        <tr><td><code>data.list</code></td><td>Array</td><td>当前页数据。</td></tr>
+        <tr><td><code>data.total</code></td><td>Long</td><td>满足条件的数据总数。</td></tr>
+      </tbody></table>
+    </section>
+
+    <section id="enums">
+      <h2>三、枚举与核心标识</h2>
+      <div class="grid2">
+        <table class="legend"><thead><tr><th>字段</th><th>值</th><th>含义</th></tr></thead><tbody>
+          <tr><td>管理端 taskStatus</td><td>0 / 1 / 2</td><td>按任务周期：未开始 / 进行中 / 已结束</td></tr>
+          <tr><td>小程序 taskStatus</td><td>0 / 1 / 2</td><td>按开始时间和必学资料进度：未开始 / 进行中 / 已完成</td></tr>
+          <tr><td>studyStatus</td><td>0 / 1 / 2</td><td>学习状态；小程序任务顶部兼容字段与 taskStatus 相同，资料状态按自身进度计算</td></tr>
+          <tr><td>onlineStatus</td><td>0 / 1</td><td>下架 / 上架</td></tr>
+          <tr><td>applyScope</td><td>1 / 2</td><td>按门店 / 按标签</td></tr>
+          <tr><td>storeScope</td><td>1 / 2</td><td>全部门店 / 部分门店</td></tr>
+          <tr><td>orderLimitType</td><td>0 / 1</td><td>不限制订货 / 限制订货</td></tr>
+        </tbody></table>
+        <table class="legend"><thead><tr><th>字段</th><th>值</th><th>含义</th></tr></thead><tbody>
+          <tr><td>attachmentType</td><td>1 / 2</td><td>视频 / 图片</td></tr>
+          <tr><td>documentBrowseLimitType</td><td>0 / 1</td><td>不限制时长 / 限制最少浏览时长</td></tr>
+          <tr><td>eventType</td><td>1 / 2 / 3</td><td>打开 / 心跳 / 结束或完成申报</td></tr>
+          <tr><td>actionType</td><td>1 / 2</td><td>开始学习 / 查看任务</td></tr>
+          <tr><td>fileType</td><td>1 / 2 / 其他</td><td>视频 / 图片 / 文档或正文</td></tr>
+          <tr><td>requiredFlag</td><td>true / false</td><td>必学 / 非必学</td></tr>
+        </tbody></table>
+      </div>
+      <table><thead><tr><th>标识</th><th>来源</th><th>使用位置</th></tr></thead><tbody>
+        <tr><td><code>taskId</code></td><td>创建任务返回或任务列表返回</td><td>任务详情、上下架、删除、访问统计、任务访问。</td></tr>
+        <tr><td><code>materialId</code></td><td>外部学习资料主表</td><td>选择资料、普通资料详情/访问、创建任务的 <code>materialItems</code>。</td></tr>
+        <tr><td><code>taskMaterialId</code></td><td>任务与资料关系表</td><td>任务资料详情、文件进度上报；不能使用 <code>materialId</code> 代替。</td></tr>
+        <tr><td><code>fileUrl</code></td><td>任务资料详情 <code>text</code> 中的视频/图片节点 <code>url</code>，或文档节点 <code>file.url</code></td><td>进度上报时定位当前附件；富文本不传。</td></tr>
+        <tr><td><code>fileKey</code></td><td>富文本固定值 <code>rich-text</code>；附件稳定键可从 <code>files</code> 取得</td><td>混排资料上报富文本时传 <code>rich-text</code>；附件新客户端使用 fileUrl。</td></tr>
+        <tr><td><code>fileVersion</code></td><td>任务资料详情的 <code>files</code> 辅助数据</td><td>仅兼容旧版附件上报。</td></tr>
+        <tr><td><code>progressRevision</code></td><td>任务资料详情返回</td><td>资料附件发生变化后递增，用于拒绝旧页面继续上报。</td></tr>
+        <tr><td><code>eventType / eventId / memberId</code></td><td>营销通用埋点字段</td><td>学习任务固定 eventType=learning_task；eventId 传任务 ID；memberId 传登录店长 userId。每次进入页面上报一次。</td></tr>
+      </tbody></table>
+    </section>
+
+    <section id="flow">
+      <h2>四、推荐调用流程</h2>
+      <h3>4.1 管理端创建/编辑</h3>
+      <ol><li>调用“可选资料分页”获取 <code>materialId</code>。</li><li>前端完成门店/标签范围选择和资料规则配置。</li><li>创建时调用 <code>/create</code>；编辑时先调用 <code>/get</code> 回显，再把当前完整资料列表提交到 <code>/update</code>。</li><li>任务创建后默认为下架，确认配置无误后调用“上下架”接口。</li></ol>
+      <h3>4.2 小程序学习</h3>
+      <ol><li>调用“我的任务”获得 <code>taskId</code>。</li><li>打开任务详情后异步调用“任务访问”，不要让访问统计失败阻断页面展示。</li><li>从任务详情取得 <code>taskMaterialId</code>，再调用“任务资料详情”。</li><li>保存详情返回的 <code>progressRevision</code>；渲染 <code>text</code> 时保存当前附件的 <code>url</code>（文档为 <code>file.url</code>）。</li><li>打开文件报 <code>eventType=1</code>，学习期间周期性报 <code>eventType=2</code>，视频播放结束报 <code>eventType=3</code>；文档、图片或富文本浏览到底部可报 <code>reachedBottom=true</code>，也可报 <code>eventType=3</code>。</li><li>收到资料变更类错误时，停止旧页面心跳并重新请求任务资料详情。</li></ol>
+    </section>
+
+    <section><h2>五、管理端接口</h2></section>
+
+    <details class="endpoint" id="admin-page" open><summary><span class="method get">GET</span><code class="path">/admin-api/bpm/learning-task/page</code><span class="summary">分页查询学习任务</span></summary><div class="content">
+      <p class="meta"><b>参数位置：</b>Query　<b>响应：</b><code>CommonResult&lt;PageResult&lt;LearningTaskPageRespVO&gt;&gt;</code></p>
+      <table><thead><tr><th>参数</th><th>类型</th><th>必填</th><th>说明</th><th>示例</th></tr></thead><tbody>
+        <tr><td>pageNo</td><td>Integer</td><td>否</td><td>页码，默认 1</td><td>1</td></tr><tr><td>pageSize</td><td>Integer</td><td>否</td><td>每页 1～100 条，默认 10</td><td>10</td></tr>
+        <tr><td>taskName</td><td>String</td><td>否</td><td>任务名称模糊查询</td><td>食品制作</td></tr><tr><td>storeId</td><td>Long</td><td>否</td><td>筛选命中指定学习门店的任务</td><td>190000000000000001</td></tr>
+        <tr><td>taskPeriod</td><td>LocalDateTime[2]</td><td>否</td><td>任务周期起止时间，必须成对传递</td><td>重复传两个同名参数</td></tr><tr><td>taskStatus</td><td>Integer</td><td>否</td><td>0未开始、1进行中、2已结束</td><td>1</td></tr><tr><td>onlineStatus</td><td>Integer</td><td>否</td><td>0下架、1上架</td><td>1</td></tr>
+      </tbody></table>
+      <pre><code>GET /admin-api/bpm/learning-task/page?pageNo=1&amp;pageSize=10&amp;taskName=食品制作&amp;taskStatus=1&amp;onlineStatus=1
+
+{
+  "code": 0,
+  "data": {
+    "list": [{
+      "taskId": "208900000000000001",
+      "taskName": "食品制作与卫生清洁",
+      "taskDescription": "门店标准化学习",
+      "startTime": "2026-09-15 00:00:00",
+      "endTime": "2026-10-15 23:59:59",
+      "taskStatus": 1,
+      "applyScope": 1,
+      "storeScope": 2,
+      "storeIds": ["190000000000000001"],
+      "storeNames": ["沈阳示例门店"],
+      "tagIds": [],
+      "tagNames": [],
+      "targetStoreCount": 1,
+      "onlineStatus": 1
+    }],
+    "total": 1
+  },
+  "msg": ""
+}</code></pre>
+      <p class="muted">门店名称、标签名称及目标门店数按当前门店/标签关系实时计算。</p>
+    </div></details>
+
+    <details class="endpoint" id="admin-get" open><summary><span class="method get">GET</span><code class="path">/admin-api/bpm/learning-task/get</code><span class="summary">查询学习任务详情</span></summary><div class="content">
+      <p class="meta"><b>参数位置：</b>Query　<b>响应：</b><code>CommonResult&lt;LearningTaskDetailRespVO&gt;</code></p>
+      <table><thead><tr><th>参数</th><th>类型</th><th>必填</th><th>说明</th></tr></thead><tbody><tr><td>id</td><td>Long</td><td class="required">是</td><td>学习任务 ID</td></tr></tbody></table>
+      <pre><code>GET /admin-api/bpm/learning-task/get?id=208900000000000001
+
+{
+  "code": 0,
+  "data": {
+    "taskId": "208900000000000001",
+    "taskName": "食品制作与卫生清洁",
+    "coverImageUrl": "https://cdn.example.com/task-cover.jpg",
+    "detailAttachments": [{"attachmentId":"1","attachmentUrl":"https://cdn.example.com/detail.jpg","attachmentType":2}],
+    "startTime": "2026-09-15 00:00:00",
+    "endTime": "2026-10-15 23:59:59",
+    "taskDescription": "门店标准化学习",
+    "applyScope": 1,
+    "storeScope": 2,
+    "storeIds": ["190000000000000001"],
+    "storeNames": ["郑州高新区旗舰店"],
+    "tagIds": [],
+    "orderLimitType": 1,
+    "orderLimitDays": 7,
+    "taskStatus": 1,
+    "onlineStatus": 1,
+    "materialGroups": [{
+      "projectCategoryId": "100",
+      "projectCategoryName": "食材制作",
+      "materialCount": 1,
+      "materials": [{
+        "taskMaterialId": "3001",
+        "materialId": "2001",
+        "materialName": "鸡排制作标准",
+        "coverUrl": "https://cdn.example.com/material.jpg",
+        "materialType": 1,
+        "materialTypeName": "图文视频",
+        "secondaryCategoryId": "101",
+        "secondaryCategoryName": "主食制作",
+        "documentCount": 1,
+        "videoCount": 1,
+        "documentBrowseLimitType": 1,
+        "minDocumentBrowseSeconds": 10,
+        "videoSpeedAllowed": false,
+        "requiredFlag": true,
+        "sort": 0,
+        "studyStatus": 0,
+        "validStudySeconds": 0,
+        "materialAvailable": true,
+        "files": []
+      }]
+    }]
+  },
+  "msg": ""
+}</code></pre>
+      <div class="note"><code>storeNames</code> 与 <code>storeIds</code> 按下标一一对应。全门店或按标签任务没有显式门店配置时，两者均返回空数组。</div>
+      <div class="note">资料名称、文案、分类、文件和上下架状态均从资料主表实时读取。已下架/删除资料不会从任务关系中物理删除，管理端详情会以 <code>materialAvailable=false</code> 标识。</div>
+    </div></details>
+
+    <details class="endpoint" id="admin-create" open><summary><span class="method post">POST</span><code class="path">/admin-api/bpm/learning-task/create</code><span class="summary">创建学习任务</span></summary><div class="content">
+      <p class="meta"><b>参数位置：</b>JSON Body　<b>响应：</b><code>CommonResult&lt;Long&gt;</code>，data 为新任务 ID；新任务默认下架。</p>
+      <h4>顶层请求字段</h4>
+      <table><thead><tr><th>字段</th><th>类型</th><th>必填</th><th>校验及说明</th></tr></thead><tbody>
+        <tr><td>taskId</td><td>Long</td><td>否</td><td>创建时不要传</td></tr><tr><td>taskName</td><td>String</td><td class="required">是</td><td>非空，最多 50 个字符</td></tr><tr><td>coverImageUrl</td><td>String</td><td class="required">是</td><td>任务封面地址</td></tr>
+        <tr><td>detailAttachments</td><td>AttachmentReqVO[]</td><td>否</td><td>任务详情图片/视频，最多 5 个；不会影响资料学习进度</td></tr><tr><td>startTime</td><td>LocalDateTime</td><td class="required">是</td><td>支持 yyyy-MM-dd HH:mm:ss 字符串或 13 位毫秒时间戳</td></tr><tr><td>endTime</td><td>LocalDateTime</td><td class="required">是</td><td>格式同 startTime，且必须晚于 startTime</td></tr><tr><td>taskDescription</td><td>String</td><td>否</td><td>最多 500 个字符</td></tr>
+        <tr><td>applyScope</td><td>Integer</td><td class="required">是</td><td>1按门店、2按标签</td></tr><tr><td>storeScope</td><td>Integer</td><td>条件必填</td><td>applyScope=1 时必传；1全部门店、2部分门店</td></tr><tr><td>storeIds</td><td>Long[]</td><td>条件必填</td><td>applyScope=1 且 storeScope=2 时至少一项</td></tr><tr><td>tagIds</td><td>Long[]</td><td>条件必填</td><td>applyScope=2 时至少一项；多个标签按并集匹配</td></tr>
+        <tr><td>orderLimitType</td><td>Integer</td><td class="required">是</td><td>0不限制、1限制</td></tr><tr><td>orderLimitDays</td><td>Integer</td><td>条件必填</td><td>orderLimitType=1 时必填，范围 3～365 天</td></tr><tr><td>materialItems</td><td>MaterialReqVO[]</td><td class="required">是</td><td>至少一项且至少一项 requiredFlag=true；同一个 materialId 不得重复。编辑时也必须保留必学资料</td></tr><tr><td>removedTaskMaterialIds</td><td>Long[]</td><td>否</td><td>创建时不传或传空数组；当前后端仅保留该字段，实际移除以 materialItems 完整列表为准</td></tr>
+      </tbody></table>
+      <h4>detailAttachments 元素</h4>
+      <table><thead><tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr></thead><tbody><tr><td>attachmentUrl</td><td>String</td><td class="required">是</td><td>附件访问地址</td></tr><tr><td>attachmentType</td><td>Integer</td><td class="required">是</td><td>1视频、2图片</td></tr></tbody></table>
+      <div class="note">任务详情附件不需要传 <code>sort</code>，后端按 <code>detailAttachments</code> 数组顺序保存。学习资料的拖拽排序仍使用 <code>materialItems[].sort</code>。</div>
+      <h4>materialItems 元素</h4>
+      <table><thead><tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr></thead><tbody>
+        <tr><td>taskMaterialId</td><td>Long</td><td>否</td><td>创建时不要传</td></tr><tr><td>materialId</td><td>Long</td><td class="required">是</td><td>外部学习资料 ID</td></tr><tr><td>documentBrowseLimitType</td><td>Integer</td><td class="required">是</td><td>0不限制、1限制最少浏览时长</td></tr><tr><td>minDocumentBrowseSeconds</td><td>Integer</td><td>条件必填</td><td>documentBrowseLimitType=1 时必须大于 0</td></tr><tr><td>videoSpeedAllowed</td><td>Boolean</td><td class="required">是</td><td>视频是否允许倍速</td></tr><tr><td>requiredFlag</td><td>Boolean</td><td class="required">是</td><td>是否必学；任务总进度只计算当前有效的必学资料</td></tr><tr><td>sort</td><td>Integer</td><td class="required">是</td><td>大于等于 0</td></tr>
+      </tbody></table>
+      <pre><code>POST /admin-api/bpm/learning-task/create
+Content-Type: application/json
+
+{
+  "taskName": "食品制作与卫生清洁",
+  "coverImageUrl": "https://cdn.example.com/task-cover.jpg",
+  "detailAttachments": [
+    {"attachmentUrl":"https://cdn.example.com/detail.jpg","attachmentType":2}
+  ],
+  "startTime": "2026-09-15 00:00:00",
+  "endTime": "2026-10-15 23:59:59",
+  "taskDescription": "门店标准化学习",
+  "applyScope": 1,
+  "storeScope": 2,
+  "storeIds": ["190000000000000001", "190000000000000002"],
+  "tagIds": [],
+  "orderLimitType": 1,
+  "orderLimitDays": 7,
+  "materialItems": [{
+    "materialId": "2001",
+    "documentBrowseLimitType": 1,
+    "minDocumentBrowseSeconds": 10,
+    "videoSpeedAllowed": false,
+    "requiredFlag": true,
+    "sort": 0
+  }],
+  "removedTaskMaterialIds": []
+}
+
+// 响应
+{"code":0,"data":"208900000000000001","msg":""}</code></pre>
+    </div></details>
+
+    <details class="endpoint" id="admin-update" open><summary><span class="method put">PUT</span><code class="path">/admin-api/bpm/learning-task/update</code><span class="summary">修改学习任务</span></summary><div class="content">
+      <p class="meta"><b>参数位置：</b>JSON Body　<b>响应：</b><code>CommonResult&lt;Boolean&gt;</code></p>
+      <p>请求结构与创建接口相同，但 <code>taskId</code> 必须传入。已有资料应保留详情接口返回的 <code>taskMaterialId</code>；新增资料的 <code>taskMaterialId</code> 传 null 或不传。</p>
+      <table><thead><tr><th>编辑场景</th><th>传参规则</th><th>进度影响</th></tr></thead><tbody>
+        <tr><td>修改任务名称、描述、封面、任务详情附件</td><td>提交最新值</td><td>不重置资料学习进度</td></tr><tr><td>修改资料排序、必学、浏览时长、倍速规则</td><td>保留 taskMaterialId，提交最新规则</td><td>附件未变时保留原始学习证据，并按当前规则重新计算状态</td></tr><tr><td>新增资料</td><td>新增 materialItems 元素，不传 taskMaterialId</td><td>新增资料从未开始计算</td></tr><tr><td>移除资料</td><td>从 materialItems 完整列表中删除；removedTaskMaterialIds 可同步传递，但当前实际移除以完整列表差集为准</td><td>历史进度记录保留但不参与当前任务进度</td></tr><tr><td>资料主表附件发生变化</td><td>无需任务端主动提交附件</td><td>对应关系 progressRevision 递增，旧进度失效</td></tr>
+      </tbody></table>
+      <div class="warning"><b>完整列表语义：</b><code>materialItems</code> 必须提交编辑完成后的完整资料列表，不能只提交发生变化的一项，否则未提交的资料会被视为移除。</div>
+      <pre><code>PUT /admin-api/bpm/learning-task/update
+Content-Type: application/json
+
+{
+  "taskId": "208900000000000001",
+  "taskName": "食品制作与卫生清洁（修订）",
+  "coverImageUrl": "https://cdn.example.com/task-cover.jpg",
+  "detailAttachments": [],
+  "startTime": "2026-09-15 00:00:00",
+  "endTime": "2026-10-31 23:59:59",
+  "taskDescription": "更新后的任务说明",
+  "applyScope": 1,
+  "storeScope": 2,
+  "storeIds": ["190000000000000001"],
+  "tagIds": [],
+  "orderLimitType": 1,
+  "orderLimitDays": 7,
+  "materialItems": [{
+    "taskMaterialId": "3001",
+    "materialId": "2001",
+    "documentBrowseLimitType": 1,
+    "minDocumentBrowseSeconds": 20,
+    "videoSpeedAllowed": false,
+    "requiredFlag": true,
+    "sort": 0
+  }],
+  "removedTaskMaterialIds": ["3002"]
+}
+
+{"code":0,"data":true,"msg":""}</code></pre>
+    </div></details>
+
+    <details class="endpoint" id="admin-online"><summary><span class="method put">PUT</span><code class="path">/admin-api/bpm/learning-task/update-online-status</code><span class="summary">修改任务上下架状态</span></summary><div class="content">
+      <p class="meta"><b>参数位置：</b>JSON Body　<b>响应：</b><code>CommonResult&lt;Boolean&gt;</code></p>
+      <table><thead><tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr></thead><tbody><tr><td>taskId</td><td>Long</td><td class="required">是</td><td>学习任务 ID</td></tr><tr><td>onlineStatus</td><td>Integer</td><td class="required">是</td><td>0下架、1上架</td></tr></tbody></table>
+      <pre><code>PUT /admin-api/bpm/learning-task/update-online-status
+
+{"taskId":"208900000000000001","onlineStatus":1}
+
+{"code":0,"data":true,"msg":""}</code></pre>
+      <p class="muted">任务下架后小程序端不可访问；再次上架不会删除既有学习进度。</p>
+    </div></details>
+
+    <details class="endpoint" id="admin-delete"><summary><span class="method delete">DELETE</span><code class="path">/admin-api/bpm/learning-task/delete</code><span class="summary">删除学习任务</span></summary><div class="content">
+      <p class="meta"><b>参数位置：</b>Query　<b>响应：</b><code>CommonResult&lt;Boolean&gt;</code></p>
+      <table><thead><tr><th>参数</th><th>类型</th><th>必填</th><th>说明</th></tr></thead><tbody><tr><td>id</td><td>Long</td><td class="required">是</td><td>学习任务 ID</td></tr></tbody></table>
+      <pre><code>DELETE /admin-api/bpm/learning-task/delete?id=208900000000000001
+
+{"code":0,"data":true,"msg":""}</code></pre><p class="muted">任务及配置关系采用逻辑删除；历史学习进度不做物理删除。</p>
+    </div></details>
+
+    <details class="endpoint" id="admin-material-page" open><summary><span class="method get">GET</span><code class="path">/admin-api/bpm/learning-task/material-page</code><span class="summary">分页查询可添加的学习资料</span></summary><div class="content">
+      <p class="meta"><b>参数位置：</b>Query　<b>响应：</b><code>CommonResult&lt;PageResult&lt;ExternalLearningMaterialVO&gt;&gt;</code></p>
+      <table><thead><tr><th>参数</th><th>类型</th><th>必填</th><th>说明</th></tr></thead><tbody><tr><td>pageNo</td><td>Integer</td><td>否</td><td>默认 1</td></tr><tr><td>pageSize</td><td>Integer</td><td>否</td><td>默认 10，最大 100</td></tr><tr><td>materialName</td><td>String</td><td>否</td><td>资料名称模糊查询</td></tr><tr><td>projectCategoryId</td><td>Long</td><td>否</td><td>项目大类 ID</td></tr><tr><td>secondaryCategoryId</td><td>Long</td><td>否</td><td>二级分类 ID</td></tr></tbody></table>
+      <pre><code>GET /admin-api/bpm/learning-task/material-page?pageNo=1&amp;pageSize=10&amp;materialName=鸡排&amp;projectCategoryId=100
+
+{
+  "code": 0,
+  "data": {
+    "list": [{
+      "materialId": "2001",
+      "materialName": "鸡排制作标准",
+      "summary": "操作步骤及卫生要求",
+      "coverImageUrl": "https://cdn.example.com/material.jpg",
+      "content": "&lt;p&gt;正文&lt;/p&gt;",
+      "materialType": 1,
+      "materialTypeName": "图文视频",
+      "projectCategoryId": "100",
+      "projectCategoryName": "食材制作",
+      "secondaryCategoryId": "101",
+      "secondaryCategoryName": "主食制作",
+      "documentCount": 1,
+      "videoCount": 1,
+      "documentBrowseLimitType": 1,
+      "minDocumentBrowseSeconds": 10,
+      "enabledStatus": 1,
+      "createTime": "2026-09-01 10:00:00",
+      "attachmentFingerprint": "完整SHA-256",
+      "files": []
+    }],
+    "total": 1
+  },
+  "msg": ""
+}</code></pre>
+      <p class="muted">接口仅返回当前可用资料。选择资料时可用 documentBrowseLimitType 和 minDocumentBrowseSeconds 回填任务表单；任务详情返回任务自身保存的规则。</p>
+    </div></details>
+
+    <details class="endpoint" id="admin-overview" open><summary><span class="method get">GET</span><code class="path">/admin-api/bpm/learning-task/statistics/overview</code><span class="summary">查询学习任务统计概览</span></summary><div class="content">
+      <p class="meta"><b>参数位置：</b>Query　<b>响应：</b><code>CommonResult&lt;LearningTaskStatisticsOverviewRespVO&gt;</code></p>
+      <table><thead><tr><th>参数</th><th>类型</th><th>必填</th><th>说明</th></tr></thead><tbody><tr><td>taskId</td><td>Long</td><td class="required">是</td><td>学习任务 ID</td></tr></tbody></table>
+      <pre><code>{
+  "code": 0,
+  "data": {
+    "totalVisitCount": 160,
+    "visitorCount": 80,
+    "totalLearnerCount": 150,
+    "startedLearnerCount": 50,
+    "unstartedLearnerCount": 100,
+    "completedLearnerCount": 45,
+    "completionRate": 30.00
+  },
+  "msg": ""
+}</code></pre>
+      <table><thead><tr><th>返回字段</th><th>类型</th><th>口径</th></tr></thead><tbody><tr><td>totalVisitCount</td><td>Long</td><td>营销埋点中 eventType=learning_task、eventId=任务ID 的访问记录数 PV</td></tr><tr><td>visitorCount</td><td>Long</td><td>访问用户数 UV，按 memberId（店长userId）去重</td></tr><tr><td>totalLearnerCount</td><td>Long</td><td>目标门店负责人按用户去重后的总人数</td></tr><tr><td>startedLearnerCount</td><td>Long</td><td>学习状态大于 0 的人数</td></tr><tr><td>unstartedLearnerCount</td><td>Long</td><td>总人数减已开始人数</td></tr><tr><td>completedLearnerCount</td><td>Long</td><td>任务学习状态为 2 的人数</td></tr><tr><td>completionRate</td><td>BigDecimal</td><td>completedLearnerCount / totalLearnerCount × 100</td></tr></tbody></table>
+      <div class="note">PV/UV 来自按月 ES 索引。如果 ES 查询超时或存在失败分片，接口返回统计不可用异常，不会伪造为 0。</div>
+    </div></details>
+
+    <details class="endpoint" id="admin-store-page" open><summary><span class="method get">GET</span><code class="path">/admin-api/bpm/learning-task/statistics/store-page</code><span class="summary">分页查询门店学习进度</span></summary><div class="content">
+      <p class="meta"><b>参数位置：</b>Query　<b>响应：</b><code>CommonResult&lt;PageResult&lt;LearningTaskStorePageRespVO&gt;&gt;</code></p>
+      <table><thead><tr><th>参数</th><th>类型</th><th>必填</th><th>说明</th></tr></thead><tbody><tr><td>taskId</td><td>Long</td><td class="required">是</td><td>学习任务 ID</td></tr><tr><td>orgId</td><td>Long</td><td>否</td><td>组织 ID 筛选</td></tr><tr><td>storeId</td><td>Long</td><td>否</td><td>门店 ID 筛选</td></tr><tr><td>studyStatus</td><td>Integer</td><td>否</td><td>0未开始、1进行中、2已完成</td></tr><tr><td>pageNo</td><td>Integer</td><td>否</td><td>默认 1</td></tr><tr><td>pageSize</td><td>Integer</td><td>否</td><td>默认 10，最大 100</td></tr></tbody></table>
+      <pre><code>{
+  "code": 0,
+  "data": {
+    "list": [{
+      "storeId": "190000000000000001",
+      "storeName": "沈阳示例门店",
+      "managerUserId": "180000000000000001",
+      "managerName": "张三",
+      "managerMobile": "17190015121",
+      "orgId": "170000000000000001",
+      "orgName": "广东直营店（朱博）",
+      "progressRate": 70.00,
+      "studyStatus": 1
+    }],
+    "total": 1
+  },
+  "msg": ""
+}</code></pre><p class="muted">同一负责人管理多家目标门店时，多家门店展示同一份用户主进度。</p>
+    </div></details>
+
+    <details class="endpoint" id="admin-store-detail" open><summary><span class="method get">GET</span><code class="path">/admin-api/bpm/learning-task/statistics/store-detail</code><span class="summary">查询指定门店学习详情</span></summary><div class="content">
+      <p class="meta"><b>参数位置：</b>Query　<b>响应：</b><code>CommonResult&lt;LearningTaskStoreDetailRespVO&gt;</code></p>
+      <table><thead><tr><th>参数</th><th>类型</th><th>必填</th><th>说明</th></tr></thead><tbody><tr><td>taskId</td><td>Long</td><td class="required">是</td><td>学习任务 ID</td></tr><tr><td>storeId</td><td>Long</td><td class="required">是</td><td>必须是该任务当前命中的目标门店</td></tr><tr><td>learnerUserId</td><td>Long</td><td>否</td><td>不传时使用门店当前负责人用户 ID；通常无需传</td></tr></tbody></table>
+      <pre><code>GET /admin-api/bpm/learning-task/statistics/store-detail?taskId=208900000000000001&amp;storeId=190000000000000001
+
+{
+  "code": 0,
+  "data": {
+    "taskId": "208900000000000001",
+    "storeId": "190000000000000001",
+    "storeName": "沈阳示例门店",
+    "managerUserId": "180000000000000001",
+    "managerName": "张三",
+    "managerMobile": "17190015121",
+    "orgId": "170000000000000001",
+    "orgName": "广东直营店（朱博）",
+    "progressRate": 70.00,
+    "studyStatus": 1,
+    "materialGroups": []
+  },
+  "msg": ""
+}</code></pre>
+      <p>其中 <code>materialGroups</code> 使用下方“任务资料分组模型”，管理端会返回规则、学习状态、有效时长及文件信息。</p>
+    </div></details>
+
+    <details class="endpoint" id="admin-export"><summary><span class="method post">POST</span><code class="path">/admin-api/bpm/learning-task/statistics/export</code><span class="summary">异步导出门店学习进度</span></summary><div class="content">
+      <p class="meta"><b>参数位置：</b>JSON Body　<b>响应：</b><code>CommonResult&lt;Boolean&gt;</code></p>
+      <p>请求字段与“门店进度分页”一致：<code>taskId</code> 必填，<code>orgId</code>、<code>storeId</code>、<code>studyStatus</code> 可选。<code>pageNo/pageSize</code> 可不传，服务端按 500 条一批异步查询。</p>
+      <pre><code>POST /admin-api/bpm/learning-task/statistics/export
+
+{
+  "taskId": "208900000000000001",
+  "orgId": null,
+  "storeId": null,
+  "studyStatus": 1
+}
+
+{"code":0,"data":true,"msg":""}</code></pre>
+      <p class="muted">data=true 仅表示导出任务已成功提交，不表示文件已经生成。文件下载/通知沿用平台异步导出机制。</p>
+    </div></details>
+
+    <section><h2>六、小程序端接口</h2><div class="note">小程序接口均使用当前登录用户。普通资料区要求该用户是当前项目至少一家正常门店的负责人；任务区还要求该负责人至少有一家门店命中该任务范围，且任务处于上架状态。</div></section>
+
+    <details class="endpoint" id="app-category"><summary><span class="method get">GET</span><code class="path">/app-api/bpm/learning-center/material/category-list</code><span class="summary">查询学习资料分类树</span></summary><div class="content">
+      <p class="meta"><b>参数：</b>无　<b>响应：</b><code>CommonResult&lt;List&lt;AppLearningCategoryRespVO&gt;&gt;</code></p>
+      <pre><code>{
+  "code": 0,
+  "data": [{
+    "categoryId": "100",
+    "categoryName": "食材制作",
+    "sort": 1,
+    "children": [{"categoryId":"101","categoryName":"主食制作","sort":1,"children":null}]
+  }],
+  "msg": ""
+}</code></pre>
+    </div></details>
+
+    <details class="endpoint" id="app-material-page" open><summary><span class="method get">GET</span><code class="path">/app-api/bpm/learning-center/material/page</code><span class="summary">分页查询普通学习资料</span></summary><div class="content">
+      <p class="meta"><b>参数位置：</b>Query　<b>响应：</b><code>CommonResult&lt;PageResult&lt;AppLearningMaterialPageRespVO&gt;&gt;</code></p>
+      <table><thead><tr><th>参数</th><th>类型</th><th>必填</th><th>说明</th></tr></thead><tbody><tr><td>pageNo</td><td>Integer</td><td>否</td><td>默认 1</td></tr><tr><td>pageSize</td><td>Integer</td><td>否</td><td>默认 10，最大 100</td></tr><tr><td>keyword</td><td>String</td><td>否</td><td>资料名称关键字，最多 50 个字符</td></tr><tr><td>projectCategoryId</td><td>Long</td><td>否</td><td>项目大类 ID</td></tr><tr><td>secondaryCategoryId</td><td>Long</td><td>否</td><td>二级分类 ID</td></tr></tbody></table>
+      <pre><code>{
+  "code": 0,
+  "data": {
+    "list": [{
+      "materialId": "2001",
+      "materialName": "鸡排制作标准",
+      "summary": "操作步骤及卫生要求",
+      "coverImageUrl": "https://cdn.example.com/material.jpg",
+      "coverUrl": "https://cdn.example.com/material.jpg",
+      "materialType": 1,
+      "materialTypeName": "图文视频",
+      "projectCategoryId": "100",
+      "projectCategoryName": "食材制作",
+      "secondaryCategoryId": "101",
+      "secondaryCategoryName": "主食制作",
+      "viewerCount": 0,
+      "createTime": "2026-09-01 10:00:00"
+    }],
+    "total": 1
+  },
+  "msg": ""
+}</code></pre>
+      <p class="muted">当前实现中普通资料列表的 viewerCount 暂返回 0；任务 PV/UV 使用独立 ES 统计。</p>
+    </div></details>
+
+    <details class="endpoint" id="app-material-get" open><summary><span class="method get">GET</span><code class="path">/app-api/bpm/learning-center/material/get</code><span class="summary">查询普通学习资料详情</span></summary><div class="content">
+      <p class="meta"><b>参数位置：</b>Query　<b>响应：</b><code>CommonResult&lt;AppLearningMaterialDetailRespVO&gt;</code></p>
+      <table><thead><tr><th>参数</th><th>类型</th><th>必填</th><th>说明</th></tr></thead><tbody><tr><td>id</td><td>Long</td><td class="required">是</td><td>外部学习资料 ID，即 materialId</td></tr></tbody></table>
+      <pre><code>{
+  "code": 0,
+  "data": {
+    "materialId": "2001",
+    "materialName": "鸡排制作标准",
+    "summary": "操作步骤及卫生要求",
+    "coverImageUrl": "https://cdn.example.com/material.jpg",
+    "coverUrl": "https://cdn.example.com/material.jpg",
+    "content": "&lt;p&gt;正文内容&lt;/p&gt;",
+    "materialType": 1,
+    "materialTypeName": "图文视频",
+    "projectCategoryId": "100",
+    "projectCategoryName": "食材制作",
+    "secondaryCategoryId": "101",
+    "secondaryCategoryName": "主食制作",
+    "viewerCount": 0,
+    "downloadAllowed": false,
+    "files": [{
+      "fileKey": "完整SHA-256",
+      "fileType": 1,
+      "fileTypeName": "视频",
+      "fileName": "制作流程.mp4",
+      "fileUrl": "https://cdn.example.com/process.mp4",
+      "fileVersion": "完整SHA-256",
+      "sort": 0,
+      "coverImageUrl": "https://cdn.example.com/video-cover.jpg",
+      "durationSeconds": 180,
+      "fileSize": 1024000,
+      "fileSuffix": "mp4",
+      "studyStatus": 0,
+      "validStudySeconds": 0,
+      "lastPositionSeconds": 0,
+      "reachedBottom": false
+    }]
+  },
+  "msg": ""
+}</code></pre>
+      <p class="muted">普通资料详情不产生任务学习进度，downloadAllowed 固定为 false。</p>
+    </div></details>
+
+    <details class="endpoint" id="app-material-visit"><summary><span class="method post">POST</span><code class="path">/app-api/bpm/learning-center/material/visit</code><span class="summary">记录普通学习资料访问</span></summary><div class="content">
+      <p class="meta"><b>参数位置：</b>JSON Body　<b>响应：</b><code>CommonResult&lt;Boolean&gt;</code></p>
+      <table><thead><tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr></thead><tbody><tr><td>materialId</td><td>Long</td><td class="required">是</td><td>外部学习资料 ID</td></tr></tbody></table>
+      <pre><code>POST /app-api/bpm/learning-center/material/visit
+
+{"materialId":"2001"}
+
+{"code":0,"data":true,"msg":""}</code></pre><p class="muted">建议页面详情成功展示后异步调用，上报失败不应阻断用户阅读资料。</p>
+    </div></details>
+
+    <details class="endpoint" id="app-task-page" open><summary><span class="method get">GET</span><code class="path">/app-api/bpm/learning-center/task/page</code><span class="summary">分页查询我的学习任务</span></summary><div class="content">
+      <p class="meta"><b>参数位置：</b>Query　<b>响应：</b><code>CommonResult&lt;PageResult&lt;AppLearningTaskPageRespVO&gt;&gt;</code></p>
+      <table><thead><tr><th>参数</th><th>类型</th><th>必填</th><th>说明</th></tr></thead><tbody><tr><td>pageNo</td><td>Integer</td><td>否</td><td>默认 1</td></tr><tr><td>pageSize</td><td>Integer</td><td>否</td><td>默认 10，最大 100</td></tr><tr><td>keyword</td><td>String</td><td>否</td><td>任务名称关键字，最多 50 个字符</td></tr><tr><td>taskStatus</td><td>Integer</td><td>否</td><td>0未开始、1进行中、2已完成；不传查询全部。旧 studyStatus 参数暂兼容，两个都传时以 taskStatus 为准</td></tr></tbody></table>
+      <pre><code>{
+  "code": 0,
+  "data": {
+    "list": [{
+      "taskId": "208900000000000001",
+      "taskName": "食品制作与卫生清洁",
+      "coverImageUrl": "https://cdn.example.com/task-cover.jpg",
+      "taskDescription": "门店标准化学习",
+      "startTime": "2026-09-15 00:00:00",
+      "endTime": "2026-10-15 23:59:59",
+      "taskStatus": 1,
+      "studyStatus": 1,
+      "progressRate": 50.00,
+      "actionType": 2,
+      "learningAllowed": true
+    }],
+    "total": 1
+  },
+  "msg": ""
+}</code></pre>
+      <ul><li>同一负责人有多家门店命中同一任务时，任务只返回一条。</li><li>开始时间之前 <code>taskStatus=0</code>；开始后，当前有效的必学资料全部完成则为 2，否则为 1。列表筛选和卡片状态都使用 taskStatus；响应中的 studyStatus 暂保留为同值兼容字段。</li><li><code>actionType=1</code> 表示开始学习，<code>actionType=2</code> 表示查看任务。</li><li>任务开始前 <code>learningAllowed=false</code>；任务结束后仍允许补学。</li></ul>
+    </div></details>
+
+    <details class="endpoint" id="app-task-get" open><summary><span class="method get">GET</span><code class="path">/app-api/bpm/learning-center/task/get</code><span class="summary">查询我的任务详情</span></summary><div class="content">
+      <p class="meta"><b>参数位置：</b>Query　<b>响应：</b><code>CommonResult&lt;AppLearningTaskDetailRespVO&gt;</code></p>
+      <table><thead><tr><th>参数</th><th>类型</th><th>必填</th><th>说明</th></tr></thead><tbody><tr><td>taskId</td><td>Long</td><td class="required">是</td><td>学习任务 ID</td></tr><tr><td>studyStatus</td><td>Integer</td><td>否</td><td>过滤资料状态：0未开始、1进行中、2已完成；不传返回全部</td></tr></tbody></table>
+      <pre><code>{
+  "code": 0,
+  "data": {
+    "taskId": "208900000000000001",
+    "taskName": "食品制作与卫生清洁",
+    "coverImageUrl": "https://cdn.example.com/task-cover.jpg",
+    "detailAttachments": [{"attachmentId":"1","attachmentUrl":"https://cdn.example.com/detail.jpg","attachmentType":2}],
+    "startTime": "2026-09-15 00:00:00",
+    "endTime": "2026-10-15 23:59:59",
+    "taskDescription": "门店标准化学习",
+    "orderLimitType": 1,
+    "orderLimitDays": 7,
+    "taskStatus": 1,
+    "studyStatus": 1,
+    "progressRate": 50.00,
+    "learningAllowed": true,
+    "allCount": 2,
+    "unstartedCount": 1,
+    "studyingCount": 0,
+    "completedCount": 1,
+    "materialGroups": [{
+      "projectCategoryId": "100",
+      "projectCategoryName": "食材制作",
+      "materialCount": 2,
+      "materials": [{
+        "taskMaterialId": "3001",
+        "materialId": "2001",
+        "materialName": "鸡排制作标准",
+        "summary": "操作步骤及卫生要求",
+        "coverImageUrl": "https://cdn.example.com/material.jpg",
+        "coverUrl": "https://cdn.example.com/material.jpg",
+        "materialType": 1,
+        "materialTypeName": "图文视频",
+        "secondaryCategoryId": "101",
+        "secondaryCategoryName": "主食制作",
+        "requiredFlag": true,
+        "sort": 0,
+        "studyStatus": 2,
+        "progressRate": 100.00,
+        "materialAvailable": true
+      }]
+    }]
+  },
+  "msg": ""
+}</code></pre>
+      <div class="note">任务顶部状态使用 taskStatus，按开始时间及当前用户的必学资料进度计算；studyStatus 暂保留为同值兼容字段。学习内容标签使用每个资料的 studyStatus。小程序仅返回当前仍上架可用的资料。若任务中的全部资料都已不可用，返回“当前没有可学习的资料”。数量字段会受资料 studyStatus 过滤影响，按本次返回的资料列表统计。</div>
+    </div></details>
+
+    <details class="endpoint" id="app-task-material" open><summary><span class="method get">GET</span><code class="path">/app-api/bpm/learning-center/task/material/get</code><span class="summary">查询任务中的单个学习资料详情</span></summary><div class="content">
+      <p class="meta"><b>参数位置：</b>Query　<b>响应：</b><code>CommonResult&lt;AppLearningTaskMaterialDetailRespVO&gt;</code></p>
+      <table><thead><tr><th>参数</th><th>类型</th><th>必填</th><th>说明</th></tr></thead><tbody><tr><td>taskMaterialId</td><td>Long</td><td class="required">是</td><td>任务资料关系 ID，不是 materialId</td></tr></tbody></table>
+      <pre><code>{
+  "code": 0,
+  "data": {
+    "taskId": "208900000000000001",
+    "taskMaterialId": "3001",
+    "id": "2001",
+    "title": "鸡排制作标准",
+    "summary": "操作步骤及卫生要求",
+    "coverUrl": "https://cdn.example.com/material.jpg",
+    "categoryId": "101",
+    "categoryPath": [
+      {"id":"100","name":"食材制作"},
+      {"id":"101","name":"主食制作"}
+    ],
+    "viewerCount": 1,
+    "text": "[{\"type\":\"richText\",\"content\":\"&lt;p&gt;将完全解冻的腿肉清洗干净并沥干水分。&lt;/p&gt;\",\"studyCompleted\":false,\"minReadSeconds\":0},{\"type\":\"video\",\"url\":\"https://prod-files.htyoudao.com/2026/09/13/process.mp4\",\"studyCompleted\":false,\"minReadSeconds\":0},{\"type\":\"image\",\"url\":\"https://prod-files.htyoudao.com/2026/09/13/step.jpg\",\"studyCompleted\":false,\"minReadSeconds\":0},{\"type\":\"document\",\"file\":{\"name\":\"配送区域学习资料新版2026.pdf\",\"url\":\"https://prod-files.htyoudao.com/2026/09/13/material.pdf\",\"size\":343266,\"type\":\"application/pdf\",\"ext\":\"pdf\",\"status\":\"success\"},\"studyCompleted\":false,\"minReadSeconds\":10}]",
+    "reachedBottom": false,
+    "requiredFlag": true,
+    "minReadSeconds": 10,
+    "allowVideoSpeed": false,
+    "studyStatus": 1,
+    "progressRate": 50.00,
+    "validStudySeconds": 35,
+    "downloadAllowed": false,
+    "learningAllowed": true,
+    "materialAvailable": true,
+    "progressRevision": 2,
+    "files": [{
+      "fileKey": "e35d...完整SHA-256",
+      "fileType": 1,
+      "fileTypeName": "视频",
+      "fileName": "制作流程.mp4",
+      "fileUrl": "https://cdn.example.com/process.mp4",
+      "fileVersion": "92ab...完整SHA-256",
+      "sort": 0,
+      "coverImageUrl": "https://cdn.example.com/video-cover.jpg",
+      "durationSeconds": 180,
+      "fileSize": 1024000,
+      "fileSuffix": "mp4",
+      "studyStatus": 1,
+      "studyCompleted": false,
+      "validStudySeconds": 35,
+      "lastPositionSeconds": 40,
+      "reachedBottom": false
+    }]
+  },
+  "msg": ""
+}</code></pre>
+      <h4>响应字段</h4>
+      <table><thead><tr><th>字段</th><th>类型</th><th>来源</th><th>说明</th></tr></thead><tbody>
+        <tr><td>taskId</td><td>Long</td><td>学习任务</td><td>当前学习任务 ID</td></tr>
+        <tr><td>taskMaterialId</td><td>Long</td><td>任务资料关系</td><td>任务资料关系 ID；进度上报时使用</td></tr>
+        <tr><td>id</td><td>Long</td><td>资料主表</td><td>学习资料 ID</td></tr>
+        <tr><td>title</td><td>String</td><td>资料主表</td><td>资料当前标题，资料修改后实时变化</td></tr>
+        <tr><td>summary</td><td>String</td><td>资料主表</td><td>资料当前摘要</td></tr>
+        <tr><td>coverUrl</td><td>String</td><td>资料主表</td><td>资料当前封面地址</td></tr>
+        <tr><td>categoryId</td><td>Long</td><td>资料主表</td><td>资料当前所属分类 ID；移动分类后实时变化</td></tr>
+        <tr><td>categoryPath</td><td>Array</td><td>当前分类树</td><td>从一级分类到资料当前分类的完整路径，不限制固定层级</td></tr>
+        <tr><td>viewerCount</td><td>Long</td><td>ES</td><td>该资料看过人数，按用户去重</td></tr>
+        <tr><td>text</td><td>String(JSON Array)</td><td>资料主表内容 + 当前用户进度</td><td>页面渲染的完整资料内容；附件和所有 richText 节点均增加 studyCompleted、minReadSeconds</td></tr>
+        <tr><td>reachedBottom</td><td>Boolean</td><td>当前用户的富文本进度</td><td>同一资料中所有富文本共用的到底标记；没有富文本时不返回。富文本不受最小浏览时长限制</td></tr>
+        <tr><td>requiredFlag</td><td>Boolean</td><td>任务资料关系</td><td>该资料在当前任务中是否必学</td></tr>
+        <tr><td>minReadSeconds</td><td>Integer</td><td>任务资料关系</td><td>PDF 附件最少有效浏览秒数；0 表示不限制，仅 PDF 生效。text 节点上的 minReadSeconds 为该节点实际使用的值</td></tr>
+        <tr><td>allowVideoSpeed</td><td>Boolean</td><td>任务资料关系</td><td>该资料在当前任务中是否允许视频倍速</td></tr>
+        <tr><td>studyStatus</td><td>Integer</td><td>个人学习进度</td><td>0 未开始、1 进行中、2 已完成</td></tr>
+        <tr><td>progressRate</td><td>Decimal</td><td>个人学习进度</td><td>资料学习进度百分比</td></tr>
+        <tr><td>downloadAllowed</td><td>Boolean</td><td>学习中心规则</td><td>是否允许下载，当前固定为 false</td></tr>
+        <tr><td>learningAllowed</td><td>Boolean</td><td>任务周期</td><td>当前是否已经到达任务开始时间</td></tr>
+        <tr><td>materialAvailable</td><td>Boolean</td><td>资料状态</td><td>资料当前是否可学习</td></tr>
+        <tr><td>progressRevision</td><td>Integer</td><td>任务资料关系</td><td>附件进度修订号，进度上报时必须原样携带</td></tr>
+        <tr><td>files</td><td>Array</td><td>text 解析结果与个人进度</td><td>服务端从 text 的视频、图片、文档节点解析出的进度辅助数据；不代替 text，页面内容仍以 text 为准</td></tr>
+      </tbody></table>
+      <h4><code>text</code> 内容节点</h4>
+      <p>每个内容节点外层返回 <code>minReadSeconds</code>（Integer，单位秒）。只有 PDF 附件使用任务配置的最少浏览秒数；未配置限制的 PDF，以及富文本、图片、视频、Word、Excel 等其他内容均返回 <code>0</code>。PDF 示例：<code>{"type":"document","file":{"name":"资料.pdf","url":"https://example.com/manual.pdf","ext":"pdf"},"studyCompleted":false,"minReadSeconds":10}</code>。</p>
+      <p>每个 <code>video</code>、<code>image</code>、<code>document</code> 节点的外层增加 <code>studyCompleted</code>（Boolean）：<code>true</code> 表示按当前任务规则已学完，<code>false</code> 表示尚未学完。例如图片节点：<code>{"type":"image","url":"https://example.com/step.jpg","studyCompleted":false,"minReadSeconds":0}</code>。文档节点的字段也放在 <code>document</code> 外层，原有 <code>file</code> 对象保持原样。</p>
+      <p>同一份资料中的所有 <code>richText</code> 节点共用一条学习进度，均带相同的 <code>studyCompleted</code>。任一富文本阅读达到当前任务完成条件后，这些节点同步变为 <code>true</code>。例如：<code>{"type":"richText","content":"&lt;p&gt;正文&lt;/p&gt;","studyCompleted":true,"minReadSeconds":0}</code>。</p>
+      <table><thead><tr><th>type</th><th>主要字段</th><th>说明</th></tr></thead><tbody>
+        <tr><td>richText</td><td>content</td><td>HTML 富文本内容</td></tr>
+        <tr><td>video</td><td>url</td><td>视频附件地址</td></tr>
+        <tr><td>image</td><td>url</td><td>图片附件地址</td></tr>
+        <tr><td>document</td><td>file.name、file.url、file.size、file.type、file.ext、file.status</td><td>PDF 等文档附件信息</td></tr>
+      </tbody></table>
+      <div class="note"><code>title</code>、<code>summary</code>、<code>coverUrl</code>、<code>categoryId</code>、<code>categoryPath</code> 和 <code>text</code> 内容均实时读取学习资料主表；<code>studyCompleted</code> 从当前用户学习进度补入本次响应。附件保留在 <code>text</code> 中的原始位置和顺序。<code>categoryPath</code> 按资料当前分类逐级向上动态生成，不使用固定资料类型。<code>requiredFlag</code>、<code>minReadSeconds</code>、<code>allowVideoSpeed</code> 使用该资料在当前任务中的配置；<code>viewerCount</code> 从 ES 按用户去重统计。</div>
+      <div class="warning">打开页面后请缓存本次返回的 <code>progressRevision</code>，每次进度上报都必须使用它。若资料附件改变，服务端会递增修订号并拒绝旧页面上报。</div>
+    </div></details>
+
+    <details class="endpoint" id="app-task-visit" open><summary><span class="method post">POST</span><code class="path">/app-api/analysis/event/add</code><span class="summary">营销通用埋点：学习任务 PV / UV</span></summary><div class="content">
+      <p class="meta"><b>参数位置：</b>JSON Body　<b>响应：</b><code>CommonResult&lt;Boolean&gt;</code></p>
+      <table><thead><tr><th>字段</th><th>类型</th><th>传值约定</th><th>说明</th></tr></thead><tbody>
+        <tr><td>from</td><td>Integer</td><td>1</td><td>微信小程序。</td></tr>
+        <tr><td>eventType</td><td>String</td><td>learning_task</td><td>枚举 EventType.LEARNING_TASK，代表学习任务页面浏览。</td></tr>
+        <tr><td>eventId</td><td>String</td><td>任务 taskId</td><td>传学习任务ID，不是资料ID或任务资料关系ID。</td></tr>
+        <tr><td>memberId</td><td>Long</td><td>当前店长 userId</td><td>用于 UV 去重；前端以字符串传大整数，切换门店仍传同一个店长 userId。</td></tr>
+        <tr><td>storeId</td><td>Long</td><td>可选</td><td>当前门店ID；不影响按店长去重的 UV。</td></tr>
+        <tr><td>businessId</td><td>Long</td><td>前端不传</td><td>服务端从当前项目上下文取得。</td></tr>
+        <tr><td>timestamp / channel</td><td>Date / String</td><td>可不传</td><td>服务端默认使用当前时间和渠道 1000000002。</td></tr>
+      </tbody></table>
+      <pre><code>POST /app-api/analysis/event/add
+
+{
+  "from": 1,
+  "eventType": "learning_task",
+  "eventId": "208900000000000001",
+  "memberId": "190000000000000001"
+}
+
+{"code":0,"data":true,"msg":""}</code></pre>
+      <ul><li>每次进入任务详情上报一次，不要在学习心跳、切换资料或组件重复渲染时再次上报。</li><li>营销通用接口每次调用都产生一条访问记录，未提供 visitId 幂等，重复请求会增加 PV。</li><li>同一个店长打开多次增加 PV，但同一任务 UV 只计一人。埋点失败不阻止学习。</li></ul>
+      <div class="note"><b>类型：</b><code>EventType.LEARNING_TASK</code> 的 code 为 <code>learning_task</code>。接口属于 analysis 服务，不拼接 bpm 前缀。请求示例另存于 <code>docs/learning-task-view-event.json</code>。</div>
+      <p>统计查询 <code>event_logs_*</code>，按 businessId、eventType=learning_task、eventId=任务ID 过滤。PV 取记录数，UV 对 memberId 做 cardinality 聚合。ES 异常时 PV/UV 返回 0，其余学习统计仍查数据库。旧专用索引的历史数据不计入此营销埋点口径。</p>
+      <p>旧 <code>/app-api/bpm/learning-center/task/visit</code> 仅保留为兼容入口，现也写入营销 event_logs 索引；新前端只调用通用埋点，避免同次访问双报。通用接口沿用营销现有的客户端上报身份口径，memberId 必须传真实店长 userId。</p>
+    </div></details>
+
+    <details class="endpoint" id="app-order-check" open><summary><span class="method get">GET</span><code class="path">/app-api/bpm/learning-center/task/order-limit/check</code><span class="summary">查询剩余天数、订货权限及最近到期的未完成任务</span></summary><div class="content">
+      <div class="note">剩余天数与是否允许订货已合并为本接口，原 <code>/task/order-limit/remaining-days</code> 入口已移除。前端只调用一次，读取 remainingDays、canOrder；存在未完成任务时可用 taskId 跳转学习。</div>
+      <p class="meta"><b>参数：</b>无业务入参，沿用登录态和项目上下文　<b>响应：</b><code>CommonResult&lt;AppLearningTaskOrderCheckRespVO&gt;</code>。</p>
+      <p>无业务入参。后端从登录态取得店长 userId，按其名下全部正常门店查询适用任务，按任务去重后校验；无需传 storeId、taskId 或 userId。</p>
+      <pre><code>GET /app-api/bpm/learning-center/task/order-limit/check
+
+{
+  "code": 0,
+  "data": {
+    "canOrder": true,
+    "remainingDays": 2,
+    "taskId": "208900000000000001"
+  },
+  "msg": ""
+}</code></pre>
+      <table><thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead><tbody>
+        <tr><td>canOrder</td><td>Boolean</td><td>是否通过学习任务订货校验。前端据此允许或阻止订货。</td></tr>
+        <tr><td>remainingDays</td><td>Integer / null</td><td>所有适用未完成任务中的最少剩余天数；不足一天向上取整，到期为 0，无未完成任务或命中放行配置时为 null。</td></tr>
+        <tr><td>taskId</td><td>Long / null</td><td>最早到期的未完成任务 ID；无未完成任务或命中放行配置时为 null。</td></tr>
+      </tbody></table>
+      <table><thead><tr><th>场景</th><th>remainingDays</th><th>canOrder</th><th>taskId</th></tr></thead><tbody>
+        <tr><td>没有适用任务，或有效必学资料都完成</td><td>null</td><td>true</td><td>null</td></tr>
+        <tr><td>有任务未完成，但所有未完成任务均未到期</td><td>大于 0</td><td>true</td><td>最早到期的未完成任务</td></tr>
+        <tr><td>任意适用任务到期且未完成</td><td>0</td><td>false</td><td>最早到期的未完成任务</td></tr>
+        <tr><td>命中店长 userId 放行配置</td><td>null</td><td>true</td><td>null</td></tr>
+      </tbody></table>
+      <p>截止时间 = <code>startTime + orderLimitDays</code>。例如 9 月 16 日 10:00 开始、限制 3 天，则 9 月 19 日 10:00 到期，与首次打开任务或首次学习时间无关。remainingDays &gt; 0 时可展示“请在 X 天内完成学习”；为 null 时不展示倒计时，不能当作 0。是否允许订货始终以 canOrder 为准，不能只看剩余天数。</p>
+      <p>多个任务分别计算截止时间，只从未完成任务中选最早到期的一项。若 3 天任务和 4 天任务同时开始：第 3 天 3 天任务未完成会阻止订货；完成该任务后，第 4 天任务尚未到期时仍可订货；第 4 天任务到期仍未完成则再次阻止订货。</p>
+      <p>只检查当前项目、当前店长名下任一正常门店匹配的范围内已上架、已开始、orderLimitType=1 的任务。店长负责多家门店时，只要其中一家命中任务就按店长个人进度校验；全部门店都未命中任务时直接允许订货，remainingDays 和 taskId 为空。未开始、下架、删除的任务不参与；已结束但仍上架的任务继续参与，补学完成后放行。按店长用户共享进度，门店更换店长后按新店长的进度判断。资料下架、删除或改为非必学后不再限制，附件变化及文档时长修改按当前内容和规则判断。</p>
+      <p>本接口对正常的“未学完不能订货”返回 code=0、canOrder=false，前端可用 taskId 跳转任务并自行展示提示。命中放行配置时直接返回 canOrder=true，remainingDays 和 taskId 为 null，不再查询学习任务。普通查询为只读、按批次加载，不调用 ES、不更新进度。订货页面应接入该校验；本次接口不修改现有下单接口的其他规则。</p>
+    </div></details>
+
+    <section id="order-nacos"><h3>订货校验店长userId放行配置</h3>
+      <p>合并到当前环境 Nacos 的 <code>bpm-server.yaml</code>，支持动态刷新；默认空集合，不放行任何账号。配置示例文件：<code>docs/learning-task-order-nacos.example.yaml</code>。</p>
+      <pre><code>bpm:
+  learning-task:
+    order:
+      bypass-user-ids:
+        - "190000000000000001"</code></pre>
+      <p>直接配置店长 <code>userId</code>，与服务端从登录态取得的用户ID匹配，前端不传；命中后本接口直接返回 canOrder=true、remainingDays=null、taskId=null，其他订货规则仍由订货接口判断。清空时将 <code>bypass-user-ids</code> 设置为 <code>[]</code>。</p>
+    </section>
+
+    <details class="endpoint" id="app-progress" open><summary><span class="method post">POST</span><code class="path">/app-api/bpm/learning-center/task/file-progress/report</code><span class="summary">上报文件学习事件并返回三级进度</span></summary><div class="content">
+      <p class="meta"><b>参数位置：</b>JSON Body　<b>响应：</b><code>CommonResult&lt;AppLearningProgressRespVO&gt;</code></p>
+      <table><thead><tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr></thead><tbody>
+        <tr><td>taskMaterialId</td><td>Long</td><td class="required">是</td><td>任务详情 materialGroups[].materials[].taskMaterialId</td></tr><tr><td>fileUrl</td><td>String</td><td>附件上报时必传</td><td>任务资料详情 text 中当前附件的 URL：视频/图片取 url，文档取 file.url；富文本不传</td></tr><tr><td>fileKey</td><td>String</td><td>混排资料上报富文本时必传</td><td>富文本固定传 rich-text，所有 richText 节点共用；纯富文本资料可省略。附件旧客户端也可继续传稳定键</td></tr><tr><td>progressRevision</td><td>Integer</td><td class="required">是</td><td>任务资料详情 data.progressRevision，原样带回</td></tr><tr><td>eventType</td><td>Integer</td><td class="required">是</td><td>前端事件：1打开、2心跳、3视频结束或阅读内容浏览到底部</td></tr><tr><td>currentPositionSeconds</td><td>Long</td><td>视频可传</td><td>播放器当前播放位置，单位秒，大于等于 0</td></tr><tr><td>reachedBottom</td><td>Boolean</td><td>阅读内容可传</td><td>文档、图片或任一富文本实际浏览到底部时传 true；eventType=3 可省略</td></tr><tr><td>fileVersion</td><td>String</td><td>否</td><td>兼容旧版附件上报；新客户端附件使用 fileUrl，富文本无需传</td></tr>
+      </tbody></table>
+      <pre><code>POST /app-api/bpm/learning-center/task/file-progress/report
+
+{
+  "taskMaterialId": "3001",
+  "fileUrl": "https://prod-files.htyoudao.com/2026/09/13/process.mp4",
+  "progressRevision": 2,
+  "eventType": 2,
+  "currentPositionSeconds": 35,
+  "reachedBottom": false
+}
+
+{
+  "code": 0,
+  "data": {
+    "taskId": "208900000000000001",
+    "taskMaterialId": "3001",
+    "fileKey": "e35d...完整SHA-256",
+    "fileStudyStatus": 1,
+    "materialStudyStatus": 1,
+    "taskStudyStatus": 1,
+    "fileValidStudySeconds": 35,
+    "materialValidStudySeconds": 70,
+    "materialProgressRate": 50.00,
+    "taskProgressRate": 25.00
+  },
+  "msg": ""
+}</code></pre>
+      <p><b>图片、文档上报：</b>浏览到底部时可传 <code>eventType=3</code>，服务端会保存 <code>reachedBottom=true</code>。PDF 的最小浏览时长读取资料级 <code>validStudySeconds</code>，通过资料时长上报接口累计；同一资料中的 PDF 共用这一份时长。图片、Word、Excel 等非 PDF 附件不限制时长。</p>
+      <pre><code>{
+  "taskMaterialId": "3001",
+  "fileUrl": "https://prod-files.htyoudao.com/2026/09/13/step.jpg",
+  "progressRevision": 2,
+  "eventType": 3
+}</code></pre>
+      <p><b>富文本上报：</b>同一资料里无论有几段 <code>richText</code>，统一传 <code>fileKey="rich-text"</code>，不传 <code>fileUrl</code>。打开时传 <code>eventType=1</code>，阅读期间传 <code>eventType=2</code>；任一段浏览到底部时传 <code>reachedBottom=true</code> 或 <code>eventType=3</code>。富文本不受最少浏览秒数限制，任一段到底后全部 richText 同步完成。</p>
+      <pre><code>{
+  "taskMaterialId": "3001",
+  "fileKey": "rich-text",
+  "progressRevision": 2,
+  "eventType": 2,
+  "reachedBottom": true
+}</code></pre>
+      <h4>事件和完成规则</h4>
+      <table><thead><tr><th>场景</th><th>建议传参</th><th>服务端处理</th></tr></thead><tbody>
+        <tr><td>打开视频/文档/富文本</td><td>eventType=1</td><td>创建或刷新文件学习记录</td></tr><tr><td>持续学习</td><td>调用资料时长上报接口，传本次停留秒数</td><td>累计当前资料的统一有效学习时长；文件事件仍用于记录视频结束和浏览到底部</td></tr><tr><td>视频播放结束</td><td>eventType=3</td><td>视频文件标记为完成</td></tr><tr><td>PDF 到底部</td><td>reachedBottom=true 或 eventType=3</td><td>写入该 PDF 的到底标记；配置时长限制时，还需资料统一时长达到 minReadSeconds</td></tr><tr><td>图片及非 PDF 附件到底部</td><td>reachedBottom=true 或 eventType=3</td><td>标记完成，不限制浏览时长</td></tr><tr><td>富文本任一段到底部</td><td>fileKey=rich-text，reachedBottom=true 或 eventType=3</td><td>写入共用富文本进度，所有 richText 节点同步已完成，不限制浏览时长</td></tr>
+      </tbody></table>
+      <div class="note">资料进度由当前修订号下所有附件及一个富文本组计算；没有富文本时只统计附件。任务总进度只统计当前有效且 requiredFlag=true 的资料。同一负责人在任一门店学习后，其管理的其他目标门店同步显示相同进度。</div>
+    </div></details>
+
+    <details class="endpoint" id="app-material-time" open><summary><span class="method post">POST</span><code class="path">/app-api/bpm/learning-center/task/material-study-time/report</code><span class="summary">累计任务学习资料有效学习时长</span></summary><div class="content">
+      <p class="meta"><b>参数位置：</b>JSON Body　<b>响应：</b><code>CommonResult&lt;AppLearningMaterialStudyTimeRespVO&gt;</code></p>
+      <table><thead><tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr></thead><tbody>
+        <tr><td>taskId</td><td>Long</td><td class="required">是</td><td>任务 ID</td></tr>
+        <tr><td>materialId</td><td>Long</td><td class="required">是</td><td>资料主表 ID；同一任务内唯一</td></tr>
+        <tr><td>staySeconds</td><td>Long</td><td class="required">是</td><td>本次新增停留秒数，不传历史累计值；范围 1～86400</td></tr>
+      </tbody></table>
+      <pre><code>POST /app-api/bpm/learning-center/task/material-study-time/report
+
+{"taskId":"208900000000000001","materialId":"2001","staySeconds":30}
+
+{"code":0,"data":{"taskId":"208900000000000001","materialId":"2001","taskMaterialId":"3001","incrementSeconds":30,"materialValidStudySeconds":65},"msg":""}</code></pre>
+      <p>按资料页面的实际停留时间分次上报；<code>incrementSeconds</code> 是本次实际计入的秒数，短时间重复请求可能被折减。资料详情的 <code>validStudySeconds</code> 和管理端门店详情的资料有效学习时长共用此累计值。各 PDF 分别上报浏览到底部，但使用这一份资料时长判断最小浏览时长。</p>
+    </div></details>
+
+    <section id="schema-material">
+      <h2>七、公共模型：资料与文件</h2>
+      <h3>7.1 ExternalLearningMaterialVO</h3>
+      <table><thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead><tbody>
+        <tr><td>materialId</td><td>Long</td><td>外部学习资料 ID</td></tr><tr><td>materialName</td><td>String</td><td>资料名称</td></tr><tr><td>summary</td><td>String</td><td>摘要</td></tr><tr><td>coverImageUrl</td><td>String</td><td>封面地址</td></tr><tr><td>content</td><td>String</td><td>富文本正文</td></tr><tr><td>materialType / materialTypeName</td><td>Integer / String</td><td>资料类型编码及名称，沿用资料系统</td></tr><tr><td>projectCategoryId / projectCategoryName</td><td>Long / String</td><td>项目大类</td></tr><tr><td>secondaryCategoryId / secondaryCategoryName</td><td>Long / String</td><td>二级分类</td></tr><tr><td>documentCount / videoCount</td><td>Integer</td><td>文档、视频数量</td></tr><tr><td>enabledStatus</td><td>Integer</td><td>1可用；其他值视为不可用</td></tr><tr><td>createTime</td><td>LocalDateTime</td><td>资料创建时间</td></tr><tr><td>attachmentFingerprint</td><td>String</td><td>仅由附件字段生成的完整 SHA-256，文案变化不影响该值</td></tr><tr><td>files</td><td>ExternalLearningMaterialFileVO[]</td><td>资料附件列表</td></tr>
+      </tbody></table>
+      <h3>7.2 文件模型</h3>
+      <table><thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead><tbody>
+        <tr><td>minReadSeconds</td><td>Integer</td><td>当前文件实际要求的最少浏览秒数，与 text 节点一致；仅 PDF 附件可能大于0，其他为0</td></tr>
+        <tr><td>fileKey</td><td>String</td><td>规范化附件字段生成的完整 SHA-256，文件稳定键</td></tr><tr><td>fileType</td><td>Integer</td><td>1视频、2图片、其他按文档处理</td></tr><tr><td>fileTypeName</td><td>String</td><td>视频/图片/文档</td></tr><tr><td>fileName</td><td>String</td><td>文件名称</td></tr><tr><td>fileUrl</td><td>String</td><td>预览地址</td></tr><tr><td>fileVersion</td><td>String</td><td>文件内容版本，用于检测过期页面</td></tr><tr><td>sort</td><td>Integer</td><td>文件排序</td></tr><tr><td>coverImageUrl</td><td>String</td><td>文件/视频封面</td></tr><tr><td>durationSeconds</td><td>Long</td><td>视频时长，单位秒</td></tr><tr><td>fileSize</td><td>Long</td><td>文件大小，单位字节</td></tr><tr><td>fileSuffix</td><td>String</td><td>文件后缀</td></tr><tr><td>studyStatus</td><td>Integer</td><td>0未学习、1学习中、2已学习</td></tr><tr><td>studyCompleted</td><td>Boolean</td><td>是否按当前任务规则已学完，与 text 中对应附件节点一致</td></tr><tr><td>validStudySeconds</td><td>Long</td><td>有效学习时长，单位秒</td></tr><tr><td>lastPositionSeconds</td><td>Long</td><td>视频最后播放位置，单位秒</td></tr><tr><td>reachedBottom</td><td>Boolean</td><td>是否曾浏览到底部</td></tr>
+      </tbody></table>
+    </section>
+
+    <section id="schema-task-material">
+      <h2>八、公共模型：任务资料分组</h2>
+      <table><thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead><tbody><tr><td>projectCategoryId</td><td>Long</td><td>项目大类 ID；无分类时可能为 0</td></tr><tr><td>projectCategoryName</td><td>String</td><td>项目大类名称；无分类时为“未分类”</td></tr><tr><td>materialCount</td><td>Integer</td><td>组内资料数量</td></tr><tr><td>materials</td><td>MaterialRespVO[]</td><td>组内资料列表</td></tr></tbody></table>
+      <table><thead><tr><th>materials 字段</th><th>类型</th><th>管理端</th><th>小程序端</th><th>说明</th></tr></thead><tbody>
+        <tr><td>taskMaterialId</td><td>Long</td><td>有</td><td>有</td><td>任务资料关系 ID</td></tr><tr><td>materialId</td><td>Long</td><td>有</td><td>有</td><td>资料主表 ID</td></tr><tr><td>materialName</td><td>String</td><td>有</td><td>有</td><td>实时资料名称</td></tr><tr><td>coverUrl</td><td>String</td><td>有</td><td>有</td><td>资料主表当前封面地址</td></tr><tr><td>summary / coverImageUrl</td><td>String</td><td>无</td><td>有</td><td>小程序兼容字段；新前端封面使用 coverUrl</td></tr><tr><td>materialType / materialTypeName</td><td>Integer / String</td><td>有</td><td>有</td><td>资料类型</td></tr><tr><td>secondaryCategoryId / Name</td><td>Long / String</td><td>有</td><td>有</td><td>二级分类</td></tr><tr><td>documentCount / videoCount</td><td>Integer / Integer</td><td>有</td><td>无</td><td>附件分类数量</td></tr><tr><td>documentBrowseLimitType</td><td>Integer</td><td>有</td><td>详情有</td><td>文档浏览限制</td></tr><tr><td>minDocumentBrowseSeconds</td><td>Integer</td><td>有</td><td>详情有</td><td>最少有效浏览秒数</td></tr><tr><td>videoSpeedAllowed</td><td>Boolean</td><td>有</td><td>详情有</td><td>是否允许倍速</td></tr><tr><td>requiredFlag</td><td>Boolean</td><td>有</td><td>有</td><td>是否必学</td></tr><tr><td>sort</td><td>Integer</td><td>有</td><td>有</td><td>资料排序</td></tr><tr><td>studyStatus</td><td>Integer</td><td>门店详情有</td><td>有</td><td>0未开始、1进行中、2已完成</td></tr><tr><td>validStudySeconds</td><td>Long</td><td>门店详情有</td><td>详情有</td><td>有效学习时长</td></tr><tr><td>progressRate</td><td>BigDecimal</td><td>无</td><td>有</td><td>资料进度百分比</td></tr><tr><td>materialAvailable</td><td>Boolean</td><td>有</td><td>有</td><td>外部资料是否仍可用</td></tr><tr><td>files</td><td>Array</td><td>有</td><td>资料详情有</td><td>实时文件及进度</td></tr>
+      </tbody></table>
+    </section>
+
+    <section id="errors">
+      <h2>九、错误码</h2>
+      <table><thead><tr><th>错误码</th><th>常量</th><th>返回文案</th><th>前端建议</th></tr></thead><tbody>
+        <tr><td>1009021001</td><td>LEARNING_TASK_NOT_EXISTS</td><td>学习任务不存在</td><td>关闭详情并刷新任务列表</td></tr>
+        <tr><td>1009021002</td><td>LEARNING_TASK_MANAGER_REQUIRED</td><td>当前用户不是任务门店负责人</td><td>提示用户无访问权限并返回</td></tr>
+        <tr><td>1009021003</td><td>LEARNING_TASK_NO_AVAILABLE_MATERIAL</td><td>当前没有可学习的资料</td><td>提示后返回任务列表</td></tr>
+        <tr><td>1009021004</td><td>LEARNING_TASK_MATERIAL_UNAVAILABLE</td><td>学习资料已下架或不可用，请刷新后重试</td><td>刷新任务详情，不继续访问旧资料</td></tr>
+        <tr><td>1009021005</td><td>LEARNING_TASK_MATERIAL_CHANGED</td><td>学习资料已更新，请刷新后重新学习</td><td>停止心跳，重新请求任务资料详情</td></tr>
+        <tr><td>1009021006</td><td>LEARNING_TASK_MATERIAL_CONTENT_INVALID</td><td>学习资料内容异常，暂时无法学习</td><td>展示提示并退出当前资料</td></tr>
+        <tr><td>1009021007</td><td>LEARNING_TASK_VISIT_REPORT_FAILED</td><td>访问记录暂时无法上报，请稍后重试</td><td>仅旧任务访问兼容入口：复用相同 visitId 重试；营销通用埋点不提供此幂等机制</td></tr>
+        <tr><td>1009021008</td><td>LEARNING_TASK_STATISTICS_UNAVAILABLE</td><td>学习任务统计暂不可用，请稍后重试</td><td>管理端提示并允许重新加载</td></tr>
+        <tr><td>1009021009</td><td>LEARNING_TASK_PROGRESS_CHANGED</td><td>学习进度已变化，请刷新后重试</td><td>重新拉取资料详情及最新进度</td></tr>
+        <tr><td>1009021010</td><td>LEARNING_TASK_OPERATION_FREQUENT</td><td>操作过于频繁，请稍后重试</td><td>短暂退避后重试，避免并发心跳</td></tr>
+        <tr><td>1009021011</td><td>LEARNING_TASK_MATERIAL_DUPLICATE</td><td>同一学习资料不能重复添加</td><td>创建/编辑页去重 materialId</td></tr>
+        <tr><td>1009021012</td><td>LEARNING_TASK_NOT_STARTED</td><td>学习任务尚未开始</td><td>禁止进度上报，保留只读查看</td></tr>
+        <tr><td>1009021013</td><td>LEARNING_TASK_REQUIRED_MATERIAL_MISSING</td><td>学习任务至少需要一项必学资料</td><td>创建或编辑任务时至少选择一项必学资料</td></tr>
+      </tbody></table>
+      <p class="muted">参数校验异常（例如名称为空、页码越界、时间不合法）使用平台统一校验错误码，msg 为 VO 上声明的中文校验文案。</p>
+    </section>
+
+    <section id="rules">
+      <h2>十、关键业务规则与联调注意事项</h2>
+      <ol>
+        <li><b>资料实时性：</b>任务关系只保存 materialId 和任务规则。资料名称、正文、分类、附件、上下架状态均实时读取资料主表。</li>
+        <li><b>下架资料：</b>小程序直接隐藏；管理端保留关系并标记不可用。重新上架后自动恢复显示。</li>
+        <li><b>进度重置：</b>修改资料文案、分类、封面或任务详情附件不重置；资料附件指纹变化会递增 progressRevision，旧修订进度不再参与计算。</li>
+        <li><b>A→B→A：</b>以重新上架时最终附件与上次有效附件比较；最终完全相同则不重置，这是已确认的业务口径。</li>
+        <li><b>多门店同步：</b>学习进度以负责人用户为主维度。同一人管理 3 家目标门店，在任一家学习后，另外 2 家展示相同进度。</li>
+        <li><b>任务状态：</b>开始时间之前为未开始；开始后，当前有效且 requiredFlag=true 的资料全部完成为已完成，否则为进行中。创建和编辑任务时至少保留一项必学资料。非必学资料不影响任务总完成率。</li>
+        <li><b>任务时间：</b>开始前可查看但不能上报进度；结束后仍允许补学。</li>
+        <li><b>访问统计：</b>任务 PV/UV 写入 ES，不参与数据库事务。详情展示与访问上报必须解耦。</li>
+        <li><b>并发控制：</b>同一 taskId + learnerUserId 的进度上报串行处理。前端不要同时启动多个心跳定时器。</li>
+        <li><b>订货限制：</b>只调用 <code>/task/order-limit/check</code>，一次取得 remainingDays、canOrder，以及最近到期的未完成任务 taskId。未到“任务开始时间＋限制天数”允许订货，到期且未学完才拦截；无有效必学资料不限制。命中 Nacos 店长 userId 放行配置时直接返回 canOrder=true，remainingDays 和 taskId 均为 null。</li>
+      </ol>
+      <div class="warning"><b>当前实现边界：</b>普通资料列表和详情的 <code>viewerCount</code> 当前填充为 0；任务访问统计已经接入 ES。若前端需要展示普通资料真实浏览人数，需要后续补充普通资料统计读取逻辑。</div>
+    </section>
+  </main>
+</div>
+</body>
+</html>

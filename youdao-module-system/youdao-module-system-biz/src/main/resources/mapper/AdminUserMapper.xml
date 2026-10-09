@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.htyoudao.youdao.module.system.dal.mysql.user.AdminUserMapper">
+    <select id="selectPageList" resultType="com.htyoudao.youdao.module.system.controller.admin.user.vo.user.UserRespVO">
+        select
+        a.*,
+        distinct_ids.STATUS userStatus,
+        distinct_ids.create_time userCreateTime,
+        distinct_ids.nickname  userNickname,
+        a.nickname supplyName
+        from (
+        select distinct a.id, d.status, d.create_time , d.nickname
+        from system_users a
+        <if test="orgIds != null and orgIds.size() > 0">
+            left join system_org_user b on a.id = b.user_id
+        </if>
+        <if test="record.roleList != null and record.roleList.size() > 0">
+            left join system_user_role c on a.id = c.user_id
+        </if>
+        <if test="record.deptList != null and record.deptList.size() > 0">
+            left join system_user_dept e on a.id = e.user_id
+        </if>
+        left join system_business_user d on a.id = d.user_id
+        <where>
+            a.deleted = 0
+            and d.deleted = 0
+            <choose>
+                <!-- 当满足 record.businessId 不为空且 deptList 不为空且有元素时 -->
+                <when test="record.businessId != null and record.deptList != null and record.deptList.size() > 0">
+                    and d.business_id = #{record.businessId}
+                </when>
+                <!-- 其他情况（不满足上面条件时） -->
+                <otherwise>
+                    and d.business_id = #{businessId}
+                </otherwise>
+            </choose>
+            <if test="record.text != null and record.text != ''">
+                and (a.username like concat('%', #{record.text}, '%')
+                or a.nickname like concat('%', #{record.text}, '%')
+                or a.mobile like concat('%', #{record.text}, '%') )
+            </if>
+            <if test="record.status != null ">
+                and d.status = #{record.status}
+            </if>
+            <if test="record.roleList != null and record.roleList.size() > 0">
+                and c.role_id in
+                <foreach collection="record.roleList" item="roleId" open="(" separator="," close=")">
+                    #{roleId}
+                </foreach>
+                and c.deleted = 0
+            </if>
+            <if test="orgIds != null and orgIds.size() > 0">
+                and b.org_id in
+                <foreach collection="orgIds" item="orgId" open="(" separator="," close=")">
+                    #{orgId}
+                </foreach>
+                and b.deleted = 0
+            </if>
+            <if test="record.deptList != null and record.deptList.size() > 0">
+                and e.dept_id in
+                <foreach collection="record.deptList" item="deptId" open="(" separator="," close=")">
+                    #{deptId}
+                </foreach>
+                and e.deleted = 0
+            </if>
+        </where>
+        ) as distinct_ids
+        join system_users a on a.id = distinct_ids.id
+        ORDER BY distinct_ids.create_time DESC
+    </select>
+
+    <select id="getUserListNotInOrg"
+            resultType="com.htyoudao.youdao.module.system.dal.dataobject.user.AdminUserDO">
+        SELECT
+            u.id,
+            bu.nickname as nickname,
+            u.nickname as username,
+            bu.business_id,
+            u.mobile
+        FROM
+            system_business_user bu
+        INNER JOIN
+            system_users u on u.id = bu.user_id  AND u.deleted = b'0'
+        LEFT JOIN
+                system_org_user ou ON u.id = ou.user_id AND ou.deleted = b'0'
+        WHERE
+            ou.id IS NULL
+<!--        AND u.user_type = '00'-->
+
+        AND u.deleted = b'0'
+        <if test="pageReqVO != null and pageReqVO.nickname != null and pageReqVO.nickname != ''">
+            AND (u.username like concat('%', #{pageReqVO.nickname}, '%') or bu.nickname like concat('%', #{pageReqVO.nickname}, '%') or  u.mobile like concat('%', #{pageReqVO.nickname}, '%'))
+        </if>
+        order by u.create_time desc
+    </select>
+
+
+    <select id="selectUserList"
+            resultType="com.htyoudao.youdao.module.system.controller.admin.user.vo.user.UserSimpleVO">
+        SELECT
+        u.id,
+        bu.nickname AS nickname,
+        u.nickname AS username,
+        u.mobile AS userMobile,
+        IFNULL(GROUP_CONCAT(o.name SEPARATOR ','), '') AS orgNames
+        FROM system_business_user bu
+        INNER JOIN system_users u
+        ON u.id = bu.user_id
+        AND u.deleted = b'0'
+        LEFT JOIN system_org_user ou
+        ON ou.user_id = u.id
+        AND ou.deleted = b'0'
+        AND ou.business_id = bu.business_id
+        LEFT JOIN system_org o
+        ON ou.org_id = o.id
+        AND o.deleted = b'0'
+        AND o.status = 1
+        WHERE
+        u.deleted = b'0'
+<!--        AND u.user_type = '00'-->
+        AND bu.business_id = #{businessId}
+        <if test="userName != null">
+            AND (u.username LIKE CONCAT('%', #{userName}, '%') OR bu.nickname LIKE CONCAT('%', #{userName}, '%') OR u.mobile LIKE CONCAT('%', #{userName}, '%')OR u.nickname LIKE CONCAT('%', #{userName}, '%') )
+        </if>
+        AND bu.status = 0
+        GROUP BY
+        u.id,
+        bu.nickname,
+        u.username,
+        u.mobile
+        ORDER BY
+        u.create_time DESC;
+
+    </select>
+    <select id="getUserListWithOrgOrStore"
+            resultType="com.htyoudao.youdao.module.system.dal.dataobject.user.AdminUserDO">
+        SELECT
+            su.id,
+            bu.nickname as nickname,
+            su.nickname as username,
+            su.mobile
+        FROM
+            system_business_user bu
+        LEFT JOIN system_users su ON bu.user_id = su.id
+            ${ew.customSqlSegment}
+    </select>
+    <select id="getUserListByDeptId"
+            resultType="com.htyoudao.youdao.module.system.dal.dataobject.user.AdminUserDO">
+        SELECT
+            su.id,
+            su.nickname as nickname,
+            su.mobile
+        FROM
+            system_users su
+        LEFT JOIN system_user_dept ud ON ud.user_id = su.id
+        WHERE
+            ud.dept_id = #{deptId}
+        AND ud.deleted = b'0'
+        AND su.deleted = b'0'
+        <if test="nameOrMobile != null">
+            AND (su.username LIKE CONCAT('%', #{nameOrMobile}, '%') OR su.mobile LIKE CONCAT('%', #{nameOrMobile}, '%'))
+        </if>
+    </select>
+
+
+</mapper>

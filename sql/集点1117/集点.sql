@@ -1,0 +1,21 @@
+CREATE TABLE `activity_exchange_log` (
+     `id` bigint(20) NOT NULL COMMENT 'id',
+     `member_nick_name` varchar(255) DEFAULT NULL COMMENT '会员昵称',
+     `member_mobile` varchar(64) DEFAULT NULL COMMENT '联系电话',
+     `activity_id` bigint(20) NOT NULL COMMENT '活动id',
+     `award_type` int(2) DEFAULT NULL COMMENT '奖品类型 1优惠券,2券包',
+     `award_name` varchar(128) DEFAULT NULL COMMENT '奖品名称',
+     `award_pic` varchar(255) DEFAULT NULL COMMENT '奖品图片',
+     `creator` varchar(20) CHARACTER SET utf8mb4 DEFAULT NULL COMMENT '创建人',
+     `create_time` datetime DEFAULT NULL COMMENT '创建时间',
+     `updater` varchar(20) CHARACTER SET utf8mb4 DEFAULT NULL COMMENT '最后修改人',
+     `update_time` datetime DEFAULT NULL COMMENT '最后修改时间',
+     `deleted` bit(1) NOT NULL DEFAULT b'0' COMMENT '删除标识 0未删除 1删除',
+     `business_id` bigint(20) DEFAULT NULL COMMENT '项目标识',
+     `foreign_id` bigint(20) DEFAULT NULL COMMENT '外键',
+     `member_id` bigint(20) DEFAULT NULL COMMENT 'member_id',
+     `store_id` bigint(20) DEFAULT NULL COMMENT '门店',
+     `distribute_mode` int(1) DEFAULT NULL COMMENT '1当场发放 2隔天',
+     `user_restrictions` int(1) DEFAULT NULL COMMENT '用户类型',
+     PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='活动的兑换记录';
