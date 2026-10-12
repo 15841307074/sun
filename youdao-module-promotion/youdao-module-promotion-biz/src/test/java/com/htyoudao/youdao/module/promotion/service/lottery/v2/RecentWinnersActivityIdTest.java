@@ -43,7 +43,7 @@ class RecentWinnersActivityIdTest {
         previousBusiness=BusinessContextHolder.getBusinessId();BusinessContextHolder.setBusinessId(10L);
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(),"recent-winners-test"),LotterySettingsDO.class);
         cache=new LotteryConfigurationCacheImpl();settings=mock(LotterySettingsMapper.class);activities=mock(ActivityMapper.class);redis=mock(StringRedisTemplate.class);values=mock(ValueOperations.class);
-        ReflectionTestUtils.setField(cache,"settingsMapper",settings);ReflectionTestUtils.setField(cache,"activityMapper",activities);ReflectionTestUtils.setField(cache,"redis",redis);ReflectionTestUtils.setField(cache,"properties",new LotteryProperties());ReflectionTestUtils.setField(cache,"json",new ObjectMapper());
+        ReflectionTestUtils.setField(cache,"settingsMapper",settings);ReflectionTestUtils.setField(cache,"activityMapper",activities);ReflectionTestUtils.setField(cache,"redis",redis);ReflectionTestUtils.setField(cache,"json",new ObjectMapper());
         ReflectionTestUtils.setField(cache,"stores",mock(ActivityStoreService.class));ReflectionTestUtils.setField(cache,"scope",mock(LotteryScopeService.class));
         cfg=new LotterySettingsDO();cfg.setId(20L);cfg.setBusinessId(10L);cfg.setActivityId(30L);cfg.setConfigVersion(1L);cfg.setStockEpoch(1L);cfg.setRuntimeVersion(2);
         activity=new ActivityDO();activity.setId(30L);activity.setBusinessId(10L);

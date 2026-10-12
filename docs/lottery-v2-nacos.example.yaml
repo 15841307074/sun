@@ -1,21 +1,22 @@
-# Merge into promotion's existing Nacos YAML (do not replace unrelated configuration).
+# 合并到 promotion-server.yaml 的 promotion 下，不替换其他配置。
+# 只配置需要覆盖的项；未填写项使用 LotteryProperties 默认值。
 promotion:
   lottery:
-    accepting: true
-    # All new draws use V2; no activity allowlist. Reconcile history before resuming old activities.
     draw-rate: 100
-    query-rate: 1000
     result-rate: 300
-    task-rate: 200
     activity-draw-rate: 60
     member-draw-rate: 1
-    draw-concurrency: 8
-    grant-concurrency: 4
-    connection-budget: 16
-    config-ttl-seconds: 1800
-    list-ttl-seconds: 30
-    result-ttl-seconds: 86400
-    refill-concurrency: 4
+    # 运行控制：需要调整时再取消注释，默认值如下。
+    # accepting: true          # false 暂停新抽奖；已受理任务继续执行
+    # query-rate: 1000         # 普通查询共用每秒上限
+    # task-rate: 200           # 任务接口共用每秒上限
+    # draw-concurrency: 8      # 每实例新抽奖并发上限
+    # grant-concurrency: 4     # 每实例异步发奖并发上限
+    # connection-budget: 16   # 每实例抽奖模块的连接预算，须给其他业务留余量
+
+# 已移除：config-ttl-seconds / list-ttl-seconds / result-ttl-seconds / refill-concurrency。
+# 活动配置/奖品/结果按活动结束时间+7天过期；门店列表300~330秒，版本发布主动失效；回源并发4。
+# 若旧环境自定义过这四项，升级后改用上述规则；详见 lottery-configuration.md。
 
 # 会员积分复用已有 wx_member / points_log 分片规则，不新增积分账本表或路由。
 # 两张逻辑表须路由到同一物理数据源，以保证余额和流水在同一事务提交。

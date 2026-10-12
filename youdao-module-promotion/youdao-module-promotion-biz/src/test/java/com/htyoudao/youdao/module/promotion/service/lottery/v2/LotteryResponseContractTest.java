@@ -168,7 +168,6 @@ class LotteryResponseContractTest {
         LotteryResultCache cache = new LotteryResultCacheImpl();
         ReflectionTestUtils.setField(cache,"redis",redis);
         ReflectionTestUtils.setField(cache,"json",json);
-        ReflectionTestUtils.setField(cache,"properties",new LotteryProperties());
         return cache;
     }
 

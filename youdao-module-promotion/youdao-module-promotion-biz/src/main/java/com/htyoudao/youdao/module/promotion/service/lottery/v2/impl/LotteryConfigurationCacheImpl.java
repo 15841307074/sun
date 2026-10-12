@@ -42,14 +42,15 @@ public class LotteryConfigurationCacheImpl implements LotteryConfigurationCache 
     @Resource
     private StringRedisTemplate redis;
     @Resource
-    private LotteryProperties properties;
-    @Resource
     private ObjectMapper json;
     @Resource
     private JdbcTemplate jdbc;
     @Resource
     private LotteryLedger ledger;
     private final AtomicInteger refills=new AtomicInteger();
+    // 门店列表跨活动，保留短期刷新和过期抖动；活动缓存按结束时间计算。
+    private static final int LIST_TTL_SECONDS=300;
+    private static final int REFILL_CONCURRENCY=4;
     private static final DefaultRedisScript<Long> UNLOCK=new DefaultRedisScript<>("if redis.call('GET',KEYS[1])==ARGV[1] then return redis.call('DEL',KEYS[1]) end return 0",Long.class);
     @Override
     public LotterySettingsCacheDataVO settings(long id) {
@@ -91,9 +92,12 @@ public class LotteryConfigurationCacheImpl implements LotteryConfigurationCache 
             String headKey=LotteryKeys.key(b,cfg.getActivityId(),"config-version",0);
             Long published=redis.execute(new DefaultRedisScript<>("local v=redis.call('GET',KEYS[1]); if v and tonumber(v)>tonumber(ARGV[1]) then return 0 end redis.call('SET',KEYS[1],ARGV[1]); return 1",Long.class),List.of(headKey),Long.toString(version));
             if(!Objects.equals(published,1L))throw exception(LOTTERY_SYSTEM_AGAIN);
-            redis.opsForValue().set(LotteryKeys.key(b,cfg.getActivityId(),"config",version),encode(value),ttl());
-            for(long ref:new long[]{cfg.getId(),cfg.getActivityId()})redis.opsForValue().set(LotteryKeys.key(b,0,"mapping",ref),cfg.getActivityId().toString(),Duration.ofDays(1));
-            redis.opsForValue().set(LotteryKeys.key(b,0,"activity-mapping",cfg.getActivityId()),cfg.getActivityId().toString(),Duration.ofDays(1));
+            Duration lifetime=LotteryCacheLifetime.remaining(value);
+            if(!lifetime.isZero()) {
+                redis.opsForValue().set(LotteryKeys.key(b,cfg.getActivityId(),"config",version),encode(value),lifetime);
+                for(long ref:new long[]{cfg.getId(),cfg.getActivityId()})redis.opsForValue().set(LotteryKeys.key(b,0,"mapping",ref),cfg.getActivityId().toString(),lifetime);
+                redis.opsForValue().set(LotteryKeys.key(b,0,"activity-mapping",cfg.getActivityId()),cfg.getActivityId().toString(),lifetime);
+            }
             return value;
         });
     }
@@ -110,7 +114,8 @@ public class LotteryConfigurationCacheImpl implements LotteryConfigurationCache 
             List<LotteryPrizeDO> values=prizeMapper.selectList(query);
             // 奖品展示缓存不保存可作为扣减依据的剩余库存。
             values.forEach(p->p.setRemainNum(null));
-            redis.opsForValue().set(key,encode(values),values.isEmpty()?Duration.ofSeconds(15):ttl());
+            Duration lifetime=LotteryCacheLifetime.remaining(cfg);
+            if(!lifetime.isZero())redis.opsForValue().set(key,encode(values),values.isEmpty()&&lifetime.compareTo(Duration.ofSeconds(15))>0?Duration.ofSeconds(15):lifetime);
             return values;
         });
     }
@@ -136,15 +141,14 @@ public class LotteryConfigurationCacheImpl implements LotteryConfigurationCache 
             List<Long> ids=jdbc.queryForList("SELECT s.id FROM lottery_settings s JOIN activity a ON a.id=s.activity_id AND a.business_id=s.business_id "
                     +"WHERE s.business_id=? AND s.deleted=0 AND a.deleted=0 AND s.runtime_version=2 AND s.state=1 AND a.is_enabled=1 AND s.public_button=0 "
                     +"AND ((COALESCE(a.app_scope,0)=0 AND a.activity_store=1) OR EXISTS(SELECT 1 FROM activity_store r WHERE r.activity_id=a.id AND r.business_id=? AND r.store_id=? AND r.deleted=0)) ORDER BY s.lottery_type,s.id",Long.class,b,b,storeId);
-            redis.opsForValue().set(key,encode(ids),Duration.ofSeconds(Math.max(1,properties.getListTtlSeconds())+ThreadLocalRandom.current().nextInt(6)));
+            redis.opsForValue().set(key,encode(ids),Duration.ofSeconds(LIST_TTL_SECONDS+ThreadLocalRandom.current().nextInt(31)));
             return ids;
         });
     }
-    private Duration ttl(){return Duration.ofSeconds(Math.max(15,properties.getConfigTtlSeconds())+ThreadLocalRandom.current().nextInt(61));}
     private String encode(Object o){try{return json.writeValueAsString(o);}catch(Exception e){throw new IllegalStateException(e);}}
     private <T>T parse(String s,Class<T> t){try{return json.readValue(s,t);}catch(Exception e){throw new IllegalStateException(e);}}
     private <T>T refill(String key,Supplier<T> action) {
-        if(refills.incrementAndGet()>Math.max(1,properties.getRefillConcurrency())){refills.decrementAndGet();throw exception(LOTTERY_SYSTEM_AGAIN);}
+        if(refills.incrementAndGet()>REFILL_CONCURRENCY){refills.decrementAndGet();throw exception(LOTTERY_SYSTEM_AGAIN);}
         String lock=key+":refill",token=UUID.randomUUID().toString();boolean acquired=false;
         try {
             acquired=Boolean.TRUE.equals(redis.opsForValue().setIfAbsent(lock,token,Duration.ofSeconds(5)));

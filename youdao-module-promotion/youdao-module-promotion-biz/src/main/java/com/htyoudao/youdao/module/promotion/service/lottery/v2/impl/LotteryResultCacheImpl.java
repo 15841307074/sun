@@ -18,8 +18,6 @@ public class LotteryResultCacheImpl implements LotteryResultCache {
     private StringRedisTemplate redis;
     @Resource
     private ObjectMapper json;
-    @Resource
-    private LotteryProperties properties;
     @Override
     public Entry get(long b,LotteryVO request) {
         try {
@@ -36,12 +34,14 @@ public class LotteryResultCacheImpl implements LotteryResultCache {
     public void publish(LotteryLedger.Draw draw,LotteryUserLogVO result) {
         if("ACCEPTED".equals(draw.getDrawStatus()))return;
         try {
+            Duration lifetime=LotteryCacheLifetime.remaining(draw.getSnapshot().getSettings());
+            if(lifetime.isZero())return; // 已过保留期的历史结果仍以持久化流水查询。
             redis.execute(new DefaultRedisScript<>(
                     "local r=tonumber(redis.call('GET',KEYS[2]) or '0'); if tonumber(ARGV[3])<r then return 0 end; local v=redis.call('GET',KEYS[1]); if v then local ok,old=pcall(cjson.decode,v); if ok and (old.lifecycleStatus=='RETURNED' or (old.result and old.result.drawStatus=='RETURNED')) then return 0 end end; redis.call('SET',KEYS[2],ARGV[3],'EX',ARGV[2]); redis.call('SET',KEYS[1],ARGV[1],'EX',ARGV[2]); return 1",Long.class),
                     List.of(key(draw.getBusinessId(),draw.getActivityId(),draw.getMemberId(),draw.getRequestId()),revisionKey(draw.getBusinessId(),draw.getActivityId(),draw.getMemberId(),draw.getRequestId())),
-                    json.writeValueAsString(new Entry(draw.getStoreId(),result,draw.getDrawStatus(),draw.getSnapshot().getReissueSequence())),Integer.toString(Math.max(1,properties.getResultTtlSeconds())),Long.toString(draw.getSnapshot().getReissueSequence()));
+                    json.writeValueAsString(new Entry(draw.getStoreId(),result,draw.getDrawStatus(),draw.getSnapshot().getReissueSequence())),Long.toString(Math.max(1,lifetime.getSeconds())),Long.toString(draw.getSnapshot().getReissueSequence()));
             for(long alias:new long[]{draw.getActivityId(),draw.getSnapshot().getSettings().getId()})
-                redis.opsForValue().set(LotteryKeys.key(draw.getBusinessId(),0,"mapping",alias),Long.toString(draw.getActivityId()),Duration.ofDays(1));
+                redis.opsForValue().set(LotteryKeys.key(draw.getBusinessId(),0,"mapping",alias),Long.toString(draw.getActivityId()),lifetime);
         }catch(Exception ignored){ /* 请求流水仍以持久化账本为准。 */ }
     }
     /** 提升补发版本后清理旧失败结果，迟到的旧查询不能再次缓存它。 */
@@ -54,7 +54,7 @@ public class LotteryResultCacheImpl implements LotteryResultCache {
         redis.execute(new DefaultRedisScript<>(
                 "local r=tonumber(redis.call('GET',KEYS[2]) or '0'); if r>tonumber(ARGV[1]) then return 0 end; redis.call('SET',KEYS[2],ARGV[1],'EX',ARGV[2]); redis.call('DEL',KEYS[1]); return 1",Long.class),
                 List.of(key(draw.getBusinessId(),draw.getActivityId(),draw.getMemberId(),draw.getRequestId()),revisionKey(draw.getBusinessId(),draw.getActivityId(),draw.getMemberId(),draw.getRequestId())),
-                Long.toString(sequence),Integer.toString(Math.max(1,properties.getResultTtlSeconds())));
+                Long.toString(sequence),Long.toString(Math.max(1,LotteryCacheLifetime.remaining(draw.getSnapshot().getSettings()).getSeconds())));
     }
     private String key(long b,long a,long member,String requestId){return LotteryKeys.key(b,a,"result",member+":"+requestId);}
     private String revisionKey(long b,long a,long member,String requestId){return key(b,a,member,requestId)+":revision";}

@@ -21,8 +21,4 @@ public class LotteryProperties {
     private int drawConcurrency = 8;
     private int grantConcurrency = 4;
     private int connectionBudget = 16;
-    private int configTtlSeconds = 1800;
-    private int listTtlSeconds = 30;
-    private int resultTtlSeconds = 86400;
-    private int refillConcurrency = 4;
 }
