@@ -6,7 +6,7 @@ import java.util.List;
 
 /** LotteryWinnerFeed 服务契约；实现位于 impl 包。 */
 public interface LotteryWinnerFeed {
-    List<LotteryRecentWinnerRespVO> latest(Long lotteryId);
+    List<LotteryRecentWinnerRespVO> latest(Long activityId);
 
     void afterLogSaved(long activityId, LotteryLogDO row);
 }

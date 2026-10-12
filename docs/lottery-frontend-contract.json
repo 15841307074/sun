@@ -117,10 +117,10 @@
       "when": "进入抽奖页加载滚动中奖区；自己抽奖完成后刷新；展示区可低频刷新。",
       "params": [
         [
-          "lotteryId",
+          "activityId",
           "Long",
           "必填",
-          "活动主表 ID，兼容配置 ID"
+          "活动主表 activity.id，来自 cacheData.activityId；不接受配置 ID"
         ]
       ],
       "request": null,

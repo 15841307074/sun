@@ -8,6 +8,8 @@ import java.util.List;
 public interface LotteryConfigurationCache {
     LotterySettingsCacheDataVO settings(long id);
 
+    LotterySettingsCacheDataVO settingsByActivity(long activityId);
+
     List<LotteryPrizeDO> prizes(LotterySettingsCacheDataVO cfg,long storeId);
 
     List<LotteryPrizeDO> displayPrizes(LotterySettingsCacheDataVO cfg,long storeId);

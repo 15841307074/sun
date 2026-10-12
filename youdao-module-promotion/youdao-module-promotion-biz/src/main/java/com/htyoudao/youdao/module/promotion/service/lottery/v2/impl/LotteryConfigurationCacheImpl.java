@@ -53,11 +53,18 @@ public class LotteryConfigurationCacheImpl implements LotteryConfigurationCache 
     private static final DefaultRedisScript<Long> UNLOCK=new DefaultRedisScript<>("if redis.call('GET',KEYS[1])==ARGV[1] then return redis.call('DEL',KEYS[1]) end return 0",Long.class);
     @Override
     public LotterySettingsCacheDataVO settings(long id) {
+        return loadSettings(id,false);
+    }
+    @Override
+    public LotterySettingsCacheDataVO settingsByActivity(long activityId) {
+        return loadSettings(activityId,true);
+    }
+    private LotterySettingsCacheDataVO loadSettings(long id,boolean activityOnly) {
         long b=BusinessContextHolder.getRequiredBusinessId();
-        String alias=LotteryKeys.key(b,0,"mapping",id);
+        String alias=LotteryKeys.key(b,0,activityOnly?"activity-mapping":"mapping",id);
         String a=redis.opsForValue().get(alias);
         if("-".equals(a))throw exception(LOTTERY_NOT_NULL);
-        if(a!=null) {
+        if(a!=null&&(!activityOnly||Long.toString(id).equals(a))) {
             String head=redis.opsForValue().get(LotteryKeys.key(b,Long.parseLong(a),"config-version",0));
             if(head!=null) {
                 String cached=redis.opsForValue().get(LotteryKeys.key(b,Long.parseLong(a),"config",head));
@@ -65,8 +72,10 @@ public class LotteryConfigurationCacheImpl implements LotteryConfigurationCache 
             }
         }
         cacheRead("config","miss");return refill(alias,()->{
-            LotterySettingsDO cfg=settingsMapper.selectOne(new LambdaQueryWrapper<LotterySettingsDO>()
-                    .eq(LotterySettingsDO::getBusinessId,b).and(w->w.eq(LotterySettingsDO::getId,id).or().eq(LotterySettingsDO::getActivityId,id)));
+            LambdaQueryWrapper<LotterySettingsDO> query=new LambdaQueryWrapper<LotterySettingsDO>().eq(LotterySettingsDO::getBusinessId,b);
+            if(activityOnly)query.eq(LotterySettingsDO::getActivityId,id);
+            else query.and(w->w.eq(LotterySettingsDO::getId,id).or().eq(LotterySettingsDO::getActivityId,id));
+            LotterySettingsDO cfg=settingsMapper.selectOne(query);
             ActivityDO activity=cfg==null||cfg.getActivityId()==null?null:activityMapper.selectById(cfg.getActivityId());
             if(cfg==null||activity==null||!Objects.equals(activity.getBusinessId(),b)) {
                 redis.opsForValue().set(alias,"-",Duration.ofSeconds(15));throw exception(LOTTERY_NOT_NULL);
@@ -84,6 +93,7 @@ public class LotteryConfigurationCacheImpl implements LotteryConfigurationCache 
             if(!Objects.equals(published,1L))throw exception(LOTTERY_SYSTEM_AGAIN);
             redis.opsForValue().set(LotteryKeys.key(b,cfg.getActivityId(),"config",version),encode(value),ttl());
             for(long ref:new long[]{cfg.getId(),cfg.getActivityId()})redis.opsForValue().set(LotteryKeys.key(b,0,"mapping",ref),cfg.getActivityId().toString(),Duration.ofDays(1));
+            redis.opsForValue().set(LotteryKeys.key(b,0,"activity-mapping",cfg.getActivityId()),cfg.getActivityId().toString(),Duration.ofDays(1));
             return value;
         });
     }

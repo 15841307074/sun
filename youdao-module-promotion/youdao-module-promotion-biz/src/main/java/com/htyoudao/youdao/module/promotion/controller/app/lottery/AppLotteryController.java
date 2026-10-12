@@ -33,9 +33,9 @@ public class AppLotteryController {
     private LotteryWinnerFeed winnerFeed;
 
     @GetMapping("/recent-winners")
-    @Operation(summary = "当前活动最新20条非兜底中奖记录，手机号已脱敏", description = "lotteryId 支持抽奖配置ID或活动主表ID；活动内所有门店汇总；返回不足20条时取实际条数")
-    public CommonResult<List<LotteryRecentWinnerRespVO>> recentWinners(@RequestParam("lotteryId") Long lotteryId) {
-        return CommonResult.success(winnerFeed.latest(lotteryId));
+    @Operation(summary = "当前活动最新20条非兜底中奖记录，手机号已脱敏", description = "activityId 为活动主表ID，不接受抽奖配置ID；活动内所有门店汇总；返回不足20条时取实际条数")
+    public CommonResult<List<LotteryRecentWinnerRespVO>> recentWinners(@RequestParam("activityId") Long activityId) {
+        return CommonResult.success(winnerFeed.latest(activityId));
     }
 
     @PostMapping("/result")

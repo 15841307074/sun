@@ -2,10 +2,10 @@
 
 ## 请求
 
-`GET /app-api/promotion/lottery-mobile/recent-winners?lotteryId=活动ID`
+`GET /app-api/promotion/lottery-mobile/recent-winners?activityId=活动ID`
 
 - 沿用小程序现有登录、项目上下文。
-- `lotteryId` 必填，支持活动主表 ID 或抽奖配置 ID；建议前端统一传活动主表 ID。
+- `activityId` 必填，传活动主表 `activity.id`（详情返回的 `cacheData.activityId`），不接受抽奖配置 ID。原 `lotteryId` 参数已移除，单独传原参数会因缺少 `activityId` 返回 HTTP 400。
 - 汇总当前活动所有门店，按记录时间倒序返回最新 20 条，不足 20 条返回实际条数，无记录返回 `[]`。
 - 排除抽奖时标记为兜底的奖品，同时排除“无奖品”。同一用户多次真实中奖会显示多条。
 
@@ -22,7 +22,7 @@
 
 ## 缓存更新
 
-- 键：`lottery:v2:{b项目ID:a活动主表ID}:winners:recent`。项目、活动隔离；两个活动 ID 入口共用一份缓存。
+- 键：`lottery:v2:{b项目ID:a活动主表ID}:winners:recent`。项目、活动隔离；同一活动所有门店共用一份缓存。
 - 新旧抽奖流程均在中奖记录保存成功后更新。事务内调用时，在提交后发布；回滚不发布。
 - Redis Lua 原子合并、排序、去重、截断至 20 条。冷缓存回填采用合并，避免覆盖并发产生的新记录。
 - 缓存只存脱敏手机号和奖品展示信息，不保存完整手机号。

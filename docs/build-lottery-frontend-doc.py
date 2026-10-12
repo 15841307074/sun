@@ -116,7 +116,7 @@ api('result','小程序', 'POST',base+'/result','查询同一次抽奖及发奖�
  [('lotteryId','Long','必填','原抽奖的活动引用'),('memberId','Long','必填','原抽奖会员'),('storeId','Long','必填','原抽奖门店'),('requestId','String','必填','原抽奖 requestId，8–64 位指定字符')],draw,common(accepted),
  ['该接口只查询，不发起新抽奖、不重复扣次数，也不会触发补发。人工查询后需通过受控后台操作补发，不能反复调用 result 当作重发奖品。','未查到受理流水时 code=0，data=null；不能当作已失败/已中奖。网络结果不确定时稍后查，必要时以同一 requestId 重发原 lottery 请求。','HTTP/业务错误不会表示已受理流水被撤销。不要因为一次查询失败就生成新 requestId。','轮询建议 1–2 秒起步，逐渐退避至 3–5 秒；属前端建议，不是后端强制时间。页面离开取消定时器，保留请求上下文以便恢复。'],['LotteryUserLogVO'])
 api('winners','小程序','GET',base+'/recent-winners','最新 20 条非兜底中奖记录','新增','进入抽奖页加载滚动中奖区；自己抽奖完成后刷新；展示区可低频刷新。',
- [('lotteryId','Long','必填','活动主表 ID，兼容配置 ID')],None,common([dict(memberMobile='159****5152',prizeName='100积分')]),
+ [('activityId','Long','必填','活动主表 activity.id，来自 cacheData.activityId；不接受配置 ID')],None,common([dict(memberMobile='159****5152',prizeName='100积分')]),
  ['无记录返回 data=[]；不足 20 条返回实际数量，不支持 pageNo/pageSize/limit。','汇总活动所有门店，按记录时间倒序；同一用户多次真实中奖可显示多条。','后端排除兜底、无奖品和未核对兜底快照的历史记录；红包完成发奖并保存记录后才展示。','每条只有 memberMobile、prizeName，不包含用户 ID、头像、中奖时间、门店或完整手机号。','展示接口失败可保留上次列表，不能阻断抽奖主流程。'],['LotteryRecentWinnerRespVO'])
 api('draw','小程序','POST',base+'/lottery','发起抽奖（立即返回奖品，异步发放）','变更','用户明确点击一次抽奖时，先生成并保存本次 requestId，再调用一次。',
  [('lotteryId','Long','V2 必填','活动详情/路由上下文'),('memberId','Long','V2 必填','当前会员'),('storeId','Long','V2 必填','当前门店'),('requestId','String','V2 必填','前端生成，同次重试不变'),('cityName','String','可选','沿用城市定位'),('isFree / integral','Integer','沿用','不控制 V2 实际扣费/机会来源')],draw,common(accepted),

@@ -45,9 +45,9 @@ public class LotteryWinnerFeedImpl implements LotteryWinnerFeed {
     private final AtomicInteger refills = new AtomicInteger();
 
     @Override
-    public List<LotteryRecentWinnerRespVO> latest(Long lotteryId) {
-        if (lotteryId == null || lotteryId <= 0) throw new IllegalArgumentException("lotteryId 不能为空");
-        var cfg = configuration.settings(lotteryId);
+    public List<LotteryRecentWinnerRespVO> latest(Long activityId) {
+        if (activityId == null || activityId <= 0) throw new IllegalArgumentException("activityId 必须为正数活动ID");
+        var cfg = configuration.settingsByActivity(activityId);
         long b = BusinessContextHolder.getRequiredBusinessId();
         String key = key(b, cfg.getActivityId());
         if (!Boolean.TRUE.equals(redis.hasKey(key + ":ready"))) refill(b, cfg.getActivityId(), cfg.getId(), key);
