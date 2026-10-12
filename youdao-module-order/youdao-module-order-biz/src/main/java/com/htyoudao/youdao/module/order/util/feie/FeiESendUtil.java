@@ -1,6 +1,7 @@
 package com.htyoudao.youdao.module.order.util.feie;
 
 import org.apache.commons.codec.digest.DigestUtils;
+import com.htyoudao.youdao.module.order.util.PrinterHttpRetry;
 import org.apache.http.HttpEntity;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.config.RequestConfig;
@@ -168,6 +169,7 @@ public class FeiESendUtil {
 
         CloseableHttpClient httpClient = HttpClients.custom()
                 .setDefaultRequestConfig(requestConfig)
+                .disableAutomaticRetries()
                 .build();
 //			String content;
 //			content = "<CB>测试打印</CB><BR>";
@@ -198,29 +200,19 @@ public class FeiESendUtil {
         nvps.add(new BasicNameValuePair("content", content));
         nvps.add(new BasicNameValuePair("times", "+" + printCopies + ""));//打印联数
 
-        CloseableHttpResponse response = null;
         String result = null;
         try {
             post.setEntity(new UrlEncodedFormEntity(nvps, "utf-8"));
-            response = httpClient.execute(post);
-            int statecode = response.getStatusLine().getStatusCode();
-            if (statecode == 200) {
-                HttpEntity httpentity = response.getEntity();
-                if (httpentity != null) {
-                    //服务器返回的JSON字符串，建议要当做日志记录起来
-                    result = EntityUtils.toString(httpentity);
+            result = PrinterHttpRetry.execute(httpClient, post, printResponse -> {
+                if (printResponse.getStatusLine().getStatusCode() == 200) {
+                    HttpEntity entity = printResponse.getEntity();
+                    return entity == null ? null : EntityUtils.toString(entity);
                 }
-            }
+                return null;
+            }, "飞鹅:" + sn);
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
-            try {
-                if (response != null) {
-                    response.close();
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
             try {
                 post.abort();
             } catch (Exception e) {

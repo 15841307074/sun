@@ -371,7 +371,7 @@ public class XpYunSendUtil {
 
         String url = BASE_URL + "/xprinter/print";
         String jsonRequest = JSON.toJSONString(request);
-        String resp = HttpClientUtil.doPostJSON(url, jsonRequest);
+        String resp = HttpClientUtil.doPostJSONWithPrintTimeoutRetry(url, jsonRequest);
         ObjectRestResponse<String> resps = JSON.parseObject(resp, new TypeReference<ObjectRestResponse<String>>() {
         });
         //resp.data:正确返回订单编号

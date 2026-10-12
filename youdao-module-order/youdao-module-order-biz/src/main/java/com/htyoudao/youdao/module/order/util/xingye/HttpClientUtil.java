@@ -1,5 +1,6 @@
 package com.htyoudao.youdao.module.order.util.xingye;
 
+import com.htyoudao.youdao.module.order.util.PrinterHttpRetry;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
@@ -169,9 +170,17 @@ public class HttpClientUtil {
     }
 
     public static String doPostJSON(String url, String json, Map<String, String> headers) {
+        return doPostJSON(url, json, headers, false);
+    }
+
+    public static String doPostJSONWithPrintTimeoutRetry(String url, String json) {
+        return doPostJSON(url, json, null, true);
+    }
+
+    private static String doPostJSON(String url, String json, Map<String, String> headers, boolean printRetry) {
         CloseableHttpClient httpClient = null;
         try {
-            httpClient = HttpClients.createDefault();
+            httpClient = printRetry ? HttpClients.custom().disableAutomaticRetries().build() : HttpClients.createDefault();
             HttpPost httpPost = new HttpPost(url);
             RequestConfig requestConfig = RequestConfig.custom().setConnectTimeout(5000).setConnectionRequestTimeout(5000).setSocketTimeout(10000).build();
             // 为httpPost实例设置配置
@@ -203,7 +212,9 @@ public class HttpClientUtil {
                     }
                 }
             };
-            return httpClient.execute(httpPost, responseHandler);
+            return printRetry
+                    ? PrinterHttpRetry.execute(httpClient, httpPost, responseHandler, "芯烨云")
+                    : httpClient.execute(httpPost, responseHandler);
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
