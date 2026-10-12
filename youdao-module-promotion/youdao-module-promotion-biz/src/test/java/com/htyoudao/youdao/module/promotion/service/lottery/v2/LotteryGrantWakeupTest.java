@@ -146,7 +146,8 @@ class LotteryGrantWakeupTest {
         JdbcTemplate jdbc=mock(JdbcTemplate.class);ApplicationEventPublisher events=mock(ApplicationEventPublisher.class);
         var actual=new LotteryLedgerImpl();ReflectionTestUtils.setField(actual,"jdbc",jdbc);ReflectionTestUtils.setField(actual,"events",events);
         actual.retryJob(18,"old-lease","failure");verifyNoInteractions(events);
-        when(jdbc.update(startsWith("UPDATE lottery_v2_job"),any(),any(),any())).thenReturn(1);
+        when(jdbc.update(startsWith("UPDATE lottery_v2_job"),any(),any(),any(),any())).thenReturn(1);
+        when(jdbc.queryForObject(startsWith("SELECT state FROM lottery_v2_job"),eq(String.class),eq(18L))).thenReturn("READY");
         actual.retryJob(18,"current-lease","failure");verify(events).publishEvent(new LotteryLedger.JobReady(18,10000));
     }
 }

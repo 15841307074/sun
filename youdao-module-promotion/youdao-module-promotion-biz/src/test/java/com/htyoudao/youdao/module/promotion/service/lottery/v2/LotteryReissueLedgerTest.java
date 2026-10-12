@@ -23,7 +23,7 @@ class LotteryReissueLedgerTest {
         var source=new DriverManagerDataSource("jdbc:h2:mem:"+UUID.randomUUID()+";MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE","sa","");
         jdbc=new JdbcTemplate(source); transaction=new TransactionTemplate(new DataSourceTransactionManager(source));
         jdbc.execute("CREATE TABLE lottery_v2_request(id BIGINT PRIMARY KEY,business_id BIGINT,activity_id BIGINT,settings_id BIGINT,member_id BIGINT,store_id BIGINT,stock_epoch BIGINT,pool_store_id BIGINT,request_id VARCHAR(64),out_bill_no VARCHAR(64),prize_code VARCHAR(64),draw_status VARCHAR(24),grant_status VARCHAR(24),stock_state VARCHAR(16),scope_key VARCHAR(128),chance_source INT,points_cost INT,snapshot_json LONGTEXT,result_json LONGTEXT)");
-        jdbc.execute("CREATE TABLE lottery_v2_job(request_pk BIGINT PRIMARY KEY,state VARCHAR(16),action VARCHAR(16),next_at DATETIME(3),lease_token VARCHAR(64),lease_until DATETIME(3),last_error VARCHAR(512))");
+        jdbc.execute("CREATE TABLE lottery_v2_job(request_pk BIGINT PRIMARY KEY,state VARCHAR(16),attempts INT DEFAULT 0,action VARCHAR(16),next_at DATETIME(3),lease_token VARCHAR(64),lease_until DATETIME(3),last_error VARCHAR(512))");
         jdbc.execute("CREATE TABLE lottery_v2_stock(business_id BIGINT,activity_id BIGINT,stock_epoch BIGINT,pool_store_id BIGINT,prize_code VARCHAR(64),total BIGINT,reserved BIGINT,issued BIGINT,revision BIGINT)");
         ledger=new LotteryLedgerImpl();ReflectionTestUtils.setField(ledger,"jdbc",jdbc);ReflectionTestUtils.setField(ledger,"json",new ObjectMapper());
         ReflectionTestUtils.setField(ledger,"events",org.mockito.Mockito.mock(org.springframework.context.ApplicationEventPublisher.class));

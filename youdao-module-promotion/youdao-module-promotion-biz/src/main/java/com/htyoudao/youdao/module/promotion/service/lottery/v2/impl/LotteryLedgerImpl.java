@@ -10,6 +10,8 @@ import com.htyoudao.youdao.module.promotion.controller.app.lottery.vo.LotteryUse
 import com.htyoudao.youdao.module.promotion.dal.dataobject.lottery.LotteryLogDO;
 import com.htyoudao.youdao.module.promotion.dal.dataobject.lottery.LotteryPrizeDO;
 import jakarta.annotation.Resource;
+import jakarta.annotation.PostConstruct;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -21,6 +23,7 @@ import static com.htyoudao.youdao.module.promotion.api.enums.ErrorCodeConstants.
 /** 仅使用主库；事务内不等待 Redis 锁、远程调用或线程池。 */
 @Service("lotteryLedger")
 @DS("master")
+@Slf4j
 public class LotteryLedgerImpl implements LotteryLedger {
     @Resource
     private JdbcTemplate jdbc;
@@ -30,6 +33,12 @@ public class LotteryLedgerImpl implements LotteryLedger {
     private LotteryCounterCache quotaCache;
     @Resource
     private ApplicationEventPublisher events;
+    private JdbcTemplate taskJdbc;
+    @PostConstruct
+    private void configureTaskJdbc() {
+        taskJdbc=new JdbcTemplate(jdbc.getDataSource());taskJdbc.setQueryTimeout(5);
+    }
+    private JdbcTemplate jobs(){return taskJdbc==null?jdbc:taskJdbc;}
     @Override
     public String encode(Object value) {
         try{return json.writeValueAsString(value);}catch(Exception e){throw new IllegalStateException(e);}
@@ -75,7 +84,7 @@ public class LotteryLedgerImpl implements LotteryLedger {
     }
     @Override
     public Draw get(long id) {
-        List<Map<String,Object>> rows=jdbc.queryForList("SELECT * FROM lottery_v2_request WHERE id=?",id);
+        List<Map<String,Object>> rows=jobs().queryForList("SELECT * FROM lottery_v2_request WHERE id=?",id);
         return rows.isEmpty()?null:read(rows.get(0));
     }
     @Override
@@ -175,7 +184,7 @@ public class LotteryLedgerImpl implements LotteryLedger {
         return accepted;
     }
 
-    @Transactional(rollbackFor=Exception.class)
+    @Transactional(rollbackFor=Exception.class,timeout=5)
     @Override
     public void grantState(long id,String grant,LotteryUserLogVO result,boolean terminal,boolean success) {
         List<Map<String,Object>> rows=jdbc.queryForList("SELECT * FROM lottery_v2_request WHERE id=? FOR UPDATE",id);
@@ -192,7 +201,7 @@ public class LotteryLedgerImpl implements LotteryLedger {
                 grant,terminal?(success?"COMPLETED":"FAILED"):"ACCEPTED",terminal&&"RESERVED".equals(draw.getStockState())?(success?"ISSUED":"RELEASED"):draw.getStockState(),result==null?null:encode(result),id);
     }
 
-    @Transactional(rollbackFor=Exception.class)
+    @Transactional(rollbackFor=Exception.class,timeout=5)
     @Override
     public void rejectUnpaid(long id) {
         Draw draw=get(id);
@@ -210,7 +219,7 @@ public class LotteryLedgerImpl implements LotteryLedger {
         quotaCache.changed(draw.getBusinessId(),draw.getActivityId(),draw.getMemberId());
     }
 
-    @Transactional(rollbackFor=Exception.class)
+    @Transactional(rollbackFor=Exception.class,timeout=5)
     @Override
     public void fallback(long id) {
         List<Map<String,Object>> rows=jdbc.queryForList("SELECT * FROM lottery_v2_request WHERE id=? FOR UPDATE",id);
@@ -240,7 +249,7 @@ public class LotteryLedgerImpl implements LotteryLedger {
             }
             return false;
         }
-        if(jdbc.update("UPDATE lottery_v2_job SET next_at=NOW(3) WHERE request_pk=? AND state='READY'",draw.getId())>0)
+        if(jdbc.update("UPDATE lottery_v2_job SET attempts=CASE WHEN state='STOPPED' THEN 0 ELSE attempts END,state='READY',next_at=NOW(3) WHERE request_pk=? AND state IN ('READY','STOPPED')",draw.getId())>0)
             events.publishEvent(new JobReady(draw.getId()));
         return true;
     }
@@ -282,7 +291,7 @@ public class LotteryLedgerImpl implements LotteryLedger {
         }
         draw.setDrawStatus("ACCEPTED"); draw.setGrantStatus("PENDING"); draw.setResult(null);
         jdbc.update("UPDATE lottery_v2_request SET draw_status='ACCEPTED',grant_status='PENDING',stock_state=?,snapshot_json=?,result_json=NULL WHERE id=?",draw.getStockState(),encode(draw.getSnapshot()),id);
-        jdbc.update("UPDATE lottery_v2_job SET state='READY',action='GRANT',lease_token=NULL,lease_until=NULL,next_at=NOW(3),last_error=NULL WHERE request_pk=?",id);
+        jdbc.update("UPDATE lottery_v2_job SET attempts=0,state='READY',action='GRANT',lease_token=NULL,lease_until=NULL,next_at=NOW(3),last_error=NULL WHERE request_pk=?",id);
         events.publishEvent(new JobReady(id));
         return new Reissue(draw,true,"已安排人工补发，不扣抽奖次数或消耗积分");
     }
@@ -291,13 +300,13 @@ public class LotteryLedgerImpl implements LotteryLedger {
         Draw draw=get(log.getId());
         if(draw==null)return false;
         if(draw.getBusinessId()!=log.getBusinessId()||draw.getMemberId()!=log.getMemberId())throw new IllegalArgumentException("退奖记录与流水不一致");
-        if(jdbc.update("UPDATE lottery_v2_job SET action='RETURN',state='READY',next_at=NOW(3) WHERE request_pk=? AND state='DONE'",draw.getId())>0)
+        if(jdbc.update("UPDATE lottery_v2_job SET attempts=0,action='RETURN',state='READY',next_at=NOW(3) WHERE request_pk=? AND state='DONE'",draw.getId())>0)
             events.publishEvent(new JobReady(draw.getId()));
         return true;
     }
     @Override
     public boolean isReturnJob(long id){return "RETURN".equals(jdbc.queryForObject("SELECT action FROM lottery_v2_job WHERE request_pk=?",String.class,id));}
-    @Transactional(rollbackFor=Exception.class)
+    @Transactional(rollbackFor=Exception.class,timeout=5)
     @Override
     public void confirmPhysicalReturn(long id) {
         var rows=jdbc.queryForList("SELECT * FROM lottery_v2_request WHERE id=? FOR UPDATE",id);
@@ -313,15 +322,25 @@ public class LotteryLedgerImpl implements LotteryLedger {
     }
 
     @Override
-    public List<Long> due(int count) {return jdbc.queryForList("SELECT request_pk FROM lottery_v2_job WHERE (state='READY' AND next_at<=NOW(3)) OR (state='RUNNING' AND lease_until<NOW(3)) ORDER BY next_at LIMIT ?",Long.class,count);}
+    public List<Long> due(int count) {return jobs().queryForList("SELECT request_pk FROM lottery_v2_job WHERE (state='READY' AND next_at<=NOW(3)) OR (state='RUNNING' AND lease_until<NOW(3)) ORDER BY next_at LIMIT ?",Long.class,count);}
     @Override
-    public boolean claim(long id,String token) {return jdbc.update("UPDATE lottery_v2_job SET state='RUNNING',lease_token=?,lease_until=DATE_ADD(NOW(3),INTERVAL 60 SECOND),attempts=attempts+1 WHERE request_pk=? AND ((state='READY' AND next_at<=NOW(3)) OR (state='RUNNING' AND lease_until<NOW(3)))",token,id)==1;}
+    public boolean claim(long id,String token) {
+        // 即便上次实例在异常处理中退出，也不无限重领同一条卡住的记录。
+        int stopped=jobs().update("UPDATE lottery_v2_job SET state='STOPPED',lease_token=NULL,lease_until=NULL,last_error=LEFT(CONCAT('自动重试已停止；',COALESCE(last_error,'')),512) WHERE request_pk=? AND attempts>=CASE WHEN last_error='微信红包处理中' THEN 30 ELSE 8 END AND ((state='READY' AND next_at<=NOW(3)) OR (state='RUNNING' AND lease_until<NOW(3)))",id);
+        if(stopped>0)return false;
+        return jobs().update("UPDATE lottery_v2_job SET state='RUNNING',lease_token=?,lease_until=DATE_ADD(NOW(3),INTERVAL 60 SECOND),attempts=attempts+1 WHERE request_pk=? AND ((state='READY' AND next_at<=NOW(3)) OR (state='RUNNING' AND lease_until<NOW(3)))",token,id)==1;
+    }
     @Override
-    public void finishJob(long id,String token){jdbc.update("UPDATE lottery_v2_job SET state='DONE',lease_token=NULL,lease_until=NULL,last_error=NULL WHERE request_pk=? AND lease_token=?",id,token);}
+    public void finishJob(long id,String token){jobs().update("UPDATE lottery_v2_job SET state='DONE',lease_token=NULL,lease_until=NULL,last_error=NULL WHERE request_pk=? AND lease_token=?",id,token);}
     @Override
     public void retryJob(long id,String token,String message) {
-        int changed=jdbc.update("UPDATE lottery_v2_job SET state='READY',lease_token=NULL,lease_until=NULL,next_at=DATE_ADD(NOW(3),INTERVAL 10 SECOND),last_error=? WHERE request_pk=? AND lease_token=?",message==null?null:message.substring(0,Math.min(512,message.length())),id,token);
-        if(changed>0)events.publishEvent(new JobReady(id,10000));
+        int limit="微信红包处理中".equals(message)?30:8;
+        int changed=jobs().update("UPDATE lottery_v2_job SET state=CASE WHEN attempts>=? THEN 'STOPPED' ELSE 'READY' END,lease_token=NULL,lease_until=NULL,next_at=DATE_ADD(NOW(3),INTERVAL 10 SECOND),last_error=? WHERE request_pk=? AND lease_token=?",limit,message==null?null:message.substring(0,Math.min(512,message.length())),id,token);
+        if(changed>0) {
+            String state=jobs().queryForObject("SELECT state FROM lottery_v2_job WHERE request_pk=?",String.class,id);
+            if("READY".equals(state))events.publishEvent(new JobReady(id,10000));
+            else if("STOPPED".equals(state))log.warn("Lottery grant auto retry stopped: request={}, reason={}",id,message);
+        }
     }
 
     @Transactional(rollbackFor=Exception.class)

@@ -16,6 +16,8 @@ public class LotteryAdmission {
     private LotteryProperties properties;
     @Resource
     private StringRedisTemplate redis;
+    @Resource
+    private LotteryGrantBackpressure backpressure;
     private final AtomicInteger draws=new AtomicInteger();
     private final AtomicInteger reads=new AtomicInteger();
     private final AtomicInteger results=new AtomicInteger();
@@ -41,6 +43,7 @@ public class LotteryAdmission {
             if(draw) {
                 check(LotteryKeys.key(b,a,"rate","activity"),properties.getActivityDrawRate());
                 check(LotteryKeys.key(b,a,"rate","member:"+member),properties.getMemberDrawRate());
+                backpressure.checkDrawAllowed();
             }
             return new Permit(active,result?null:general);
         } catch(RuntimeException e) { active.decrementAndGet();if(!result)general.decrementAndGet();rejected(kind); throw exception(LOTTERY_SYSTEM_AGAIN); }

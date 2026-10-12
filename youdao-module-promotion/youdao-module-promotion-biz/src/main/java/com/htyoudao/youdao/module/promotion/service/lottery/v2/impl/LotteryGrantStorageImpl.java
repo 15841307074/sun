@@ -13,6 +13,7 @@ import com.htyoudao.youdao.module.promotion.enums.CouponSourceType;
 import jakarta.annotation.Resource;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import java.time.*;
 import java.util.*;
 
@@ -27,6 +28,7 @@ public class LotteryGrantStorageImpl implements LotteryGrantStorage {
     @Resource
     private LotteryWinnerFeed winnerFeed;
     @Override
+    @Transactional(rollbackFor=Exception.class,timeout=5)
     public boolean claimPhysicalReturn(LotteryLedger.Draw draw) {
         var key=new LambdaQueryWrapper<LotteryLogDO>().eq(LotteryLogDO::getBusinessId,draw.getBusinessId())
                 .eq(LotteryLogDO::getMemberId,draw.getMemberId()).eq(LotteryLogDO::getId,draw.getId());
@@ -39,6 +41,7 @@ public class LotteryGrantStorageImpl implements LotteryGrantStorage {
         return logs.update(update,key.eq(LotteryLogDO::getPrizeState,1))==1;
     }
     @Override
+    @Transactional(rollbackFor=Exception.class,timeout=5)
     public void coupon(LotteryLedger.Draw draw) {
         var s=draw.getSnapshot();var template=s.getCoupon();
         if(template==null)throw new IllegalStateException("缺少发券快照");
