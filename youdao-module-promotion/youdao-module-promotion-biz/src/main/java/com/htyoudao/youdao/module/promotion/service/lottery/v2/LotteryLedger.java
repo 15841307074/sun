@@ -24,6 +24,11 @@ public interface LotteryLedger {
         }
     }
 
+    /** 持久化任务就绪通知；提交后唤醒，延迟任务仍以数据库 next_at 为准。 */
+    record JobReady(long id,long delayMillis) {
+        public JobReady(long id){this(id,0);}
+    }
+
     public record Stock(long total,long reserved,long issued,long revision) {}
 
     public static class UnavailablePrize extends RuntimeException {}

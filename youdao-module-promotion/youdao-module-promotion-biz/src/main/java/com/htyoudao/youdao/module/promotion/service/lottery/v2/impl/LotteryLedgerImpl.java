@@ -10,6 +10,7 @@ import com.htyoudao.youdao.module.promotion.controller.app.lottery.vo.LotteryUse
 import com.htyoudao.youdao.module.promotion.dal.dataobject.lottery.LotteryLogDO;
 import com.htyoudao.youdao.module.promotion.dal.dataobject.lottery.LotteryPrizeDO;
 import jakarta.annotation.Resource;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +28,8 @@ public class LotteryLedgerImpl implements LotteryLedger {
     private ObjectMapper json;
     @Resource
     private LotteryCounterCache quotaCache;
+    @Resource
+    private ApplicationEventPublisher events;
     @Override
     public String encode(Object value) {
         try{return json.writeValueAsString(value);}catch(Exception e){throw new IllegalStateException(e);}
@@ -168,6 +171,7 @@ public class LotteryLedgerImpl implements LotteryLedger {
         accepted.setDrawStatus("ACCEPTED"); accepted.setGrantStatus("PENDING"); accepted.setStockState(stocked?"RESERVED":"NONE");
         accepted.setScopeKey(chosen.getScope()); accepted.setSource(chosen.getSource()); accepted.setPointsCost(chosen.getPointsCost());
         accepted.setStockPrizeCode(prize.getCode()); accepted.setSnapshot(snapshot); accepted.setNewlyAccepted(true);
+        events.publishEvent(new JobReady(id));
         return accepted;
     }
 
@@ -236,7 +240,8 @@ public class LotteryLedgerImpl implements LotteryLedger {
             }
             return false;
         }
-        jdbc.update("UPDATE lottery_v2_job SET next_at=NOW(3) WHERE request_pk=? AND state='READY'",draw.getId());
+        if(jdbc.update("UPDATE lottery_v2_job SET next_at=NOW(3) WHERE request_pk=? AND state='READY'",draw.getId())>0)
+            events.publishEvent(new JobReady(draw.getId()));
         return true;
     }
 
@@ -278,6 +283,7 @@ public class LotteryLedgerImpl implements LotteryLedger {
         draw.setDrawStatus("ACCEPTED"); draw.setGrantStatus("PENDING"); draw.setResult(null);
         jdbc.update("UPDATE lottery_v2_request SET draw_status='ACCEPTED',grant_status='PENDING',stock_state=?,snapshot_json=?,result_json=NULL WHERE id=?",draw.getStockState(),encode(draw.getSnapshot()),id);
         jdbc.update("UPDATE lottery_v2_job SET state='READY',action='GRANT',lease_token=NULL,lease_until=NULL,next_at=NOW(3),last_error=NULL WHERE request_pk=?",id);
+        events.publishEvent(new JobReady(id));
         return new Reissue(draw,true,"已安排人工补发，不扣抽奖次数或消耗积分");
     }
     @Override
@@ -285,7 +291,8 @@ public class LotteryLedgerImpl implements LotteryLedger {
         Draw draw=get(log.getId());
         if(draw==null)return false;
         if(draw.getBusinessId()!=log.getBusinessId()||draw.getMemberId()!=log.getMemberId())throw new IllegalArgumentException("退奖记录与流水不一致");
-        jdbc.update("UPDATE lottery_v2_job SET action='RETURN',state='READY',next_at=NOW(3) WHERE request_pk=? AND state='DONE'",draw.getId());
+        if(jdbc.update("UPDATE lottery_v2_job SET action='RETURN',state='READY',next_at=NOW(3) WHERE request_pk=? AND state='DONE'",draw.getId())>0)
+            events.publishEvent(new JobReady(draw.getId()));
         return true;
     }
     @Override
@@ -312,7 +319,10 @@ public class LotteryLedgerImpl implements LotteryLedger {
     @Override
     public void finishJob(long id,String token){jdbc.update("UPDATE lottery_v2_job SET state='DONE',lease_token=NULL,lease_until=NULL,last_error=NULL WHERE request_pk=? AND lease_token=?",id,token);}
     @Override
-    public void retryJob(long id,String token,String message){jdbc.update("UPDATE lottery_v2_job SET state='READY',lease_token=NULL,lease_until=NULL,next_at=DATE_ADD(NOW(3),INTERVAL 10 SECOND),last_error=? WHERE request_pk=? AND lease_token=?",message==null?null:message.substring(0,Math.min(512,message.length())),id,token);}
+    public void retryJob(long id,String token,String message) {
+        int changed=jdbc.update("UPDATE lottery_v2_job SET state='READY',lease_token=NULL,lease_until=NULL,next_at=DATE_ADD(NOW(3),INTERVAL 10 SECOND),last_error=? WHERE request_pk=? AND lease_token=?",message==null?null:message.substring(0,Math.min(512,message.length())),id,token);
+        if(changed>0)events.publishEvent(new JobReady(id,10000));
+    }
 
     @Transactional(rollbackFor=Exception.class)
     @Override

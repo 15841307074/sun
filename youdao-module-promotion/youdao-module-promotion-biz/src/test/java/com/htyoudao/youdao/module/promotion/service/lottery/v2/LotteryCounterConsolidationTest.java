@@ -42,7 +42,8 @@ class LotteryCounterConsolidationTest {
         cache=new LotteryCounterCacheImpl();redis=mock(StringRedisTemplate.class);
         ReflectionTestUtils.setField(cache,"jdbc",jdbc);ReflectionTestUtils.setField(cache,"redis",redis);ReflectionTestUtils.setField(cache,"json",new ObjectMapper());
         var executor=mock(LotteryCacheExecutor.class);ReflectionTestUtils.setField(cache,"executor",executor);
-        ledger=new LotteryLedgerImpl();ReflectionTestUtils.setField(ledger,"jdbc",jdbc);ReflectionTestUtils.setField(ledger,"json",new ObjectMapper());ReflectionTestUtils.setField(ledger,"quotaCache",cache);
+        ledger=new LotteryLedgerImpl();ReflectionTestUtils.setField(ledger,"jdbc",jdbc);ReflectionTestUtils.setField(ledger,"json",new ObjectMapper());
+        ReflectionTestUtils.setField(ledger,"events",mock(org.springframework.context.ApplicationEventPublisher.class));ReflectionTestUtils.setField(ledger,"quotaCache",cache);
         var cfg=new LotterySettingsCacheDataVO();cfg.setId(20L);cfg.setActivityId(21L);cfg.setConfigVersion(1L);cfg.setStockEpoch(1L);cfg.setLotteryLimit(0);cfg.setLotteryTotalNumber(0);
         var request=new LotteryVO();request.setLotteryId(20L);request.setMemberId(40L);request.setStoreId(30L);request.setRequestId("request_123");
         var prize=new LotteryPrizeDO();prize.setId(100L);prize.setCode("guarantee");prize.setIsGuarantees(1);prize.setPrizeType(4);

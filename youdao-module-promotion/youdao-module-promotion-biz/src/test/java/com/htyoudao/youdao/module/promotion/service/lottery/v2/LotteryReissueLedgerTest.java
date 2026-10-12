@@ -26,6 +26,7 @@ class LotteryReissueLedgerTest {
         jdbc.execute("CREATE TABLE lottery_v2_job(request_pk BIGINT PRIMARY KEY,state VARCHAR(16),action VARCHAR(16),next_at DATETIME(3),lease_token VARCHAR(64),lease_until DATETIME(3),last_error VARCHAR(512))");
         jdbc.execute("CREATE TABLE lottery_v2_stock(business_id BIGINT,activity_id BIGINT,stock_epoch BIGINT,pool_store_id BIGINT,prize_code VARCHAR(64),total BIGINT,reserved BIGINT,issued BIGINT,revision BIGINT)");
         ledger=new LotteryLedgerImpl();ReflectionTestUtils.setField(ledger,"jdbc",jdbc);ReflectionTestUtils.setField(ledger,"json",new ObjectMapper());
+        ReflectionTestUtils.setField(ledger,"events",org.mockito.Mockito.mock(org.springframework.context.ApplicationEventPublisher.class));
         var snapshot=new LotteryDrawSnapshot();var prize=new LotteryPrizeDO();prize.setId(101L);prize.setCode("prize");prize.setIsGuarantees(0);prize.setPrizeType(2);
         snapshot.setPrize(prize);var cfg=new LotterySettingsCacheDataVO();cfg.setId(21L);snapshot.setSettings(cfg);
         jdbc.update("INSERT INTO lottery_v2_request VALUES(100,10,20,21,40,30,1,0,'request_123','L100','prize','FAILED','FAILED','RELEASED','TOTAL',2,50,?,NULL)",ledger.encode(snapshot));

@@ -39,6 +39,7 @@ class LotteryLedgerStateTest {
         ledger = new LotteryLedgerImpl();
         ReflectionTestUtils.setField(ledger, "jdbc", jdbc);
         ReflectionTestUtils.setField(ledger, "json", new ObjectMapper());
+        ReflectionTestUtils.setField(ledger,"events",mock(org.springframework.context.ApplicationEventPublisher.class));
         ReflectionTestUtils.setField(ledger, "quotaCache", mock(LotteryCounterCache.class));
         var settings = new LotterySettingsCacheDataVO();
         settings.setId(20L); settings.setActivityId(21L);

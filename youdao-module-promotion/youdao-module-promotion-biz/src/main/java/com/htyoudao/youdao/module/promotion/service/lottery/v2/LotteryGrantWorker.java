@@ -10,6 +10,14 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.LongSupplier;
+import org.springframework.transaction.event.TransactionalEventListener;
+import javax.sql.DataSource;
+import com.baomidou.dynamic.datasource.DynamicRoutingDataSource;
+import com.baomidou.dynamic.datasource.ds.ItemDataSource;
+import com.zaxxer.hikari.HikariDataSource;
+import com.alibaba.druid.pool.DruidDataSource;
 
 @Component
 @Slf4j
@@ -26,17 +34,106 @@ public class LotteryGrantWorker {
     private LotteryV2Service service;
     @Resource
     private LotteryProperties properties;
+    @Resource
+    private DataSource dataSource;
     @DubboReference(timeout=3000,retries=0) private WxMemberApi members;
-    private final ThreadPoolExecutor executor=new ThreadPoolExecutor(4,4,30,TimeUnit.SECONDS,new SynchronousQueue<>(),r->{Thread t=new Thread(r,"lottery-grant");t.setDaemon(true);return t;},new ThreadPoolExecutor.AbortPolicy());
-    @Scheduled(fixedDelay=500)
-    public void poll() {
+    // 待执行队列有界；通知丢失或溢出仍由持久化任务恢复，不在请求线程发奖。
+    private final ThreadPoolExecutor executor=new ThreadPoolExecutor(4,4,30,TimeUnit.SECONDS,new ArrayBlockingQueue<>(64),r->{Thread t=new Thread(r,"lottery-grant");t.setDaemon(true);return t;},new ThreadPoolExecutor.AbortPolicy());
+    private static final long IDLE_AUDIT_MILLIS=TimeUnit.MINUTES.toMillis(5);
+    private static final long BUSY_AUDIT_MILLIS=1000;
+    private static final int MAX_DELAYED_WAKEUPS=1024;
+    private final Set<Long> inFlight=ConcurrentHashMap.newKeySet();
+    private final ConcurrentMap<Long,Long> delayed=new ConcurrentHashMap<>();
+    private final AtomicLong nextAuditAt=new AtomicLong();
+    private LongSupplier clock=()->System.nanoTime()/1000000;
+    private LongSupplier auditJitter=()->ThreadLocalRandom.current().nextLong(30001);
+    private volatile boolean stopped;
+
+    private record PoolState(int max,int active) {
+        int reserve(){return Math.min(max-1,Math.max(2,(max+3)/4));}
+        int room(){return Math.max(0,max-reserve()-active);}
+    }
+
+    /** 只读连接池内存指标，不取连接、不执行 SQL。无法识别的池沿用配置预算。 */
+    private PoolState poolState() {
+        try {
+            DataSource pool=dataSource;
+            if(pool instanceof DynamicRoutingDataSource routing)pool=routing.getDataSource("master");
+            if(pool instanceof ItemDataSource item)pool=item.getRealDataSource();
+            if(pool instanceof HikariDataSource hikari) {
+                int max=hikari.getMaximumPoolSize();
+                var metrics=hikari.getHikariPoolMXBean();
+                return max>0?new PoolState(max,metrics==null?0:metrics.getActiveConnections()):null;
+            }
+            if(pool instanceof DruidDataSource druid)
+                return druid.getMaxActive()>0?new PoolState(druid.getMaxActive(),druid.getActiveCount()):null;
+        } catch(RuntimeException ignored) { /* 数据源初始化/切换期间仍受配置并发预算约束。 */ }
+        return null;
+    }
+
+    private boolean poolHasRoom(){PoolState pool=poolState();return pool==null||pool.room()>0;}
+
+    @TransactionalEventListener(fallbackExecution=true)
+    public void onJobReady(LotteryLedger.JobReady event) {
+        if(stopped)return;
+        if(event.delayMillis()>0) {
+            long at=clock.getAsLong()+event.delayMillis();
+            if(delayed.containsKey(event.id())||delayed.size()<MAX_DELAYED_WAKEUPS)
+                delayed.merge(event.id(),at,Math::min);
+            else requestAudit(at);
+        } else submit(event.id());
+    }
+
+    private synchronized int resizeExecutor() {
         int size=Math.max(1,Math.min(properties.getGrantConcurrency(),properties.getConnectionBudget()/2));
+        PoolState pool=poolState();
+        if(pool!=null)size=Math.min(size,Math.max(1,pool.max()/4));
         if(size>executor.getMaximumPoolSize()){executor.setMaximumPoolSize(size);executor.setCorePoolSize(size);}
         else {executor.setCorePoolSize(size);executor.setMaximumPoolSize(size);}
-        int free=Math.max(0,size-executor.getActiveCount());if(free==0)return;
+        return size;
+    }
+
+    private void requestAudit(long at) {
+        nextAuditAt.getAndUpdate(previous->previous==0?0:Math.min(previous,at));
+    }
+
+    private void submit(long id) {
+        if(stopped||!inFlight.add(id))return;
         try {
-            for(Long id:ledger.due(free))try{executor.execute(()->run(id));}catch(RejectedExecutionException e){break;}
-        } catch(RuntimeException e){log.warn("Lottery work poll unavailable: {}",e.getClass().getSimpleName());}
+            resizeExecutor();
+            executor.execute(()->{
+                try {
+                    if(!stopped&&poolHasRoom())run(id);
+                    else requestAudit(clock.getAsLong()+BUSY_AUDIT_MILLIS);
+                }
+                catch(RuntimeException e){log.warn("Lottery grant dispatch deferred: request={}, reason={}",id,e.getClass().getSimpleName());}
+                finally {inFlight.remove(id);}
+            });
+        } catch(RuntimeException e) {
+            inFlight.remove(id);
+            requestAudit(clock.getAsLong()+BUSY_AUDIT_MILLIS);
+        }
+    }
+
+    // 每秒只检查内存期限；空闲审计五分钟加抖动，八实例错峰。启动后首次恢复不等待五分钟。
+    @Scheduled(fixedDelay=1000)
+    public void poll() {
+        if(stopped)return;
+        long now=clock.getAsLong();
+        delayed.forEach((id,at)->{if(now>=at&&delayed.remove(id,at))submit(id);});
+        int size=resizeExecutor();
+        int free=Math.max(0,size-executor.getActiveCount()-executor.getQueue().size());
+        PoolState pool=poolState();
+        if(pool!=null)free=Math.min(free,pool.room());
+        if(free==0)return;
+        long dueAt=nextAuditAt.get();
+        if(dueAt!=0&&now<dueAt)return;
+        if(!nextAuditAt.compareAndSet(dueAt,now+IDLE_AUDIT_MILLIS+auditJitter.getAsLong()))return;
+        try {
+            List<Long> ids=ledger.due(free);
+            for(Long id:ids)submit(id);
+            if(ids.size()==free)requestAudit(now+BUSY_AUDIT_MILLIS);
+        } catch(RuntimeException e){log.warn("Lottery work audit deferred: {}",e.getClass().getSimpleName());}
     }
     private void run(long id) {
         String token=UUID.randomUUID().toString();
@@ -97,5 +194,5 @@ public class LotteryGrantWorker {
         } catch(Exception e){ledger.retryJob(id,token,e.getClass().getSimpleName());log.warn("Lottery grant deferred: request={}, reason={}",id,e.getClass().getSimpleName());}
         finally{BusinessContextHolder.setBusinessId(previousBusiness);}
     }
-    @PreDestroy public void stop(){executor.shutdown();}
+    @PreDestroy public void stop(){stopped=true;executor.shutdown();delayed.clear();}
 }

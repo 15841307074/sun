@@ -1,0 +1,20 @@
+# 8 个 promotion-server 实例，正常业务合计约 20 次新抽奖/秒的保守起点。
+# rate 是共享 Redis 下的集群总上限；concurrency/budget 是每实例上限。
+# 合并至现有 promotion-server.yaml；上线前核对主库连接池和其他业务余量。
+promotion:
+  lottery:
+    accepting: true
+    draw-rate: 60
+    activity-draw-rate: 40
+    member-draw-rate: 2
+    query-rate: 300
+    result-rate: 300
+    task-rate: 100
+    draw-concurrency: 4
+    grant-concurrency: 2
+    connection-budget: 12
+
+# 每台普通请求共享预算为 12-2-4=6，新抽奖自身最多 4 个。
+# 发奖全组配置上限为 2*8=16 个；实际还受连接池容量和占用情况限制。
+# 两位会员在同活动下每秒最多约 4 次新抽奖；压测业务容量需准备足量会员。
+# 20 并发线程不等于 20 次/秒；上限应结合实际吞吐量和有效抽奖记录评估。
