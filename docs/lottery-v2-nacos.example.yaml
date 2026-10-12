@@ -17,18 +17,5 @@ promotion:
     result-ttl-seconds: 86400
     refill-concurrency: 4
 
-# Member service ShardingSphere fragment: merge under the existing tables / shardingAlgorithms.
-# db_master here is an example alias. It MUST be the SAME physical datasource as wx_member
-# and points_log; verify the environment's existing rules before publishing.
-# tables:
-#   member_lottery_points:
-#     actualDataNodes: db_master.member_lottery_points_${0..9}
-#     tableStrategy:
-#       standard:
-#         shardingColumn: sharding_value
-#         shardingAlgorithmName: member-lottery-points-inline
-# shardingAlgorithms:
-#   member-lottery-points-inline:
-#     type: INLINE
-#     props:
-#       algorithm-expression: member_lottery_points_${sharding_value % 10}
+# 会员积分复用已有 wx_member / points_log 分片规则，不新增积分账本表或路由。
+# 两张逻辑表须路由到同一物理数据源，以保证余额和流水在同一事务提交。

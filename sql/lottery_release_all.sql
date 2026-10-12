@@ -5,7 +5,7 @@
 -- 使用方法：在正确的实际数据库连接中设置下方执行类型，执行整个文件。
 --   PROMOTION：营销主库，必须已有 activity、lottery_settings、lottery_prize。
 --   SYSTEM   ：系统主库，必须已有 system_menu；包含标签通知表及人工补发按钮权限。
---   MEMBER   ：会员物理库，按该库已存在的 wx_member_0..9 建对应积分幂等分表。
+--   MEMBER   ：会员物理库，仅给已有 points_log_0..9 增加查询索引并兼容旧拒绝记录，不创建表。
 --   LOG      ：中奖记录物理库，仅修改该库已存在的 lottery_log / lottery_log_0..9。
 -- 库若分布在不同实例，分别用对应连接执行本文件；数据库同实例也不要把四类内容盲目建入同一库。
 -- 示例：先选营销库，将类型设 PROMOTION 执行；再选系统库，将类型设 SYSTEM 执行。
@@ -16,7 +16,7 @@
 -- 可重复执行：只新增不存在的字段/索引/表；已存在对象不会被覆盖，但仍需核对原有结构。
 -- 包含 CHECK 约束，建议使用 MySQL 8.0.16+；本文件没有连接实际数据库验证。
 -- 发布前暂停旧抽奖受理并处理在途任务；历史活动默认 runtime_version=1，禁止批量改为 2。
--- Nacos 仍需配置会员积分幂等分表路由，实际数据源必须与 wx_member / points_log 一致。
+-- 会员积分复用现有 wx_member / points_log 路由，无需新增 Nacos 分表规则；二者须在同一事务数据源。
 -- 人工补发不再扣次数或消耗积分；新增 JSON 快照字段不需要改表结构。
 -- SYSTEM 类型只新增按钮，不给任何角色自动授权；执行后在角色管理按需授权。
 
@@ -269,73 +269,216 @@ EXECUTE lottery_release_stmt;
 DEALLOCATE PREPARE lottery_release_stmt;
 
 -- ==================== C · MEMBER：会员实际物理库 ====================
--- 每张积分幂等表必须与对应 wx_member_N 位于同一物理库；不会创建不属于当前库的多余分表。
+-- 复用 points_log，不新增积分账本表。每个分片增加业务号查询索引。
+-- 升级时只将旧账本的拒绝记录转成隐藏流水，不变更任何会员余额。
+-- 旧 SUCCESS 已与 points_log 同事务写入；发布前必须确认下方 missing_success_logs 全部为 0。
+-- 不自动删除旧表；切换前暂停抽奖任务，防止旧代码与新代码并行写入。
 
-SET @lottery_release_ddl = IF(@lottery_do_member AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='wx_member_0'),
-  'CREATE TABLE IF NOT EXISTS member_lottery_points_0 (business_id BIGINT NOT NULL,member_id BIGINT NOT NULL,sharding_value INT NOT NULL,business_no VARCHAR(64) COLLATE utf8mb4_bin NOT NULL,delta INT NOT NULL,state VARCHAR(16) NOT NULL,created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),PRIMARY KEY(business_id,member_id,business_no)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4',
+SET @lottery_release_ddl = IF(@lottery_do_member AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='points_log_0') AND NOT EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='points_log_0' AND INDEX_NAME='idx_lottery_points_code'),
+  'ALTER TABLE `points_log_0` ADD INDEX `idx_lottery_points_code` (`business_id`,`member_id`,`log_code`)',
   'DO 0');
 PREPARE lottery_release_stmt FROM @lottery_release_ddl;
 EXECUTE lottery_release_stmt;
 DEALLOCATE PREPARE lottery_release_stmt;
 
-SET @lottery_release_ddl = IF(@lottery_do_member AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='wx_member_1'),
-  'CREATE TABLE IF NOT EXISTS member_lottery_points_1 (business_id BIGINT NOT NULL,member_id BIGINT NOT NULL,sharding_value INT NOT NULL,business_no VARCHAR(64) COLLATE utf8mb4_bin NOT NULL,delta INT NOT NULL,state VARCHAR(16) NOT NULL,created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),PRIMARY KEY(business_id,member_id,business_no)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4',
+SET @lottery_release_ddl = IF(@lottery_do_member AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='points_log_0') AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='member_lottery_points_0'),
+  'INSERT INTO `points_log_0` (points_log_id,business_id,member_id,sharding_value,log_code,points_change,points_type,points_log_status,is_points_product,product_name,create_time,update_time,deleted) SELECT UUID_SHORT(),old.business_id,old.member_id,old.sharding_value,old.business_no,old.delta,CASE WHEN old.delta<0 THEN 2 ELSE 1 END,0,2,CASE WHEN old.business_no LIKE ''%:REFUND'' THEN ''抽奖积分退回'' WHEN old.delta<0 THEN ''抽奖消耗积分'' ELSE ''抽奖奖励积分'' END,old.created_at,NOW(),1 FROM `member_lottery_points_0` old WHERE old.state=''REJECTED'' AND NOT EXISTS (SELECT 1 FROM `points_log_0` p WHERE p.business_id=old.business_id AND p.member_id=old.member_id AND p.sharding_value=old.sharding_value AND p.log_code=old.business_no)',
   'DO 0');
 PREPARE lottery_release_stmt FROM @lottery_release_ddl;
 EXECUTE lottery_release_stmt;
 DEALLOCATE PREPARE lottery_release_stmt;
 
-SET @lottery_release_ddl = IF(@lottery_do_member AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='wx_member_2'),
-  'CREATE TABLE IF NOT EXISTS member_lottery_points_2 (business_id BIGINT NOT NULL,member_id BIGINT NOT NULL,sharding_value INT NOT NULL,business_no VARCHAR(64) COLLATE utf8mb4_bin NOT NULL,delta INT NOT NULL,state VARCHAR(16) NOT NULL,created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),PRIMARY KEY(business_id,member_id,business_no)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4',
+SET @lottery_release_ddl = IF(@lottery_do_member AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='points_log_0') AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='member_lottery_points_0'),
+  'SELECT ''member_lottery_points_0'' AS legacy_table,COUNT(*) AS missing_success_logs FROM `member_lottery_points_0` old WHERE old.state=''SUCCESS'' AND NOT EXISTS (SELECT 1 FROM `points_log_0` p WHERE p.business_id=old.business_id AND p.member_id=old.member_id AND p.sharding_value=old.sharding_value AND p.log_code=old.business_no AND p.points_change=old.delta AND p.points_log_status IN (1,2))',
   'DO 0');
 PREPARE lottery_release_stmt FROM @lottery_release_ddl;
 EXECUTE lottery_release_stmt;
 DEALLOCATE PREPARE lottery_release_stmt;
 
-SET @lottery_release_ddl = IF(@lottery_do_member AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='wx_member_3'),
-  'CREATE TABLE IF NOT EXISTS member_lottery_points_3 (business_id BIGINT NOT NULL,member_id BIGINT NOT NULL,sharding_value INT NOT NULL,business_no VARCHAR(64) COLLATE utf8mb4_bin NOT NULL,delta INT NOT NULL,state VARCHAR(16) NOT NULL,created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),PRIMARY KEY(business_id,member_id,business_no)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4',
+SET @lottery_release_ddl = IF(@lottery_do_member AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='points_log_1') AND NOT EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='points_log_1' AND INDEX_NAME='idx_lottery_points_code'),
+  'ALTER TABLE `points_log_1` ADD INDEX `idx_lottery_points_code` (`business_id`,`member_id`,`log_code`)',
   'DO 0');
 PREPARE lottery_release_stmt FROM @lottery_release_ddl;
 EXECUTE lottery_release_stmt;
 DEALLOCATE PREPARE lottery_release_stmt;
 
-SET @lottery_release_ddl = IF(@lottery_do_member AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='wx_member_4'),
-  'CREATE TABLE IF NOT EXISTS member_lottery_points_4 (business_id BIGINT NOT NULL,member_id BIGINT NOT NULL,sharding_value INT NOT NULL,business_no VARCHAR(64) COLLATE utf8mb4_bin NOT NULL,delta INT NOT NULL,state VARCHAR(16) NOT NULL,created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),PRIMARY KEY(business_id,member_id,business_no)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4',
+SET @lottery_release_ddl = IF(@lottery_do_member AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='points_log_1') AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='member_lottery_points_1'),
+  'INSERT INTO `points_log_1` (points_log_id,business_id,member_id,sharding_value,log_code,points_change,points_type,points_log_status,is_points_product,product_name,create_time,update_time,deleted) SELECT UUID_SHORT(),old.business_id,old.member_id,old.sharding_value,old.business_no,old.delta,CASE WHEN old.delta<0 THEN 2 ELSE 1 END,0,2,CASE WHEN old.business_no LIKE ''%:REFUND'' THEN ''抽奖积分退回'' WHEN old.delta<0 THEN ''抽奖消耗积分'' ELSE ''抽奖奖励积分'' END,old.created_at,NOW(),1 FROM `member_lottery_points_1` old WHERE old.state=''REJECTED'' AND NOT EXISTS (SELECT 1 FROM `points_log_1` p WHERE p.business_id=old.business_id AND p.member_id=old.member_id AND p.sharding_value=old.sharding_value AND p.log_code=old.business_no)',
   'DO 0');
 PREPARE lottery_release_stmt FROM @lottery_release_ddl;
 EXECUTE lottery_release_stmt;
 DEALLOCATE PREPARE lottery_release_stmt;
 
-SET @lottery_release_ddl = IF(@lottery_do_member AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='wx_member_5'),
-  'CREATE TABLE IF NOT EXISTS member_lottery_points_5 (business_id BIGINT NOT NULL,member_id BIGINT NOT NULL,sharding_value INT NOT NULL,business_no VARCHAR(64) COLLATE utf8mb4_bin NOT NULL,delta INT NOT NULL,state VARCHAR(16) NOT NULL,created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),PRIMARY KEY(business_id,member_id,business_no)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4',
+SET @lottery_release_ddl = IF(@lottery_do_member AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='points_log_1') AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='member_lottery_points_1'),
+  'SELECT ''member_lottery_points_1'' AS legacy_table,COUNT(*) AS missing_success_logs FROM `member_lottery_points_1` old WHERE old.state=''SUCCESS'' AND NOT EXISTS (SELECT 1 FROM `points_log_1` p WHERE p.business_id=old.business_id AND p.member_id=old.member_id AND p.sharding_value=old.sharding_value AND p.log_code=old.business_no AND p.points_change=old.delta AND p.points_log_status IN (1,2))',
   'DO 0');
 PREPARE lottery_release_stmt FROM @lottery_release_ddl;
 EXECUTE lottery_release_stmt;
 DEALLOCATE PREPARE lottery_release_stmt;
 
-SET @lottery_release_ddl = IF(@lottery_do_member AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='wx_member_6'),
-  'CREATE TABLE IF NOT EXISTS member_lottery_points_6 (business_id BIGINT NOT NULL,member_id BIGINT NOT NULL,sharding_value INT NOT NULL,business_no VARCHAR(64) COLLATE utf8mb4_bin NOT NULL,delta INT NOT NULL,state VARCHAR(16) NOT NULL,created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),PRIMARY KEY(business_id,member_id,business_no)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4',
+SET @lottery_release_ddl = IF(@lottery_do_member AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='points_log_2') AND NOT EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='points_log_2' AND INDEX_NAME='idx_lottery_points_code'),
+  'ALTER TABLE `points_log_2` ADD INDEX `idx_lottery_points_code` (`business_id`,`member_id`,`log_code`)',
   'DO 0');
 PREPARE lottery_release_stmt FROM @lottery_release_ddl;
 EXECUTE lottery_release_stmt;
 DEALLOCATE PREPARE lottery_release_stmt;
 
-SET @lottery_release_ddl = IF(@lottery_do_member AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='wx_member_7'),
-  'CREATE TABLE IF NOT EXISTS member_lottery_points_7 (business_id BIGINT NOT NULL,member_id BIGINT NOT NULL,sharding_value INT NOT NULL,business_no VARCHAR(64) COLLATE utf8mb4_bin NOT NULL,delta INT NOT NULL,state VARCHAR(16) NOT NULL,created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),PRIMARY KEY(business_id,member_id,business_no)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4',
+SET @lottery_release_ddl = IF(@lottery_do_member AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='points_log_2') AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='member_lottery_points_2'),
+  'INSERT INTO `points_log_2` (points_log_id,business_id,member_id,sharding_value,log_code,points_change,points_type,points_log_status,is_points_product,product_name,create_time,update_time,deleted) SELECT UUID_SHORT(),old.business_id,old.member_id,old.sharding_value,old.business_no,old.delta,CASE WHEN old.delta<0 THEN 2 ELSE 1 END,0,2,CASE WHEN old.business_no LIKE ''%:REFUND'' THEN ''抽奖积分退回'' WHEN old.delta<0 THEN ''抽奖消耗积分'' ELSE ''抽奖奖励积分'' END,old.created_at,NOW(),1 FROM `member_lottery_points_2` old WHERE old.state=''REJECTED'' AND NOT EXISTS (SELECT 1 FROM `points_log_2` p WHERE p.business_id=old.business_id AND p.member_id=old.member_id AND p.sharding_value=old.sharding_value AND p.log_code=old.business_no)',
   'DO 0');
 PREPARE lottery_release_stmt FROM @lottery_release_ddl;
 EXECUTE lottery_release_stmt;
 DEALLOCATE PREPARE lottery_release_stmt;
 
-SET @lottery_release_ddl = IF(@lottery_do_member AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='wx_member_8'),
-  'CREATE TABLE IF NOT EXISTS member_lottery_points_8 (business_id BIGINT NOT NULL,member_id BIGINT NOT NULL,sharding_value INT NOT NULL,business_no VARCHAR(64) COLLATE utf8mb4_bin NOT NULL,delta INT NOT NULL,state VARCHAR(16) NOT NULL,created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),PRIMARY KEY(business_id,member_id,business_no)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4',
+SET @lottery_release_ddl = IF(@lottery_do_member AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='points_log_2') AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='member_lottery_points_2'),
+  'SELECT ''member_lottery_points_2'' AS legacy_table,COUNT(*) AS missing_success_logs FROM `member_lottery_points_2` old WHERE old.state=''SUCCESS'' AND NOT EXISTS (SELECT 1 FROM `points_log_2` p WHERE p.business_id=old.business_id AND p.member_id=old.member_id AND p.sharding_value=old.sharding_value AND p.log_code=old.business_no AND p.points_change=old.delta AND p.points_log_status IN (1,2))',
   'DO 0');
 PREPARE lottery_release_stmt FROM @lottery_release_ddl;
 EXECUTE lottery_release_stmt;
 DEALLOCATE PREPARE lottery_release_stmt;
 
-SET @lottery_release_ddl = IF(@lottery_do_member AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='wx_member_9'),
-  'CREATE TABLE IF NOT EXISTS member_lottery_points_9 (business_id BIGINT NOT NULL,member_id BIGINT NOT NULL,sharding_value INT NOT NULL,business_no VARCHAR(64) COLLATE utf8mb4_bin NOT NULL,delta INT NOT NULL,state VARCHAR(16) NOT NULL,created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),PRIMARY KEY(business_id,member_id,business_no)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4',
+SET @lottery_release_ddl = IF(@lottery_do_member AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='points_log_3') AND NOT EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='points_log_3' AND INDEX_NAME='idx_lottery_points_code'),
+  'ALTER TABLE `points_log_3` ADD INDEX `idx_lottery_points_code` (`business_id`,`member_id`,`log_code`)',
+  'DO 0');
+PREPARE lottery_release_stmt FROM @lottery_release_ddl;
+EXECUTE lottery_release_stmt;
+DEALLOCATE PREPARE lottery_release_stmt;
+
+SET @lottery_release_ddl = IF(@lottery_do_member AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='points_log_3') AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='member_lottery_points_3'),
+  'INSERT INTO `points_log_3` (points_log_id,business_id,member_id,sharding_value,log_code,points_change,points_type,points_log_status,is_points_product,product_name,create_time,update_time,deleted) SELECT UUID_SHORT(),old.business_id,old.member_id,old.sharding_value,old.business_no,old.delta,CASE WHEN old.delta<0 THEN 2 ELSE 1 END,0,2,CASE WHEN old.business_no LIKE ''%:REFUND'' THEN ''抽奖积分退回'' WHEN old.delta<0 THEN ''抽奖消耗积分'' ELSE ''抽奖奖励积分'' END,old.created_at,NOW(),1 FROM `member_lottery_points_3` old WHERE old.state=''REJECTED'' AND NOT EXISTS (SELECT 1 FROM `points_log_3` p WHERE p.business_id=old.business_id AND p.member_id=old.member_id AND p.sharding_value=old.sharding_value AND p.log_code=old.business_no)',
+  'DO 0');
+PREPARE lottery_release_stmt FROM @lottery_release_ddl;
+EXECUTE lottery_release_stmt;
+DEALLOCATE PREPARE lottery_release_stmt;
+
+SET @lottery_release_ddl = IF(@lottery_do_member AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='points_log_3') AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='member_lottery_points_3'),
+  'SELECT ''member_lottery_points_3'' AS legacy_table,COUNT(*) AS missing_success_logs FROM `member_lottery_points_3` old WHERE old.state=''SUCCESS'' AND NOT EXISTS (SELECT 1 FROM `points_log_3` p WHERE p.business_id=old.business_id AND p.member_id=old.member_id AND p.sharding_value=old.sharding_value AND p.log_code=old.business_no AND p.points_change=old.delta AND p.points_log_status IN (1,2))',
+  'DO 0');
+PREPARE lottery_release_stmt FROM @lottery_release_ddl;
+EXECUTE lottery_release_stmt;
+DEALLOCATE PREPARE lottery_release_stmt;
+
+SET @lottery_release_ddl = IF(@lottery_do_member AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='points_log_4') AND NOT EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='points_log_4' AND INDEX_NAME='idx_lottery_points_code'),
+  'ALTER TABLE `points_log_4` ADD INDEX `idx_lottery_points_code` (`business_id`,`member_id`,`log_code`)',
+  'DO 0');
+PREPARE lottery_release_stmt FROM @lottery_release_ddl;
+EXECUTE lottery_release_stmt;
+DEALLOCATE PREPARE lottery_release_stmt;
+
+SET @lottery_release_ddl = IF(@lottery_do_member AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='points_log_4') AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='member_lottery_points_4'),
+  'INSERT INTO `points_log_4` (points_log_id,business_id,member_id,sharding_value,log_code,points_change,points_type,points_log_status,is_points_product,product_name,create_time,update_time,deleted) SELECT UUID_SHORT(),old.business_id,old.member_id,old.sharding_value,old.business_no,old.delta,CASE WHEN old.delta<0 THEN 2 ELSE 1 END,0,2,CASE WHEN old.business_no LIKE ''%:REFUND'' THEN ''抽奖积分退回'' WHEN old.delta<0 THEN ''抽奖消耗积分'' ELSE ''抽奖奖励积分'' END,old.created_at,NOW(),1 FROM `member_lottery_points_4` old WHERE old.state=''REJECTED'' AND NOT EXISTS (SELECT 1 FROM `points_log_4` p WHERE p.business_id=old.business_id AND p.member_id=old.member_id AND p.sharding_value=old.sharding_value AND p.log_code=old.business_no)',
+  'DO 0');
+PREPARE lottery_release_stmt FROM @lottery_release_ddl;
+EXECUTE lottery_release_stmt;
+DEALLOCATE PREPARE lottery_release_stmt;
+
+SET @lottery_release_ddl = IF(@lottery_do_member AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='points_log_4') AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='member_lottery_points_4'),
+  'SELECT ''member_lottery_points_4'' AS legacy_table,COUNT(*) AS missing_success_logs FROM `member_lottery_points_4` old WHERE old.state=''SUCCESS'' AND NOT EXISTS (SELECT 1 FROM `points_log_4` p WHERE p.business_id=old.business_id AND p.member_id=old.member_id AND p.sharding_value=old.sharding_value AND p.log_code=old.business_no AND p.points_change=old.delta AND p.points_log_status IN (1,2))',
+  'DO 0');
+PREPARE lottery_release_stmt FROM @lottery_release_ddl;
+EXECUTE lottery_release_stmt;
+DEALLOCATE PREPARE lottery_release_stmt;
+
+SET @lottery_release_ddl = IF(@lottery_do_member AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='points_log_5') AND NOT EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='points_log_5' AND INDEX_NAME='idx_lottery_points_code'),
+  'ALTER TABLE `points_log_5` ADD INDEX `idx_lottery_points_code` (`business_id`,`member_id`,`log_code`)',
+  'DO 0');
+PREPARE lottery_release_stmt FROM @lottery_release_ddl;
+EXECUTE lottery_release_stmt;
+DEALLOCATE PREPARE lottery_release_stmt;
+
+SET @lottery_release_ddl = IF(@lottery_do_member AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='points_log_5') AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='member_lottery_points_5'),
+  'INSERT INTO `points_log_5` (points_log_id,business_id,member_id,sharding_value,log_code,points_change,points_type,points_log_status,is_points_product,product_name,create_time,update_time,deleted) SELECT UUID_SHORT(),old.business_id,old.member_id,old.sharding_value,old.business_no,old.delta,CASE WHEN old.delta<0 THEN 2 ELSE 1 END,0,2,CASE WHEN old.business_no LIKE ''%:REFUND'' THEN ''抽奖积分退回'' WHEN old.delta<0 THEN ''抽奖消耗积分'' ELSE ''抽奖奖励积分'' END,old.created_at,NOW(),1 FROM `member_lottery_points_5` old WHERE old.state=''REJECTED'' AND NOT EXISTS (SELECT 1 FROM `points_log_5` p WHERE p.business_id=old.business_id AND p.member_id=old.member_id AND p.sharding_value=old.sharding_value AND p.log_code=old.business_no)',
+  'DO 0');
+PREPARE lottery_release_stmt FROM @lottery_release_ddl;
+EXECUTE lottery_release_stmt;
+DEALLOCATE PREPARE lottery_release_stmt;
+
+SET @lottery_release_ddl = IF(@lottery_do_member AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='points_log_5') AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='member_lottery_points_5'),
+  'SELECT ''member_lottery_points_5'' AS legacy_table,COUNT(*) AS missing_success_logs FROM `member_lottery_points_5` old WHERE old.state=''SUCCESS'' AND NOT EXISTS (SELECT 1 FROM `points_log_5` p WHERE p.business_id=old.business_id AND p.member_id=old.member_id AND p.sharding_value=old.sharding_value AND p.log_code=old.business_no AND p.points_change=old.delta AND p.points_log_status IN (1,2))',
+  'DO 0');
+PREPARE lottery_release_stmt FROM @lottery_release_ddl;
+EXECUTE lottery_release_stmt;
+DEALLOCATE PREPARE lottery_release_stmt;
+
+SET @lottery_release_ddl = IF(@lottery_do_member AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='points_log_6') AND NOT EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='points_log_6' AND INDEX_NAME='idx_lottery_points_code'),
+  'ALTER TABLE `points_log_6` ADD INDEX `idx_lottery_points_code` (`business_id`,`member_id`,`log_code`)',
+  'DO 0');
+PREPARE lottery_release_stmt FROM @lottery_release_ddl;
+EXECUTE lottery_release_stmt;
+DEALLOCATE PREPARE lottery_release_stmt;
+
+SET @lottery_release_ddl = IF(@lottery_do_member AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='points_log_6') AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='member_lottery_points_6'),
+  'INSERT INTO `points_log_6` (points_log_id,business_id,member_id,sharding_value,log_code,points_change,points_type,points_log_status,is_points_product,product_name,create_time,update_time,deleted) SELECT UUID_SHORT(),old.business_id,old.member_id,old.sharding_value,old.business_no,old.delta,CASE WHEN old.delta<0 THEN 2 ELSE 1 END,0,2,CASE WHEN old.business_no LIKE ''%:REFUND'' THEN ''抽奖积分退回'' WHEN old.delta<0 THEN ''抽奖消耗积分'' ELSE ''抽奖奖励积分'' END,old.created_at,NOW(),1 FROM `member_lottery_points_6` old WHERE old.state=''REJECTED'' AND NOT EXISTS (SELECT 1 FROM `points_log_6` p WHERE p.business_id=old.business_id AND p.member_id=old.member_id AND p.sharding_value=old.sharding_value AND p.log_code=old.business_no)',
+  'DO 0');
+PREPARE lottery_release_stmt FROM @lottery_release_ddl;
+EXECUTE lottery_release_stmt;
+DEALLOCATE PREPARE lottery_release_stmt;
+
+SET @lottery_release_ddl = IF(@lottery_do_member AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='points_log_6') AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='member_lottery_points_6'),
+  'SELECT ''member_lottery_points_6'' AS legacy_table,COUNT(*) AS missing_success_logs FROM `member_lottery_points_6` old WHERE old.state=''SUCCESS'' AND NOT EXISTS (SELECT 1 FROM `points_log_6` p WHERE p.business_id=old.business_id AND p.member_id=old.member_id AND p.sharding_value=old.sharding_value AND p.log_code=old.business_no AND p.points_change=old.delta AND p.points_log_status IN (1,2))',
+  'DO 0');
+PREPARE lottery_release_stmt FROM @lottery_release_ddl;
+EXECUTE lottery_release_stmt;
+DEALLOCATE PREPARE lottery_release_stmt;
+
+SET @lottery_release_ddl = IF(@lottery_do_member AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='points_log_7') AND NOT EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='points_log_7' AND INDEX_NAME='idx_lottery_points_code'),
+  'ALTER TABLE `points_log_7` ADD INDEX `idx_lottery_points_code` (`business_id`,`member_id`,`log_code`)',
+  'DO 0');
+PREPARE lottery_release_stmt FROM @lottery_release_ddl;
+EXECUTE lottery_release_stmt;
+DEALLOCATE PREPARE lottery_release_stmt;
+
+SET @lottery_release_ddl = IF(@lottery_do_member AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='points_log_7') AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='member_lottery_points_7'),
+  'INSERT INTO `points_log_7` (points_log_id,business_id,member_id,sharding_value,log_code,points_change,points_type,points_log_status,is_points_product,product_name,create_time,update_time,deleted) SELECT UUID_SHORT(),old.business_id,old.member_id,old.sharding_value,old.business_no,old.delta,CASE WHEN old.delta<0 THEN 2 ELSE 1 END,0,2,CASE WHEN old.business_no LIKE ''%:REFUND'' THEN ''抽奖积分退回'' WHEN old.delta<0 THEN ''抽奖消耗积分'' ELSE ''抽奖奖励积分'' END,old.created_at,NOW(),1 FROM `member_lottery_points_7` old WHERE old.state=''REJECTED'' AND NOT EXISTS (SELECT 1 FROM `points_log_7` p WHERE p.business_id=old.business_id AND p.member_id=old.member_id AND p.sharding_value=old.sharding_value AND p.log_code=old.business_no)',
+  'DO 0');
+PREPARE lottery_release_stmt FROM @lottery_release_ddl;
+EXECUTE lottery_release_stmt;
+DEALLOCATE PREPARE lottery_release_stmt;
+
+SET @lottery_release_ddl = IF(@lottery_do_member AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='points_log_7') AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='member_lottery_points_7'),
+  'SELECT ''member_lottery_points_7'' AS legacy_table,COUNT(*) AS missing_success_logs FROM `member_lottery_points_7` old WHERE old.state=''SUCCESS'' AND NOT EXISTS (SELECT 1 FROM `points_log_7` p WHERE p.business_id=old.business_id AND p.member_id=old.member_id AND p.sharding_value=old.sharding_value AND p.log_code=old.business_no AND p.points_change=old.delta AND p.points_log_status IN (1,2))',
+  'DO 0');
+PREPARE lottery_release_stmt FROM @lottery_release_ddl;
+EXECUTE lottery_release_stmt;
+DEALLOCATE PREPARE lottery_release_stmt;
+
+SET @lottery_release_ddl = IF(@lottery_do_member AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='points_log_8') AND NOT EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='points_log_8' AND INDEX_NAME='idx_lottery_points_code'),
+  'ALTER TABLE `points_log_8` ADD INDEX `idx_lottery_points_code` (`business_id`,`member_id`,`log_code`)',
+  'DO 0');
+PREPARE lottery_release_stmt FROM @lottery_release_ddl;
+EXECUTE lottery_release_stmt;
+DEALLOCATE PREPARE lottery_release_stmt;
+
+SET @lottery_release_ddl = IF(@lottery_do_member AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='points_log_8') AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='member_lottery_points_8'),
+  'INSERT INTO `points_log_8` (points_log_id,business_id,member_id,sharding_value,log_code,points_change,points_type,points_log_status,is_points_product,product_name,create_time,update_time,deleted) SELECT UUID_SHORT(),old.business_id,old.member_id,old.sharding_value,old.business_no,old.delta,CASE WHEN old.delta<0 THEN 2 ELSE 1 END,0,2,CASE WHEN old.business_no LIKE ''%:REFUND'' THEN ''抽奖积分退回'' WHEN old.delta<0 THEN ''抽奖消耗积分'' ELSE ''抽奖奖励积分'' END,old.created_at,NOW(),1 FROM `member_lottery_points_8` old WHERE old.state=''REJECTED'' AND NOT EXISTS (SELECT 1 FROM `points_log_8` p WHERE p.business_id=old.business_id AND p.member_id=old.member_id AND p.sharding_value=old.sharding_value AND p.log_code=old.business_no)',
+  'DO 0');
+PREPARE lottery_release_stmt FROM @lottery_release_ddl;
+EXECUTE lottery_release_stmt;
+DEALLOCATE PREPARE lottery_release_stmt;
+
+SET @lottery_release_ddl = IF(@lottery_do_member AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='points_log_8') AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='member_lottery_points_8'),
+  'SELECT ''member_lottery_points_8'' AS legacy_table,COUNT(*) AS missing_success_logs FROM `member_lottery_points_8` old WHERE old.state=''SUCCESS'' AND NOT EXISTS (SELECT 1 FROM `points_log_8` p WHERE p.business_id=old.business_id AND p.member_id=old.member_id AND p.sharding_value=old.sharding_value AND p.log_code=old.business_no AND p.points_change=old.delta AND p.points_log_status IN (1,2))',
+  'DO 0');
+PREPARE lottery_release_stmt FROM @lottery_release_ddl;
+EXECUTE lottery_release_stmt;
+DEALLOCATE PREPARE lottery_release_stmt;
+
+SET @lottery_release_ddl = IF(@lottery_do_member AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='points_log_9') AND NOT EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='points_log_9' AND INDEX_NAME='idx_lottery_points_code'),
+  'ALTER TABLE `points_log_9` ADD INDEX `idx_lottery_points_code` (`business_id`,`member_id`,`log_code`)',
+  'DO 0');
+PREPARE lottery_release_stmt FROM @lottery_release_ddl;
+EXECUTE lottery_release_stmt;
+DEALLOCATE PREPARE lottery_release_stmt;
+
+SET @lottery_release_ddl = IF(@lottery_do_member AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='points_log_9') AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='member_lottery_points_9'),
+  'INSERT INTO `points_log_9` (points_log_id,business_id,member_id,sharding_value,log_code,points_change,points_type,points_log_status,is_points_product,product_name,create_time,update_time,deleted) SELECT UUID_SHORT(),old.business_id,old.member_id,old.sharding_value,old.business_no,old.delta,CASE WHEN old.delta<0 THEN 2 ELSE 1 END,0,2,CASE WHEN old.business_no LIKE ''%:REFUND'' THEN ''抽奖积分退回'' WHEN old.delta<0 THEN ''抽奖消耗积分'' ELSE ''抽奖奖励积分'' END,old.created_at,NOW(),1 FROM `member_lottery_points_9` old WHERE old.state=''REJECTED'' AND NOT EXISTS (SELECT 1 FROM `points_log_9` p WHERE p.business_id=old.business_id AND p.member_id=old.member_id AND p.sharding_value=old.sharding_value AND p.log_code=old.business_no)',
+  'DO 0');
+PREPARE lottery_release_stmt FROM @lottery_release_ddl;
+EXECUTE lottery_release_stmt;
+DEALLOCATE PREPARE lottery_release_stmt;
+
+SET @lottery_release_ddl = IF(@lottery_do_member AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='points_log_9') AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='member_lottery_points_9'),
+  'SELECT ''member_lottery_points_9'' AS legacy_table,COUNT(*) AS missing_success_logs FROM `member_lottery_points_9` old WHERE old.state=''SUCCESS'' AND NOT EXISTS (SELECT 1 FROM `points_log_9` p WHERE p.business_id=old.business_id AND p.member_id=old.member_id AND p.sharding_value=old.sharding_value AND p.log_code=old.business_no AND p.points_change=old.delta AND p.points_log_status IN (1,2))',
   'DO 0');
 PREPARE lottery_release_stmt FROM @lottery_release_ddl;
 EXECUTE lottery_release_stmt;
@@ -502,13 +645,16 @@ DEALLOCATE PREPARE lottery_release_stmt;
 SELECT @lottery_release_database AS target_database,@lottery_release_target AS target_type,
        IF(@lottery_release_ready,'COMPLETED_CHECK_OBJECTS','SKIPPED_WRONG_TARGET_OR_DATABASE') AS release_status;
 SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE()
-  AND (TABLE_NAME LIKE 'lottery_v2_%' OR TABLE_NAME LIKE 'member_lottery_points_%'
+  AND (TABLE_NAME LIKE 'lottery_v2_%'
        OR TABLE_NAME IN ('activity_store_tag','system_activity_tag_outbox')) ORDER BY TABLE_NAME;
 SELECT TABLE_NAME,COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE()
   AND ((TABLE_NAME='activity' AND COLUMN_NAME='app_scope')
        OR (TABLE_NAME='lottery_settings' AND COLUMN_NAME IN ('config_version','stock_epoch','runtime_version','prize_template_json','last_reset_scope','cache_cleaned_version'))
        OR (TABLE_NAME REGEXP '^lottery_log(_[0-9])?$' AND COLUMN_NAME='is_guarantees'))
   ORDER BY TABLE_NAME,COLUMN_NAME;
+
+SELECT TABLE_NAME,INDEX_NAME FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE()
+  AND INDEX_NAME='idx_lottery_points_code' ORDER BY TABLE_NAME,SEQ_IN_INDEX;
 
 -- 历史兜底快照回填不属于本次必执行 SQL：必须核对当时奖品配置后分批处理，未知数据保留 NULL。
 -- 不会批量启用旧活动，不会把 runtime_version 全部改为 2，不会覆盖 V2 历史账本。
