@@ -46,15 +46,19 @@ public class LotteryV2ServiceImpl implements LotteryV2Service {
             LotteryDrawSnapshot snapshot=legacy.prepareV2Draw(req,cfg,cache.prizes(cfg,req.getStoreId()));
             LotteryStockCache.Reservation reserved=null;
             try {
-                if(!Objects.equals(snapshot.getPrize().getIsGuarantees(),1))reserved=stock.reserve(b,snapshot);
-                LotteryLedger.Draw accepted=ledger.accept(b,snapshot);
+                LotteryLedger.Draw accepted;
+                try {
+                    if(!Objects.equals(snapshot.getPrize().getIsGuarantees(),1))reserved=stock.reserve(b,snapshot);
+                    accepted=ledger.accept(b,snapshot);
+                } catch(LotteryLedger.UnavailablePrize noStock) {
+                    reconcile(reserved);if(reserved!=null){reserved.close();reserved=null;}
+                    snapshot.setPrize(snapshot.getGuarantee());
+                    snapshot.setCoupon(snapshot.getGuaranteeCoupon());
+                    // 兜底受理也走下面统一的幂等/提交不确定恢复，避免并发重试时返回异常。
+                    accepted=ledger.accept(b,snapshot);
+                }
                 if(accepted.isNewlyAccepted())commit(reserved);else reconcile(reserved);
                 return result(accepted);
-            } catch(LotteryLedger.UnavailablePrize noStock) {
-                reconcile(reserved);if(reserved!=null){reserved.close();reserved=null;}
-                snapshot.setPrize(snapshot.getGuarantee());
-                snapshot.setCoupon(snapshot.getGuaranteeCoupon());
-                return result(ledger.accept(b,snapshot));
             } catch(DuplicateKeyException duplicate) {
                 reconcile(reserved);
                 LotteryLedger.Draw accepted=ledger.find(b,cfg.getActivityId(),req.getMemberId(),req.getRequestId());

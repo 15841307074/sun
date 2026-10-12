@@ -28,7 +28,7 @@ public class LotteryCacheRetention {
                     +"WHERE s.runtime_version=2 AND s.cache_cleaned_version<s.config_version AND a.end_date<DATE_SUB(NOW(),INTERVAL 7 DAY) "
                     +"AND NOT EXISTS(SELECT 1 FROM lottery_v2_request r WHERE r.business_id=s.business_id AND r.activity_id=s.activity_id AND (r.draw_status='ACCEPTED' OR r.updated_at>=DATE_SUB(NOW(),INTERVAL 7 DAY))) "
                     +"AND NOT EXISTS(SELECT 1 FROM lottery_v2_job j JOIN lottery_v2_request r ON r.id=j.request_pk WHERE r.business_id=s.business_id AND r.activity_id=s.activity_id AND (j.state<>'DONE' OR j.updated_at>=DATE_SUB(NOW(),INTERVAL 7 DAY))) "
-                    +"AND NOT EXISTS(SELECT 1 FROM lottery_v2_counter_cache_task c WHERE c.business_id=s.business_id AND c.activity_id=s.activity_id AND c.dirty=1) ORDER BY a.end_date LIMIT 100");
+                    +"AND NOT EXISTS(SELECT 1 FROM lottery_v2_counter c WHERE c.business_id=s.business_id AND c.activity_id=s.activity_id AND c.scope_key='TOTAL' AND c.source=0 AND c.cache_dirty=1) ORDER BY a.end_date LIMIT 100");
             for(var row:activities) {
                 long b=((Number)row.get("business_id")).longValue(),a=((Number)row.get("activity_id")).longValue();
                 String version=row.get("config_version").toString(),registry=LotteryKeys.mutableRegistry(b,a);

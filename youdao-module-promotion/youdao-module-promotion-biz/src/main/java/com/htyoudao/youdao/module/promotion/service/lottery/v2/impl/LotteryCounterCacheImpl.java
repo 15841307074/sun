@@ -40,7 +40,7 @@ public class LotteryCounterCacheImpl implements LotteryCounterCache {
     @Override
     public void changed(long b,long a,long member) {
         long revision=jdbc.queryForObject("SELECT revision FROM lottery_v2_counter WHERE business_id=? AND activity_id=? AND member_id=? AND scope_key='TOTAL' AND source=0",Long.class,b,a,member);
-        jdbc.update("INSERT INTO lottery_v2_counter_cache_task(business_id,activity_id,member_id,revision) VALUES(?,?,?,?) ON DUPLICATE KEY UPDATE revision=GREATEST(revision,VALUES(revision)),dirty=1,next_at=NOW(3)",b,a,member,revision);
+        jdbc.update("UPDATE lottery_v2_counter SET cache_dirty=1,cache_next_at=NOW(3) WHERE business_id=? AND activity_id=? AND member_id=? AND scope_key='TOTAL' AND source=0",b,a,member);
         Runnable publish=()->{try{publishHead(b,a,member,revision);}catch(Exception e){log.debug("Lottery quota publication deferred: activity={}",a);}};
         if(TransactionSynchronizationManager.isActualTransactionActive())TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization(){
             @Override
@@ -71,10 +71,10 @@ public class LotteryCounterCacheImpl implements LotteryCounterCache {
     @Scheduled(fixedDelay=1000)
     @Override
     public void retry() {
-        try{for(var row:jdbc.queryForList("SELECT * FROM lottery_v2_counter_cache_task WHERE dirty=1 AND next_at<=NOW(3) LIMIT 64")){
+        try{for(var row:jdbc.queryForList("SELECT business_id,activity_id,member_id,revision FROM lottery_v2_counter WHERE scope_key='TOTAL' AND source=0 AND cache_dirty=1 AND cache_next_at<=NOW(3) ORDER BY cache_next_at LIMIT 64")){
             long b=num(row,"business_id"),a=num(row,"activity_id"),m=num(row,"member_id"),v=num(row,"revision");
-            try{publishHead(b,a,m,v);jdbc.update("UPDATE lottery_v2_counter_cache_task SET dirty=0 WHERE business_id=? AND activity_id=? AND member_id=? AND revision=?",b,a,m,v);}
-            catch(Exception e){jdbc.update("UPDATE lottery_v2_counter_cache_task SET next_at=DATE_ADD(NOW(3),INTERVAL 10 SECOND) WHERE business_id=? AND activity_id=? AND member_id=?",b,a,m);}
+            try{publishHead(b,a,m,v);jdbc.update("UPDATE lottery_v2_counter SET cache_dirty=0 WHERE business_id=? AND activity_id=? AND member_id=? AND scope_key='TOTAL' AND source=0 AND revision=?",b,a,m,v);}
+            catch(Exception e){jdbc.update("UPDATE lottery_v2_counter SET cache_next_at=DATE_ADD(NOW(3),INTERVAL 10 SECOND) WHERE business_id=? AND activity_id=? AND member_id=? AND scope_key='TOTAL' AND source=0 AND revision=?",b,a,m,v);}
         }}catch(Exception e){log.debug("Lottery quota publisher unavailable: {}",e.getClass().getSimpleName());}
     }
     private long ttl(String period){

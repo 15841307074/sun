@@ -104,7 +104,7 @@ public class LotteryLedgerImpl implements LotteryLedger {
     }
     @Override
     public long activityDrawCount(long b,long a) {
-        var totals=jdbc.queryForList("SELECT total FROM lottery_v2_activity_counter WHERE business_id=? AND activity_id=?",Long.class,b,a);
+        var totals=jdbc.queryForList("SELECT gained FROM lottery_v2_counter WHERE business_id=? AND activity_id=? AND member_id=0 AND scope_key='ACTIVITY_TOTAL' AND source=0",Long.class,b,a);
         return totals.isEmpty()?0:totals.get(0);
     }
     @Override
@@ -159,7 +159,7 @@ public class LotteryLedgerImpl implements LotteryLedger {
         jdbc.update("INSERT INTO lottery_v2_request(id,business_id,activity_id,settings_id,member_id,store_id,request_id,config_version,stock_epoch,pool_store_id,prize_code,prize_id,stock_state,chance_source,scope_key,points_cost,out_bill_no,snapshot_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 id,b,a,cfg.getId(),m,req.getStoreId(),req.getRequestId(),cfg.getConfigVersion(),cfg.getStockEpoch(),pool,prize.getCode(),prize.getId(),stocked?"RESERVED":"NONE",chosen.getSource(),chosen.getScope(),chosen.getPointsCost(),"L"+id,encode(snapshot));
         jdbc.update("INSERT INTO lottery_v2_job(request_pk) VALUES(?)",id);
-        jdbc.update("INSERT INTO lottery_v2_activity_counter(business_id,activity_id,total) VALUES(?,?,1) ON DUPLICATE KEY UPDATE total=total+1",b,a);
+        jdbc.update("INSERT INTO lottery_v2_counter(business_id,activity_id,member_id,scope_key,source,gained) VALUES(?,?,0,'ACTIVITY_TOTAL',0,1) ON DUPLICATE KEY UPDATE gained=gained+1",b,a);
         quotaCache.changed(b,a,m);
         // 插入所需字段均已确定，无需立即重读并反序列化。
         Draw accepted=new Draw(); accepted.setId(id); accepted.setBusinessId(b); accepted.setActivityId(a);
@@ -202,7 +202,7 @@ public class LotteryLedgerImpl implements LotteryLedger {
         grantState(id,"FAILED",null,true,false);
         for(Object[] counter:new Object[][]{{"TOTAL",0},{draw.getSnapshot().getScopeKey(),0},{draw.getScopeKey(),draw.getSource()}})
             jdbc.update("UPDATE lottery_v2_counter SET consumed=consumed-1,revision=revision+1 WHERE business_id=? AND activity_id=? AND member_id=? AND scope_key=? AND source=? AND consumed>0",draw.getBusinessId(),draw.getActivityId(),draw.getMemberId(),counter[0],counter[1]);
-        jdbc.update("UPDATE lottery_v2_activity_counter SET total=total-1 WHERE business_id=? AND activity_id=? AND total>0",draw.getBusinessId(),draw.getActivityId());
+        jdbc.update("UPDATE lottery_v2_counter SET gained=gained-1 WHERE business_id=? AND activity_id=? AND member_id=0 AND scope_key='ACTIVITY_TOTAL' AND source=0 AND gained>0",draw.getBusinessId(),draw.getActivityId());
         quotaCache.changed(draw.getBusinessId(),draw.getActivityId(),draw.getMemberId());
     }
 

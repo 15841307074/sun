@@ -1,4 +1,4 @@
-﻿-- 抽奖改造统一发布 SQL · 2026-10-08
+﻿-- 抽奖改造统一发布 SQL · 2026-10-12（兼容此前版本）
 -- 覆盖：标签适用范围、V2 库存/请求/任务账本、门店标签通知、会员积分幂等、最近中奖、人工补发权限。
 -- 仅本轮增量，不包含历史基础建表/旧活动数据迁移，不删除历史数据，不清零库存或次数。
 --
@@ -159,8 +159,10 @@ SET @lottery_release_ddl = IF(@lottery_do_promotion,
   scope_key VARCHAR(128) COLLATE utf8mb4_bin NOT NULL, source INT NOT NULL,
   gained BIGINT NOT NULL DEFAULT 0, consumed BIGINT NOT NULL DEFAULT 0, finished BIGINT NOT NULL DEFAULT 0,
   revision BIGINT NOT NULL DEFAULT 1,
+  cache_dirty TINYINT NOT NULL DEFAULT 0,cache_next_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-  PRIMARY KEY (business_id, activity_id, member_id, scope_key, source)
+  PRIMARY KEY (business_id, activity_id, member_id, scope_key, source),
+  KEY idx_lottery_counter_publish (scope_key,source,cache_dirty,cache_next_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4',
   'DO 0');
 PREPARE lottery_release_stmt FROM @lottery_release_ddl;
@@ -193,22 +195,38 @@ PREPARE lottery_release_stmt FROM @lottery_release_ddl;
 EXECUTE lottery_release_stmt;
 DEALLOCATE PREPARE lottery_release_stmt;
 
-SET @lottery_release_ddl = IF(@lottery_do_promotion,
-  'CREATE TABLE IF NOT EXISTS lottery_v2_activity_counter (
-  business_id BIGINT NOT NULL,activity_id BIGINT NOT NULL,total BIGINT NOT NULL DEFAULT 0,
-  PRIMARY KEY(business_id,activity_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4',
+-- 2026-10-12：汇总与次数缓存发布复用次数表，不再创建两个辅助表。
+-- 升级时暂停旧抽奖/发奖实例，迁移后整体切换；不修改真实抽奖次数，不自动 DROP 旧表。
+SET @lottery_release_ddl = IF(@lottery_do_promotion AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='lottery_v2_counter') AND NOT EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='lottery_v2_counter' AND COLUMN_NAME='cache_dirty'),
+  'ALTER TABLE lottery_v2_counter ADD COLUMN cache_dirty TINYINT NOT NULL DEFAULT 0',
   'DO 0');
 PREPARE lottery_release_stmt FROM @lottery_release_ddl;
 EXECUTE lottery_release_stmt;
 DEALLOCATE PREPARE lottery_release_stmt;
 
-SET @lottery_release_ddl = IF(@lottery_do_promotion,
-  'CREATE TABLE IF NOT EXISTS lottery_v2_counter_cache_task (
-  business_id BIGINT NOT NULL,activity_id BIGINT NOT NULL,member_id BIGINT NOT NULL,
-  revision BIGINT NOT NULL,dirty TINYINT NOT NULL DEFAULT 1,next_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-  PRIMARY KEY(business_id,activity_id,member_id),KEY idx_lottery_quota_publish(dirty,next_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4',
+SET @lottery_release_ddl = IF(@lottery_do_promotion AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='lottery_v2_counter') AND NOT EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='lottery_v2_counter' AND COLUMN_NAME='cache_next_at'),
+  'ALTER TABLE lottery_v2_counter ADD COLUMN cache_next_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)',
+  'DO 0');
+PREPARE lottery_release_stmt FROM @lottery_release_ddl;
+EXECUTE lottery_release_stmt;
+DEALLOCATE PREPARE lottery_release_stmt;
+
+SET @lottery_release_ddl = IF(@lottery_do_promotion AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='lottery_v2_counter') AND NOT EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='lottery_v2_counter' AND INDEX_NAME='idx_lottery_counter_publish'),
+  'ALTER TABLE lottery_v2_counter ADD INDEX idx_lottery_counter_publish (scope_key,source,cache_dirty,cache_next_at)',
+  'DO 0');
+PREPARE lottery_release_stmt FROM @lottery_release_ddl;
+EXECUTE lottery_release_stmt;
+DEALLOCATE PREPARE lottery_release_stmt;
+
+SET @lottery_release_ddl = IF(@lottery_do_promotion AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='lottery_v2_counter') AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='lottery_v2_activity_counter'),
+  'INSERT IGNORE INTO lottery_v2_counter(business_id,activity_id,member_id,scope_key,source,gained) SELECT business_id,activity_id,0,''ACTIVITY_TOTAL'',0,total FROM lottery_v2_activity_counter',
+  'DO 0');
+PREPARE lottery_release_stmt FROM @lottery_release_ddl;
+EXECUTE lottery_release_stmt;
+DEALLOCATE PREPARE lottery_release_stmt;
+
+SET @lottery_release_ddl = IF(@lottery_do_promotion AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='lottery_v2_counter') AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='lottery_v2_counter_cache_task'),
+  'UPDATE lottery_v2_counter c SET cache_dirty=1,cache_next_at=(SELECT LEAST(old.next_at,NOW(3)) FROM lottery_v2_counter_cache_task old WHERE old.business_id=c.business_id AND old.activity_id=c.activity_id AND old.member_id=c.member_id) WHERE c.scope_key=''TOTAL'' AND c.source=0 AND EXISTS(SELECT 1 FROM lottery_v2_counter_cache_task old WHERE old.business_id=c.business_id AND old.activity_id=c.activity_id AND old.member_id=c.member_id AND old.dirty=1 AND c.revision>=old.revision)',
   'DO 0');
 PREPARE lottery_release_stmt FROM @lottery_release_ddl;
 EXECUTE lottery_release_stmt;

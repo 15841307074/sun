@@ -110,10 +110,11 @@ public class LotteryCachePublisherImpl implements LotteryCachePublisher {
         redis.execute(PUBLISH, List.of(LotteryKeys.key(b,a,"config-version",0)), Long.toString(version));
         redis.opsForValue().increment(LotteryKeys.key(b,0,"store-list-version",0));
         // 仅清理旧版展示缓存，不触碰库存键。
+        List<Long> stores=jdbc.queryForList("SELECT DISTINCT store_id FROM lottery_prize WHERE lottery_id=? AND business_id=? AND store_id IS NOT NULL",Long.class,settings,b);
         for(long id : new long[]{a,settings}) {
             redis.delete(LOTTERY_SETTING+id);
             redis.delete(LOTTERY_PRIZE+id);
-            for(Long store : jdbc.queryForList("SELECT DISTINCT store_id FROM lottery_prize WHERE lottery_id=? AND business_id=? AND store_id IS NOT NULL",Long.class,settings,b))
+            for(Long store : stores)
                 redis.delete(LOTTERY_PRIZE+id+":store:"+store);
         }
         jdbc.update("UPDATE lottery_v2_cache_task SET dirty=0,attempts=0 WHERE business_id=? AND activity_id=? AND config_version=?",b,a,version);

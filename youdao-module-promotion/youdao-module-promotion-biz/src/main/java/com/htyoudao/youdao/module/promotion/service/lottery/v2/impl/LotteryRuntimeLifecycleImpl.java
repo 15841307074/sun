@@ -61,9 +61,8 @@ public class LotteryRuntimeLifecycleImpl implements LotteryRuntimeLifecycle {
         // 旧版标记若已存在新版业务数据，拒绝重新初始化。
         Long existing = jdbc.queryForObject("SELECT (SELECT COUNT(*) FROM lottery_v2_request WHERE business_id=? AND activity_id=?) + " +
                 "(SELECT COUNT(*) FROM lottery_v2_counter WHERE business_id=? AND activity_id=?) + " +
-                "(SELECT COUNT(*) FROM lottery_v2_activity_counter WHERE business_id=? AND activity_id=?) + " +
                 "(SELECT COUNT(*) FROM lottery_v2_stock WHERE business_id=? AND activity_id=?)", Long.class,
-                b,cfg.getActivityId(),b,cfg.getActivityId(),b,cfg.getActivityId(),b,cfg.getActivityId());
+                b,cfg.getActivityId(),b,cfg.getActivityId(),b,cfg.getActivityId());
         if (existing != null && existing > 0) throw new IllegalArgumentException("历史活动存在新版运行数据，请核对运行版本，不能重复初始化");
         scope.prepareLegacyPrizes(cfg);
         cfg.setStockEpoch(Optional.ofNullable(cfg.getStockEpoch()).orElse(1L) + 1);
