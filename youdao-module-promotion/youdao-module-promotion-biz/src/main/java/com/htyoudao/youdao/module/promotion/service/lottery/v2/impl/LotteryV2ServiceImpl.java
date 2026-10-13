@@ -31,6 +31,7 @@ public class LotteryV2ServiceImpl implements LotteryV2Service {
     @Resource
     private LotteryResultCache results;
     @Resource @Lazy private LotteryMobileServiceImpl legacy;
+    @Resource @Lazy private LotteryGrantWorker grants;
 
     @Override
     public boolean enabled(LotterySettingsCacheDataVO cfg) {return Objects.equals(cfg.getRuntimeVersion(),2);}
@@ -58,20 +59,51 @@ public class LotteryV2ServiceImpl implements LotteryV2Service {
                     accepted=ledger.accept(b,snapshot);
                 }
                 if(accepted.isNewlyAccepted())commit(reserved);else reconcile(reserved);
-                return result(accepted);
+                // 微信调用前释放库存锁，红包准备不会阻塞同奖品的其他抽奖。
+                if(reserved!=null){reserved.close();reserved=null;}
+                return drawResponse(accepted);
             } catch(DuplicateKeyException duplicate) {
                 reconcile(reserved);
+                if(reserved!=null){reserved.close();reserved=null;}
                 LotteryLedger.Draw accepted=ledger.find(b,cfg.getActivityId(),req.getMemberId(),req.getRequestId());
                 if(accepted==null)throw duplicate;
-                return sameRequest(accepted,req);
+                if(accepted.getStoreId()!=req.getStoreId())throw new IllegalArgumentException("同一 requestId 不能更换门店");
+                return drawResponse(accepted);
             } catch(RuntimeException failed) {
+                if(failed instanceof com.htyoudao.youdao.framework.common.exception.ServiceException business
+                        &&(business.getCode()==LOTTERY_CASH_PREPARING.getCode()||business.getCode()==LOTTERY_CASH_FAILED.getCode()))throw failed;
                 // 提交结果不确定时查询持久化流水，不盲目回退库存。
                 reconcile(reserved);
+                if(reserved!=null){reserved.close();reserved=null;}
                 LotteryLedger.Draw accepted=ledger.find(b,cfg.getActivityId(),req.getMemberId(),req.getRequestId());
-                if(accepted!=null)return sameRequest(accepted,req);
+                if(accepted!=null){if(accepted.getStoreId()!=req.getStoreId())throw new IllegalArgumentException("同一 requestId 不能更换门店");return drawResponse(accepted);}
                 throw failed;
             } finally {if(reserved!=null)reserved.close();}
         }
+    }
+    @Override
+    public LotteryUserLogVO prepareCashResult(LotteryVO req) {
+        validateRequest(req);long b=BusinessContextHolder.getRequiredBusinessId();
+        try(var permit=admission.enter("result",b,0,req.getMemberId())) {
+            LotteryLedger.Draw draw=ledger.findByReference(b,req.getLotteryId(),req.getMemberId(),req.getRequestId());
+            if(draw==null||draw.getStoreId()!=req.getStoreId())throw new IllegalArgumentException("原红包抽奖流水不存在或门店不一致");
+            return drawResponse(draw);
+        }
+    }
+    private LotteryUserLogVO drawResponse(LotteryLedger.Draw draw) {
+        if(Objects.equals(draw.getSnapshot().getPrize().getPrizeType(),5)&&"ACCEPTED".equals(draw.getDrawStatus())
+                &&(draw.getResult()==null||draw.getResult().getPackageInfo()==null||draw.getResult().getPackageInfo().isBlank())) {
+            grants.prepareCash(draw.getId());
+            LotteryLedger.Draw refreshed=ledger.get(draw.getId());if(refreshed!=null)draw=refreshed;
+        }
+        LotteryUserLogVO response=result(draw);
+        if(response.getPrizeType()==5) {
+            if("FAILED".equals(draw.getDrawStatus()))throw exception(LOTTERY_CASH_FAILED);
+            if(!"SUCCESS".equals(draw.getGrantStatus())
+                    &&(!"WAIT_USER_CONFIRM".equals(draw.getGrantStatus())||response.getPackageInfo()==null||response.getPackageInfo().isBlank()))
+                throw exception(LOTTERY_CASH_PREPARING);
+        }
+        return response;
     }
     @Override
     public LotteryUserLogVO query(LotteryVO req) {

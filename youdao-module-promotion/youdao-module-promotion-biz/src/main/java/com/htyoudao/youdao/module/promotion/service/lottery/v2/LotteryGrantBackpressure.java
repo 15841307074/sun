@@ -1,6 +1,5 @@
 package com.htyoudao.youdao.module.promotion.service.lottery.v2;
 
-import com.baomidou.dynamic.datasource.annotation.DS;
 import com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder;
 import jakarta.annotation.PreDestroy;
 import jakarta.annotation.Resource;
@@ -22,13 +21,13 @@ import static com.htyoudao.youdao.module.promotion.api.enums.ErrorCodeConstants.
 
 /** 八实例共享发奖压力快照；只在新抽奖请求到来时刷新，不新增空闲扫描。 */
 @Component
-@DS("master")
 @Slf4j
 public class LotteryGrantBackpressure {
     private static final int HIGH=100,LOW=30;
     private static final long REFRESH_MILLIS=2000;
     private static final String SNAPSHOT=LotteryKeys.key(0,0,"grant-pressure","snapshot");
     private static final String LOCK=LotteryKeys.key(0,0,"grant-pressure","refresh-lock");
+    private static final String BOOTSTRAP=LotteryKeys.key(0,0,"grant-pressure","bootstrap");
     private static final DefaultRedisScript<Long> SAVE=new DefaultRedisScript<>(
             "local old=redis.call('GET',KEYS[1]); local paused=0; if old then paused=tonumber(string.match(old,'^%d+:([01]):%d+$')) or 1 end; local n=tonumber(ARGV[1]); if n>=tonumber(ARGV[3]) then paused=1 elseif n<=tonumber(ARGV[4]) then paused=0 end; redis.call('SET',KEYS[1],ARGV[1]..':'..paused..':'..ARGV[2],'EX',600); return paused",Long.class);
     private static final DefaultRedisScript<Long> UNLOCK=new DefaultRedisScript<>(
@@ -46,25 +45,29 @@ public class LotteryGrantBackpressure {
         if(snapshot!=null&&now>=snapshot.at()&&now-snapshot.at()<REFRESH_MILLIS){check(snapshot.paused());return;}
         String token=UUID.randomUUID().toString();
         if(Boolean.TRUE.equals(redis.opsForValue().setIfAbsent(LOCK,token,Duration.ofSeconds(60)))) {
-            try {refreshExecutor.execute(()->refresh(token));}
+            String source=DynamicDataSourceContextHolder.peek();
+            try {refreshExecutor.execute(()->refresh(token,source));}
             catch(RejectedExecutionException busy){unlock(token);}
         }
-        // 数据库刷新只在后台进行；请求最多使用五秒内的旧快照，过旧则拒绝。
-        check(snapshot==null||now<snapshot.at()||now-snapshot.at()>5000||snapshot.paused());
+        // 旧快照继续用于判断，过期本身不代表积压；刷新失败会发布暂停快照。
+        // 首次没有快照时，全实例合计只放行一个受控请求，避免首个正常点击必被拒绝。
+        if(snapshot==null)check(!Boolean.TRUE.equals(redis.opsForValue().setIfAbsent(BOOTSTRAP,token,Duration.ofSeconds(60))));
+        else check(snapshot.paused());
     }
 
-    private void refresh(String token) {
-        DynamicDataSourceContextHolder.push("master");
+    private void refresh(String token,String source) {
+        if(source!=null)DynamicDataSourceContextHolder.push(source);
         try {
             int count=pendingCount();
             Long paused=redis.execute(SAVE,List.of(SNAPSHOT),Integer.toString(count),Long.toString(clock.getAsLong()),Integer.toString(HIGH),Integer.toString(LOW));
             if(paused==null)throw new IllegalStateException("未写入发奖积压快照");
+            redis.delete(BOOTSTRAP);
         } catch(RuntimeException e) {
             try {redis.opsForValue().set(SNAPSHOT,HIGH+":1:"+clock.getAsLong(),Duration.ofMinutes(10));}
             catch(RuntimeException redisUnavailable){log.warn("Lottery grant pressure snapshot unavailable: {}",redisUnavailable.getClass().getSimpleName());}
             log.warn("Lottery grant pressure unavailable: {}",e.getClass().getSimpleName());
         } finally {
-            DynamicDataSourceContextHolder.poll();
+            if(source!=null)DynamicDataSourceContextHolder.poll();
             unlock(token);
         }
     }

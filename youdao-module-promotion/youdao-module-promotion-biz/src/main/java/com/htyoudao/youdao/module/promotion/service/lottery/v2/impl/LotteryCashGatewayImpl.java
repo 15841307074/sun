@@ -4,6 +4,9 @@ import com.htyoudao.youdao.module.promotion.service.lottery.v2.*;
 
 import com.htyoudao.youdao.module.promotion.controller.admin.wechatDemo.TransferToUser;
 import com.htyoudao.youdao.module.promotion.controller.app.lotteryRedPacket.config.LotteryWeChatPayConfig;
+import com.htyoudao.youdao.module.promotion.controller.app.lotteryRedPacket.VO.LotteryRedPacketVo;
+import com.htyoudao.youdao.module.promotion.dal.dataobject.lotteryRedPacket.LotteryTransferSceneReportDO;
+import com.htyoudao.youdao.module.promotion.service.lotteryRedPacket.LotteryRedPacketService;
 import com.htyoudao.youdao.module.promotion.util.WechatRedEnvelope.WXPayUtility;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
@@ -17,6 +20,7 @@ import java.util.List;
 public class LotteryCashGatewayImpl implements LotteryCashGateway {
     @Resource
     private LotteryWeChatPayConfig config;
+    @Resource private LotteryRedPacketService redPackets;
     private volatile TransferToUser client;
     private volatile List<String> clientConfig;
     private TransferToUser client() {
@@ -30,19 +34,19 @@ public class LotteryCashGatewayImpl implements LotteryCashGateway {
     }
     @Override
     public TransferToUser.TransferToUserResponse reconcileOrSend(LotteryLedger.Draw draw) {
-        TransferToUser api=client();
-        try{return api.query(draw.cashBillNo());}
-        catch(WXPayUtility.ApiException e){if(e.getStatusCode()!=404||!"NOT_FOUND".equals(e.getErrorCode()))throw e;}
+        return redPackets.transferUser(buildRedPacketVo(draw),client());
+    }
+    private LotteryRedPacketVo buildRedPacketVo(LotteryLedger.Draw draw) {
         var snapshot=draw.getSnapshot();
-        TransferToUser.TransferToUserRequest req=new TransferToUser.TransferToUserRequest();
-        req.appid=config.getAppId();req.outBillNo=draw.cashBillNo();req.openid=snapshot.getMember().getOpenid();
-        req.transferSceneId=config.getTransferSceneId();req.notifyUrl=config.getNotifyUrl();
-        req.transferAmount=snapshot.getPrize().getPrizeValue().movePointRight(2).setScale(0,RoundingMode.HALF_UP).intValueExact();
-        req.transferRemark="活动抽奖奖励";
-        TransferToUser.TransferSceneReportInfo activity=new TransferToUser.TransferSceneReportInfo();activity.infoType="活动名称";activity.infoContent=snapshot.getSettings().getLotteryTitle();
-        TransferToUser.TransferSceneReportInfo reason=new TransferToUser.TransferSceneReportInfo();reason.infoType="奖励说明";reason.infoContent="参与活动抽奖获得奖励";
-        req.transferSceneReportInfos=List.of(activity,reason);
-        return api.run(req);
+        LotteryRedPacketVo vo=new LotteryRedPacketVo();
+        vo.setActivityId(draw.getActivityId());vo.setOutBillNo(draw.cashBillNo());vo.setOpenId(snapshot.getMember().getOpenid());
+        vo.setTransferAmount(snapshot.getPrize().getPrizeValue().movePointRight(2).setScale(0,RoundingMode.HALF_UP).intValueExact());
+        vo.setTransferRemark("抽奖活动红包");
+        LotteryTransferSceneReportDO activity=new LotteryTransferSceneReportDO();activity.setInfoType("活动名称");
+        String title=snapshot.getSettings().getLotteryTitle();activity.setInfoContent(title==null||title.isBlank()?"抽奖活动":title);
+        LotteryTransferSceneReportDO reason=new LotteryTransferSceneReportDO();reason.setInfoType("奖励说明");reason.setInfoContent("参与活动抽奖获得奖励");
+        vo.setSceneReports(List.of(activity,reason));
+        return vo;
     }
     /** 人工补发前只查单，不直接发起支付；未知状态不能换新支付单号。 */
     @Override

@@ -118,9 +118,9 @@ api('result','小程序', 'POST',base+'/result','查询同一次抽奖及发奖�
 api('winners','小程序','GET',base+'/recent-winners','最新 20 条非兜底中奖记录','新增','进入抽奖页加载滚动中奖区；自己抽奖完成后刷新；展示区可低频刷新。',
  [('activityId','Long','必填','活动主表 activity.id，来自 cacheData.activityId；不接受配置 ID')],None,common([dict(memberMobile='159****5152',prizeName='100积分')]),
  ['无记录返回 data=[]；不足 20 条返回实际数量，不支持 pageNo/pageSize/limit。','汇总活动所有门店，按记录时间倒序；同一用户多次真实中奖可显示多条。','后端排除兜底、无奖品和未核对兜底快照的历史记录；红包完成发奖并保存记录后才展示。','每条只有 memberMobile、prizeName，不包含用户 ID、头像、中奖时间、门店或完整手机号。','展示接口失败可保留上次列表，不能阻断抽奖主流程。'],['LotteryRecentWinnerRespVO'])
-api('draw','小程序','POST',base+'/lottery','发起抽奖（立即返回奖品，异步发放）','变更','用户明确点击一次抽奖时，先生成并保存本次 requestId，再调用一次。',
+api('draw','小程序','POST',base+'/lottery','发起抽奖（红包返回领取参数，其他奖品异步发放）','变更','用户明确点击一次抽奖时，先生成并保存本次 requestId，再调用一次。',
  [('lotteryId','Long','V2 必填','活动详情/路由上下文'),('memberId','Long','V2 必填','当前会员'),('storeId','Long','V2 必填','当前门店'),('requestId','String','V2 必填','前端生成，同次重试不变'),('cityName','String','可选','沿用城市定位'),('isFree / integral','Integer','沿用','不控制 V2 实际扣费/机会来源')],draw,common(accepted),
- ['code=0 且有奖品数据时，前端直接完成本轮中奖展示，不等待异步发奖；中奖不等同于奖励已到账。','同次请求固定活动、会员、门店与 requestId；下一次明确抽奖换新 ID。防重范围包含项目、活动、会员、requestId。','网络超时优先调用 result；不要重生成 requestId 盲目重抽。','grantStatus 仅说明发放进度，不作为转盘动画或是否允许下一次抽奖的条件；当前后台仍可能在红包失败后切换兜底，此次字段移除没有调整该发奖补偿逻辑。','旧活动继续走旧流程，新增 requestId/grantStatus 可为空；runtimeVersion=1/缺失时沿用原页面处理。'],['LotteryUserLogVO','LotteryVO'])
+ ['code=0 且有奖品数据时直接展示中奖；积分、优惠券、实物不等待异步发放，红包先准备微信转账单和完整领取参数再返回，确认到账仍异步。','同次请求固定活动、会员、门店与 requestId；下一次明确抽奖换新 ID。防重范围包含项目、活动、会员、requestId。','网络超时优先调用 result；不要重生成 requestId 盲目重抽。','红包 grantStatus=WAIT_USER_CONFIRM 且 packageInfo/outBillNo 有值时，直接供原立即领取按钮调用微信接口，正常无需先查询 result。','1006005031 表示原抽奖已受理但红包尚未就绪，使用原 requestId 重试本次 lottery；不生成新 ID 再扣次数。1006005032 表示红包明确失败，记录保留供人工核对。','红包在调用微信前保存未领取记录，领取参数就绪后回写原记录；准备失败也保留记录和固定商户单号。','grantStatus 说明发放进度；红包明确失败仍可沿用原兜底逻辑，未知状态不盲目换单或释放库存。','旧活动继续走旧流程，新增 requestId/grantStatus 可为空；runtimeVersion=1/缺失时沿用原页面处理。'],['LotteryUserLogVO','LotteryVO'])
 api('app-detail','小程序','POST',base+'/getLotteryDetailApp','活动详情（新增 cacheData 运行字段）','变更','进入抽奖页先请求，确定流程版本和当前门店是否可参加。',
  [('lotteryId','Long','必填','活动主表 ID，兼容配置 ID'),('storeId','Long','V2 必填','当前门店'),('memberId','Long','建议沿用','当前会员上下文')],{k:v for k,v in draw.items() if k!='requestId'},common(dict(cacheData=dict(id=admin_detail['id'],activityId=draw['lotteryId'],appScope=1,tagIds=scope['tagIds'],runtimeVersion=2,configVersion=3,stockEpoch=1),prizes=[])),
  ['新增字段在 data.cacheData 内，不在 data 顶层。详情校验活动状态和门店范围，失败时不继续开放抽奖按钮。','runtimeVersion/configVersion/stockEpoch 是后端字段，不属于后台新增/编辑提交字段。','标签是否命中由后端判断，前端不按 tagIds 自己计算参加资格。'],['LotterySettingsCacheDataVO'])
@@ -208,7 +208,7 @@ for group in dict.fromkeys(x['group'] for x in apis):
 
 statusrows=[['PENDING','后台尚待发放；不阻塞中奖展示或下一次抽奖'],['PROCESSING / ACCEPTED / TRANSFERING / CANCELING','发放/红包处理中；按需查询，不能当作到账成功'],['WAIT_USER_CONFIRM','真实 packageInfo 存在时，提供现有微信确认收款入口'],['SUCCESS','已发放成功'],['FAILED / RETURNED','发放失败或已退回；用于领奖页面与人工排查'],['空/缺失','旧活动按现有领奖流程处理']]
 sections.append('<section id="accepted-examples"><h2>中奖结果与发放进度 · 响应示例</h2><p>接口直接返回奖品，同时保留可选的 grantStatus 供领取/排查使用；不要求抽奖页等待发放完成。PENDING 不表示没有抽出奖品。</p>'+code(common(accepted),'示例 1 · lottery 返回中奖奖品，发放待处理')+code(common(dict(accepted,requestId='cash_demo_20261008_001',prizeName='10元红包',prizeType=5,outBillNo='L2104868000000000001',grantStatus='WAIT_USER_CONFIRM',packageInfo='示意值：由微信返回，前端不可自行生成')),'示例 2 · 按需查询红包领取信息')+code(common(dict(accepted,grantStatus='SUCCESS')),'示例 3 · 查询原积分奖品的发放结果')+'<p>示例 1/3 使用同一 requestId，示例 2 是另一轮红包请求。示例中的 ID、奖品、图片及 packageInfo 都是说明值。</p></section>')
-sections.append('<section id="statuses"><h2>发放进度与红包领取</h2>'+table(['grantStatus','前端处理'],statusrows)+'<p>发放进度服务于领取入口和异常排查，不是抽奖结果展示条件。普通积分/优惠券/实物中奖无需为了这一字段持续调用 result。</p><p>红包需要后续取得 packageInfo 时可查询 result；确认操作完成后可再查到账状态。result 本身不触发补发。前端不主动调用 /promotion/redPacket/send 发奖，/notify 为微信服务端回调。</p></section>')
+sections.append('<section id="statuses"><h2>发放进度与红包领取</h2>'+table(['grantStatus','前端处理'],statusrows)+'<p>普通积分/优惠券/实物中奖无需为了发放进度持续调用 result。</p><p>正常红包从 lottery 直接取得 packageInfo/outBillNo，再由立即领取按钮调用微信；1006005031 时保留原 requestId 重试本次 lottery，或只查 result 核对原结果。确认操作完成后可再查到账状态。result 本身不发起转账或补发。前端不主动调用 /promotion/redPacket/send 发奖，/notify 为微信服务端回调。</p></section>')
 sections.append('<section id="scope"><h2>标签/门店切换规则</h2>'+table(['场景','提交字段','前端行为'],[
  ['按标签','<code>appScope=1, activityStore=0, tagIds=[标签值ID...]</code>','tagIds 至少一个有效正数；任意标签命中即可。不能以 storeIds 代替标签。'],
  ['指定门店','<code>appScope=0, activityStore=0, storeIds=[门店ID...], tagIds=[]</code>','门店 ID 从现有门店选择器取得；切换后标签关系由后端清除。'],
@@ -239,6 +239,8 @@ sections.append('<section id="errors"><h2>错误与兼容处理</h2>'+table(['�
  ['<code>1006000009</code> 活动总/来源次数达到上限','提示 msg，刷新 lotteryNum；不循环重复发起新抽奖。'],
  ['<code>1006000005</code> 周期次数达到上限','提示 msg，按现有次数限制展示。'],
  ['<code>1006005030</code> 人工补发未受理','检查原流水、项目、会员、门店、退奖状态或原库存；根据 msg 核对，不创建新 requestId 绕过。'],
+ ['<code>1006005031</code> 红包处理中','原抽奖已经受理，保留同一 requestId 重试原 lottery，不创建新抽奖。'],
+ ['<code>1006005032</code> 红包发放失败','查看保留的中奖记录并人工核对，不能用空领取参数调用微信。'],
  ['tagIds 未选 / appScope 非 0、1','提交前校验；服务端具体 code/msg 由统一异常处理产生，不能写死成固定 HTTP 码。'],
  ['不存在 / 不适用门店 / 活动停用或过期','使用服务端 msg，停止页面新抽奖；不要只凭缓存按钮状态绕过。'],
  ['result.data=null 或网络超时','保留 pending，稍后查；需要重发时仅重发原 lottery 及原 requestId。'],
@@ -266,5 +268,5 @@ function reveal(){const id=location.hash.slice(1),el=document.getElementById(id)
 '''
 doc='<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>抽奖 V2 · 前端接口文档</title><style>'+css+'</style></head><body><header><h1>抽奖 V2 · 前端接口文档</h1><p>Swagger 风格 · 新增接口 / 新增字段 / 调用时机 / 字段来源 · 2026-10-08</p></header><div class="layout"><nav>'+navigation+'</nav><main><div class="chips"><span class="chip">3 个新增接口</span><span class="chip">标签范围配置</span><span class="chip">人工补发不扣次/积分</span><span class="chip">离线可分享</span></div><div class="toolbar"><input id="search" type="search" aria-label="搜索接口或字段" placeholder="搜索路径、接口、字段，例如 requestId / tagIds"><select id="kind" aria-label="接口变更类型"><option value="">全部接口</option><option>新增</option><option>变更</option><option>关联</option></select><button id="expand">全部展开</button><button id="collapse">全部折叠</button><span id="count" class="small"></span></div>'+''.join(sections)+'<footer>代码依据：AppLotteryController、LotteryController、TagController、LotteryV2Service、LotteryLedger、LotteryReissueService、LotteryScopeService、LotteryWinnerFeed 及响应 VO。文档描述前端接口契约，并标注旧接口调用边界。</footer></main></div><script>'+js+'</script></body></html>'
 OUT.write_text(doc,encoding='utf-8')
-(ROOT/'docs/lottery-frontend-contract.json').write_text(json.dumps(dict(baseline='779723b5c',head='4fbb6c2d7',date='2026-10-08',apis=apis,models=models),ensure_ascii=False,indent=2),encoding='utf-8')
+(ROOT/'docs/lottery-frontend-contract.json').write_text(json.dumps(dict(baseline='779723b5c',head='4fbb6c2d7',date='2026-10-13',apis=apis,models=models),ensure_ascii=False,indent=2),encoding='utf-8')
 print(json.dumps(dict(html=str(OUT),bytes=OUT.stat().st_size,endpoints=len(apis),models=len(models),new_endpoints=sum(a['status']=='新增' for a in apis)),ensure_ascii=False))

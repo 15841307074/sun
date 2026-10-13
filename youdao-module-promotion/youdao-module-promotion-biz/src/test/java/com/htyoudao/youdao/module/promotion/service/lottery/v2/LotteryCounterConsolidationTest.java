@@ -86,7 +86,8 @@ class LotteryCounterConsolidationTest {
     @Test void redisOutageIsRetriedLaterFromCounterRow(){
         accept();when(redis.execute(any(RedisScript.class),anyList(),any(Object[].class))).thenThrow(new IllegalStateException("Redis unavailable")).thenReturn(1L);
         cache.retry();assertEquals(1,dirty());assertEquals(1,jdbc.queryForObject("SELECT COUNT(*) FROM lottery_v2_counter WHERE cache_dirty=1 AND cache_next_at>CURRENT_TIMESTAMP",Integer.class));
-        jdbc.update("UPDATE lottery_v2_counter SET cache_next_at=CURRENT_TIMESTAMP WHERE cache_dirty=1");cache.retry();assertEquals(0,dirty());
+        // H2 TIMESTAMP 精度高于业务 NOW(3)，使用已到期的时间避免同毫秒精度竞态。
+        jdbc.update("UPDATE lottery_v2_counter SET cache_next_at=DATEADD('SECOND',-1,CURRENT_TIMESTAMP) WHERE cache_dirty=1");cache.retry();assertEquals(0,dirty());
     }
     @Test void publishedUpgradeMigratesTotalsAndPendingCacheWithoutOverwritingNewTotals() throws Exception {
         accept();jdbc.update("DELETE FROM lottery_v2_counter WHERE scope_key='ACTIVITY_TOTAL'");jdbc.update("UPDATE lottery_v2_counter SET cache_dirty=0");

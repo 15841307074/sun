@@ -1,5 +1,6 @@
 package com.htyoudao.youdao.module.promotion.service.lottery.v2;
 
+import com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder;
 import jakarta.annotation.PreDestroy;
 import org.springframework.stereotype.Component;
 import java.util.concurrent.*;
@@ -9,6 +10,13 @@ import java.util.concurrent.*;
 public class LotteryCacheExecutor {
     private final ThreadPoolExecutor worker=new ThreadPoolExecutor(1,1,30,TimeUnit.SECONDS,new ArrayBlockingQueue<>(64),
             job->{Thread t=new Thread(job,"lottery-cache-publish");t.setDaemon(true);return t;},new ThreadPoolExecutor.AbortPolicy());
-    public void submit(Runnable job){try{worker.execute(job);}catch(RejectedExecutionException ignored){ /* 持久化任务已记录，可由后台重试。 */ }}
+    public void submit(Runnable job){
+        String source=DynamicDataSourceContextHolder.peek();
+        try {worker.execute(()->{
+            if(source!=null)DynamicDataSourceContextHolder.push(source);
+            try {job.run();}
+            finally {if(source!=null)DynamicDataSourceContextHolder.poll();}
+        });}catch(RejectedExecutionException ignored){ /* 持久化任务已记录，可由后台重试。 */ }
+    }
     @PreDestroy public void stop(){worker.shutdown();}
 }

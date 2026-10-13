@@ -1,6 +1,5 @@
 package com.htyoudao.youdao.module.promotion.service.lottery.v2;
 
-import com.baomidou.dynamic.datasource.annotation.DS;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.*;
 import lombok.extern.slf4j.Slf4j;
@@ -10,7 +9,6 @@ import org.springframework.stereotype.Component;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Component
-@DS("master")
 @Slf4j
 public class LotteryWorkMetrics {
     @Resource

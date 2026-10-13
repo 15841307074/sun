@@ -1,6 +1,5 @@
 package com.htyoudao.youdao.module.system.service.store;
 
-import com.baomidou.dynamic.datasource.annotation.DS;
 import com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -29,7 +28,6 @@ import java.util.function.LongSupplier;
 
 /** 门店事务只保存通知；提交后仍调用原有活动更新接口，失败由定时任务重试。 */
 @Service
-@DS("master")
 @EnableScheduling
 @Slf4j
 public class StoreActivityTagOutbox {
@@ -73,10 +71,11 @@ public class StoreActivityTagOutbox {
             jdbc.update("INSERT INTO system_activity_tag_outbox(id,business_id,store_id,operation,payload) VALUES(?,?,?,?,?)",id,BusinessContextHolder.getRequiredBusinessId(),change.getStoreId(),type.name(),json.writeValueAsString(change));
             ids.add(id);
         } catch(com.fasterxml.jackson.core.JsonProcessingException e){throw new IllegalArgumentException(e);}
+        String source=DynamicDataSourceContextHolder.peek();
         Runnable publish=() -> {
             if(ids.isEmpty())return;
             requestScan(clock.getAsLong()+TimeUnit.SECONDS.toMillis(LEASE_SECONDS));
-            ids.forEach(this::submit);
+            ids.forEach(id->submit(id,source));
         };
         if(TransactionSynchronizationManager.isActualTransactionActive())
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
@@ -111,11 +110,15 @@ public class StoreActivityTagOutbox {
 
     /** 定时线程只查询通知编号；远程调用由有界线程池执行。 */
     private void submit(long id) {
+        submit(id,DynamicDataSourceContextHolder.peek());
+    }
+    private void submit(long id,String source) {
         if(stopped||!inFlight.add(id))return;
         try {
             immediate.execute(()->{
+                if(source!=null)DynamicDataSourceContextHolder.push(source);
                 try {dispatchOne(id);}
-                finally {inFlight.remove(id);}
+                finally {if(source!=null)DynamicDataSourceContextHolder.poll();inFlight.remove(id);}
             });
         }catch(RuntimeException full) {
             inFlight.remove(id);
@@ -128,14 +131,13 @@ public class StoreActivityTagOutbox {
     private void schemaFailure(BadSqlGrammarException e) {
         nextScanAt.set(clock.getAsLong()+SQL_ERROR_BACKOFF_MILLIS);
         var cause=e.getSQLException();
-        log.warn("门店标签通知表查询失败，五分钟后重试；核对 system 主库的 system_activity_tag_outbox 表及统一脚本 SYSTEM 部分。SQLState={}, errorCode={}, reason={}",
+        log.warn("门店标签通知表查询失败，五分钟后重试；核对 system 当前数据源的 system_activity_tag_outbox 表及统一脚本 SYSTEM 部分。SQLState={}, errorCode={}, reason={}",
                 cause.getSQLState(),cause.getErrorCode(),cause.getMessage());
     }
 
     /** 只调用原有活动更新方法，Redis 标签先从已提交的门店关系刷新。 */
     private void dispatchOne(long id) {
         Long prior=BusinessContextHolder.getBusinessId();
-        DynamicDataSourceContextHolder.push("master");
         try {
             List<Map<String,Object>> rows=jdbc.queryForList("SELECT business_id,store_id,operation,payload FROM system_activity_tag_outbox WHERE id=? AND done=0 AND next_at<=NOW(3)",id);
             if(rows.isEmpty())return;
@@ -159,7 +161,6 @@ public class StoreActivityTagOutbox {
         catch(Exception e){requestScan(clock.getAsLong()+TimeUnit.SECONDS.toMillis(RETRY_DELAY_SECONDS));log.warn("门店标签通知处理异常，通知ID={}",id,e);}
         finally{
             BusinessContextHolder.setBusinessId(prior);
-            DynamicDataSourceContextHolder.poll();
         }
     }
 

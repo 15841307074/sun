@@ -46,6 +46,8 @@ public interface ErrorCodeConstants {
     ErrorCode LOTTERY_SHARE_REPEAT = new ErrorCode(1_006_005_023, "当前时段已完成该分享任务");
     ErrorCode LOTTERY_SHARE_SELF_NOT_ALLOW = new ErrorCode(1_006_005_024, "不能给自己助力");
     ErrorCode LOTTERY_REISSUE_REJECTED = new ErrorCode(1_006_005_030, "人工补发未受理：{}");
+    ErrorCode LOTTERY_CASH_PREPARING = new ErrorCode(1_006_005_031, "红包处理中，请稍后重试本次抽奖");
+    ErrorCode LOTTERY_CASH_FAILED = new ErrorCode(1_006_005_032, "红包发放失败，请联系工作人员");
     ErrorCode LOTTERY_BROWSE_NOT_OPEN = new ErrorCode(1_006_005_021, "当前活动未开启浏览抽奖次数");
     ErrorCode LOTTERY_BROWSE_LIMIT_REACHED = new ErrorCode(1_006_005_022, "浏览抽奖次数已达上限");
     //1_006_001_001 优惠券

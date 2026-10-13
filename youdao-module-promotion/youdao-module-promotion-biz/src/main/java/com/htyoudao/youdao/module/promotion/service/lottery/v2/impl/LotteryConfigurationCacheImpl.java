@@ -2,7 +2,6 @@ package com.htyoudao.youdao.module.promotion.service.lottery.v2.impl;
 
 import com.htyoudao.youdao.module.promotion.service.lottery.v2.*;
 
-import com.baomidou.dynamic.datasource.annotation.DS;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.htyoudao.youdao.framework.common.util.object.BeanUtils;
@@ -27,7 +26,6 @@ import static com.htyoudao.youdao.framework.common.exception.util.ServiceExcepti
 import static com.htyoudao.youdao.module.promotion.api.enums.ErrorCodeConstants.*;
 
 @Service("lotteryConfigurationCache")
-@DS("master")
 public class LotteryConfigurationCacheImpl implements LotteryConfigurationCache {
     @Resource
     private LotterySettingsMapper settingsMapper;

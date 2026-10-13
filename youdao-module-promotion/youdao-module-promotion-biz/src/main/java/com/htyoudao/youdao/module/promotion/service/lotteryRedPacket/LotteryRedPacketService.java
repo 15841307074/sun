@@ -3,6 +3,8 @@ package com.htyoudao.youdao.module.promotion.service.lotteryRedPacket;
 import cn.hutool.core.util.ObjectUtil;
 import com.baomidou.dynamic.datasource.annotation.DS;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.htyoudao.youdao.framework.context.BusinessContextHolder;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.htyoudao.youdao.framework.common.util.collection.BeanCopyUtils;
 import com.htyoudao.youdao.framework.sharding.core.enums.DsNameConstants;
@@ -34,6 +36,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.crypto.Cipher;
@@ -50,6 +53,87 @@ import java.util.*;
 @Service
 @Slf4j
 public class LotteryRedPacketService {
+
+    @Resource @Lazy
+    private LotteryRedPacketService self;
+
+    /** 新版异步抽奖沿用原红包参数和转账记录，微信查询/发送在数据库事务外。 */
+    public TransferToUser.TransferToUserResponse transferUser(LotteryRedPacketVo vo,TransferToUser client) {
+        LotteryTransferRecordDO record=self.prepareFixedTransferRecord(vo);
+        if(record.getStatus()==LotteryTransferStatus.SUCCESS||record.getStatus()==LotteryTransferStatus.FAIL) {
+            var known=new TransferToUser.TransferToUserResponse();known.setCode(200);known.setOutBillNo(record.getOutBillNo());
+            known.setTransferBillNo(record.getTransferBillNo());known.setPackageInfo(record.getPackageInfo());known.setFailReason(record.getFailReason());
+            known.setState(record.getStatus()==LotteryTransferStatus.SUCCESS?TransferToUser.TransferBillStatus.SUCCESS:TransferToUser.TransferBillStatus.FAIL);
+            return known;
+        }
+        try {
+            TransferToUser.TransferToUserResponse response;
+            try {response=client.query(record.getOutBillNo());}
+            catch(WXPayUtility.ApiException missing) {
+                if(missing.getStatusCode()!=404||!"NOT_FOUND".equals(missing.getErrorCode()))throw missing;
+                var request=new TransferToUser.TransferToUserRequest();
+                request.appid=weChatPayConfig.getAppId();request.outBillNo=record.getOutBillNo();
+                request.transferSceneId=weChatPayConfig.getTransferSceneId();request.notifyUrl=weChatPayConfig.getNotifyUrl();
+                request.openid=vo.getOpenId();request.userName=vo.getUserName();
+                request.transferAmount=vo.getTransferAmount();request.transferRemark=vo.getTransferRemark();
+                request.userRecvPerception=vo.getUserRecvPerception();
+                for(var info:vo.getSceneReports()) {
+                    var report=new TransferToUser.TransferSceneReportInfo();report.infoType=info.getInfoType();report.infoContent=info.getInfoContent();
+                    request.transferSceneReportInfos.add(report);
+                }
+                response=client.run(request);
+            }
+            if(response==null||response.getState()==null)throw new IllegalStateException("微信转账状态为空");
+            if(response.getOutBillNo()!=null&&!record.getOutBillNo().equals(response.getOutBillNo()))throw new IllegalStateException("微信转账单号与原抽奖不一致");
+            response.setOutBillNo(record.getOutBillNo());response.setCode(200);
+            if((response.getState()==TransferToUser.TransferBillStatus.WAIT_USER_CONFIRM||response.getState()==TransferToUser.TransferBillStatus.SUCCESS)&&response.getPackageInfo()==null)
+                response.setPackageInfo(record.getPackageInfo());
+            self.saveFixedTransferResult(record,response);
+            return response;
+        }catch(WXPayUtility.ApiException e) {
+            self.saveFixedTransferFailure(record,e.getErrorMessage());
+            log.warn("新版抽奖红包调用失败，outBillNo={}, http={}, code={}, message={}",record.getOutBillNo(),e.getStatusCode(),e.getErrorCode(),e.getErrorMessage());
+            throw e;
+        }
+    }
+
+    /** 仅保存数据库信息，不调用微信。 */
+    @DS(DsNameConstants.SHARDING)
+    @Transactional(rollbackFor=Exception.class,timeout=5)
+    public LotteryTransferRecordDO prepareFixedTransferRecord(LotteryRedPacketVo vo) {
+        if(vo==null||vo.getActivityId()==null||vo.getActivityId()<=0||vo.getOutBillNo()==null||!vo.getOutBillNo().matches("[A-Za-z0-9]{1,32}")
+                ||vo.getOpenId()==null||vo.getOpenId().isBlank()||vo.getTransferAmount()==null||vo.getTransferAmount()<=0)
+            throw new IllegalArgumentException("新版抽奖红包必须提供活动ID、固定单号、OpenID和有效金额");
+        LotteryTransferRecordDO record=saveTransferRecord(vo);
+        if(!Objects.equals(record.getBusinessId(),BusinessContextHolder.getRequiredBusinessId())
+                ||!Objects.equals(record.getOpenId(),vo.getOpenId())||!Objects.equals(record.getTransferAmount(),vo.getTransferAmount())
+                ||!Objects.equals(record.getAppId(),weChatPayConfig.getAppId()))throw new IllegalStateException("原红包单号与项目、用户或金额不一致");
+        return record;
+    }
+
+    @DS(DsNameConstants.SHARDING)
+    @Transactional(rollbackFor=Exception.class,timeout=5)
+    public void saveFixedTransferResult(LotteryTransferRecordDO record,TransferToUser.TransferToUserResponse response) {
+        LotteryTransferStatus status=response.getState()==TransferToUser.TransferBillStatus.CANCELLED?LotteryTransferStatus.FAIL:convertWeChatStatus(response.getState());
+        var update=new LambdaUpdateWrapper<LotteryTransferRecordDO>().eq(LotteryTransferRecordDO::getId,record.getId())
+                .eq(LotteryTransferRecordDO::getBusinessId,BusinessContextHolder.getRequiredBusinessId()).eq(LotteryTransferRecordDO::getOutBillNo,record.getOutBillNo());
+        if(status!=LotteryTransferStatus.SUCCESS)update.ne(LotteryTransferRecordDO::getStatus,LotteryTransferStatus.SUCCESS);
+        if(status!=LotteryTransferStatus.SUCCESS&&status!=LotteryTransferStatus.FAIL)update.ne(LotteryTransferRecordDO::getStatus,LotteryTransferStatus.FAIL);
+        update.set(LotteryTransferRecordDO::getStatus,status).set(LotteryTransferRecordDO::getFailReason,response.getFailReason());
+        if(response.getPackageInfo()!=null)update.set(LotteryTransferRecordDO::getPackageInfo,response.getPackageInfo());
+        if(response.getTransferBillNo()!=null)update.set(LotteryTransferRecordDO::getTransferBillNo,response.getTransferBillNo());
+        lotteryTransferRecordMapper.update(null,update);
+    }
+
+    @DS(DsNameConstants.SHARDING)
+    @Transactional(rollbackFor=Exception.class,timeout=5)
+    public void saveFixedTransferFailure(LotteryTransferRecordDO record,String reason) {
+        // API 异常不能当作确定未付款，保留单号和状态供原单查证。
+        lotteryTransferRecordMapper.update(null,new LambdaUpdateWrapper<LotteryTransferRecordDO>()
+                .eq(LotteryTransferRecordDO::getId,record.getId()).eq(LotteryTransferRecordDO::getBusinessId,BusinessContextHolder.getRequiredBusinessId())
+                .eq(LotteryTransferRecordDO::getOutBillNo,record.getOutBillNo()).ne(LotteryTransferRecordDO::getStatus,LotteryTransferStatus.SUCCESS)
+                .set(LotteryTransferRecordDO::getFailReason,reason));
+    }
 
     @Autowired
     private LotteryWeChatPayConfig weChatPayConfig;

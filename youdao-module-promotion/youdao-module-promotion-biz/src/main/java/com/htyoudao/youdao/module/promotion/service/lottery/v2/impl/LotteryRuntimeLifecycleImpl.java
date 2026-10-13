@@ -2,7 +2,6 @@ package com.htyoudao.youdao.module.promotion.service.lottery.v2.impl;
 
 import com.htyoudao.youdao.module.promotion.service.lottery.v2.*;
 
-import com.baomidou.dynamic.datasource.annotation.DS;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.htyoudao.youdao.framework.context.BusinessContextHolder;
 import com.htyoudao.youdao.module.promotion.dal.dataobject.lottery.LotterySettingsDO;
@@ -16,7 +15,6 @@ import org.springframework.transaction.annotation.Propagation;
 import java.util.*;
 
 @Service("lotteryRuntimeLifecycle")
-@DS("master")
 public class LotteryRuntimeLifecycleImpl implements LotteryRuntimeLifecycle {
     @Resource
     private JdbcTemplate jdbc;

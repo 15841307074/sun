@@ -15,6 +15,7 @@ import java.util.function.LongSupplier;
 import org.springframework.transaction.event.TransactionalEventListener;
 import javax.sql.DataSource;
 import com.baomidou.dynamic.datasource.DynamicRoutingDataSource;
+import com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder;
 import com.baomidou.dynamic.datasource.ds.ItemDataSource;
 import com.zaxxer.hikari.HikariDataSource;
 import com.alibaba.druid.pool.DruidDataSource;
@@ -43,7 +44,8 @@ public class LotteryGrantWorker {
     private static final long BUSY_AUDIT_MILLIS=1000;
     private static final int MAX_DELAYED_WAKEUPS=1024;
     private final Set<Long> inFlight=ConcurrentHashMap.newKeySet();
-    private final ConcurrentMap<Long,Long> delayed=new ConcurrentHashMap<>();
+    private record Wakeup(long at,String source) {}
+    private final ConcurrentMap<Long,Wakeup> delayed=new ConcurrentHashMap<>();
     private final AtomicLong nextAuditAt=new AtomicLong();
     private LongSupplier clock=()->System.nanoTime()/1000000;
     private LongSupplier auditJitter=()->ThreadLocalRandom.current().nextLong(30001);
@@ -58,7 +60,7 @@ public class LotteryGrantWorker {
     private PoolState poolState() {
         try {
             DataSource pool=dataSource;
-            if(pool instanceof DynamicRoutingDataSource routing)pool=routing.getDataSource("master");
+            if(pool instanceof DynamicRoutingDataSource routing)pool=routing.getDataSource(DynamicDataSourceContextHolder.peek());
             if(pool instanceof ItemDataSource item)pool=item.getRealDataSource();
             if(pool instanceof HikariDataSource hikari) {
                 int max=hikari.getMaximumPoolSize();
@@ -78,9 +80,10 @@ public class LotteryGrantWorker {
         if(stopped)return;
         if(event.delayMillis()>0) {
             long at=clock.getAsLong()+event.delayMillis();
-            if(delayed.containsKey(event.id())||delayed.size()<MAX_DELAYED_WAKEUPS)
-                delayed.merge(event.id(),at,Math::min);
-            else requestAudit(at);
+            if(delayed.containsKey(event.id())||delayed.size()<MAX_DELAYED_WAKEUPS) {
+                var wakeup=new Wakeup(at,DynamicDataSourceContextHolder.peek());
+                delayed.merge(event.id(),wakeup,(old,next)->old.at()<=next.at()?old:next);
+            } else requestAudit(at);
         } else submit(event.id());
     }
 
@@ -98,16 +101,21 @@ public class LotteryGrantWorker {
     }
 
     private void submit(long id) {
+        submit(id,DynamicDataSourceContextHolder.peek());
+    }
+
+    private void submit(long id,String source) {
         if(stopped||!inFlight.add(id))return;
         try {
             resizeExecutor();
             executor.execute(()->{
+                if(source!=null)DynamicDataSourceContextHolder.push(source);
                 try {
                     if(!stopped&&poolHasRoom())run(id);
                     else requestAudit(clock.getAsLong()+BUSY_AUDIT_MILLIS);
                 }
                 catch(RuntimeException e){log.warn("Lottery grant dispatch deferred: request={}, reason={}",id,e.getClass().getSimpleName());}
-                finally {inFlight.remove(id);}
+                finally {if(source!=null)DynamicDataSourceContextHolder.poll();inFlight.remove(id);}
             });
         } catch(RuntimeException e) {
             inFlight.remove(id);
@@ -120,7 +128,7 @@ public class LotteryGrantWorker {
     public void poll() {
         if(stopped)return;
         long now=clock.getAsLong();
-        delayed.forEach((id,at)->{if(now>=at&&delayed.remove(id,at))submit(id);});
+        delayed.forEach((id,wakeup)->{if(now>=wakeup.at()&&delayed.remove(id,wakeup))submit(id,wakeup.source());});
         int size=resizeExecutor();
         int free=Math.max(0,size-executor.getActiveCount()-executor.getQueue().size());
         PoolState pool=poolState();
@@ -159,6 +167,8 @@ public class LotteryGrantWorker {
                     var result=service.result(draw);
                     int type=draw.getSnapshot().getPrize().getPrizeType();
                     if(type==5) {
+                        // 中奖结果已确定，先落未领取记录；微信异常/待确认也保留人工排查入口。
+                        storage.log(draw);
                         ledger.grantState(id,"PROCESSING",result,false,false);
                         var response=cash.reconcileOrSend(draw);
                         if(response.getState()==null)throw new IllegalStateException("红包状态未知");
@@ -171,6 +181,7 @@ public class LotteryGrantWorker {
                         }
                         else {
                             ledger.grantState(id,state,result,false,false);
+                            storage.log(ledger.get(id));
                             ledger.retryJob(id,token,"微信红包处理中");return;
                         }
                     } else {
@@ -188,11 +199,13 @@ public class LotteryGrantWorker {
             if(!"ISSUED".equals(draw.getStockState()))stockCache.reconcile(draw);
             if("FAILED".equals(draw.getDrawStatus()) && !draw.getSnapshot().isManualReissue() && draw.getPointsCost()>0)
                 members.refundLotteryPoints(draw.getMemberId(),draw.getOutBillNo());
-            if("COMPLETED".equals(draw.getDrawStatus()))storage.log(draw);
+            if("COMPLETED".equals(draw.getDrawStatus())||Objects.equals(draw.getSnapshot().getPrize().getPrizeType(),5)||draw.getSnapshot().isFallbackApplied())storage.log(draw);
             if("ACCEPTED".equals(draw.getDrawStatus()))ledger.retryJob(id,token,"保底发放待处理");
-            else ledger.finishJob(id,token);
+            else {ledger.finishJob(id,token);delayed.remove(id);}
         } catch(Exception e){ledger.retryJob(id,token,e.getClass().getSimpleName());log.warn("Lottery grant deferred: request={}, reason={}",id,e.getClass().getSimpleName());}
         finally{BusinessContextHolder.setBusinessId(previousBusiness);}
     }
+    /** 保持原红包按钮契约：lottery 返回前准备微信单与领取参数，到账确认仍异步。 */
+    public void prepareCash(long id){run(id);}
     @PreDestroy public void stop(){stopped=true;executor.shutdown();delayed.clear();}
 }

@@ -1079,7 +1079,12 @@ public class LotteryMobileServiceImpl implements LotteryMobileService {
         if (!lotteryV2Service.enabled(resolved)) return legacyLottery(lotteryVo, resolved);
         if (lotteryVo.getRequestId() != null && !lotteryVo.getRequestId().isBlank()) {
             LotteryUserLogVO previous = lotteryV2Service.query(lotteryVo);
-            if (previous != null) return CommonResult.success(previous);
+            if (previous != null) {
+                if(previous.getPrizeType()==5&&!"SUCCESS".equals(previous.getGrantStatus())
+                        &&(previous.getPackageInfo()==null||previous.getPackageInfo().isBlank()))
+                    previous=lotteryV2Service.prepareCashResult(lotteryVo);
+                return CommonResult.success(previous);
+            }
         }
         return CommonResult.success(lotteryV2Service.drawAfterResultMiss(lotteryVo, resolved));
     }

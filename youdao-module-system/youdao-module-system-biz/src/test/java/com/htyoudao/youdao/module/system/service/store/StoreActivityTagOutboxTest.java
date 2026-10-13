@@ -82,8 +82,9 @@ class StoreActivityTagOutboxTest {
         when(jdbc.queryForList(startsWith("SELECT id FROM"),eq(32))).thenReturn(List.of(Map.of("id",42L)));
         when(jdbc.queryForList(startsWith("SELECT business_id,store_id"),eq(42L))).thenReturn(List.of(Map.of("business_id",10L,"store_id",20L,"operation","UPDATE","payload","{\"storeId\":20,\"tagIds\":[30]}")));
         CountDownLatch entered=new CountDownLatch(1);release=new CountDownLatch(1);AtomicReference<String> thread=new AtomicReference<>();
-        doAnswer(call->{thread.set(Thread.currentThread().getName());assertEquals(10L,BusinessContextHolder.getBusinessId());entered.countDown();release.await(2,TimeUnit.SECONDS);return null;}).when(activities).updateActivityStoreByTagIdAndStoreId(anyList(),eq(CouponStoreTagSqlTypeEnum.UPDATE));
-        long began=System.nanoTime();outbox.dispatch();
+        doAnswer(call->{thread.set(Thread.currentThread().getName());assertEquals(10L,BusinessContextHolder.getBusinessId());assertEquals("uat-business",com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder.peek());entered.countDown();release.await(2,TimeUnit.SECONDS);return null;}).when(activities).updateActivityStoreByTagIdAndStoreId(anyList(),eq(CouponStoreTagSqlTypeEnum.UPDATE));
+        long began=System.nanoTime();com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder.push("uat-business");
+        try {outbox.dispatch();}finally{com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder.poll();}
         assertTrue(TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-began)<1000);
         assertTrue(entered.await(1,TimeUnit.SECONDS));assertEquals("store-activity-tag-sync",thread.get());
         verify(cache).refresh(10L,20L);

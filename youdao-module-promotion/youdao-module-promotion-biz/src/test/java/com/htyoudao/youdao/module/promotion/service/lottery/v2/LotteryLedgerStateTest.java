@@ -29,6 +29,12 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class LotteryLedgerStateTest {
+    @Test void cashDrawKeepsADelayedDurableRecoveryNotification() {
+        databaseState(true);snapshot.getPrize().setPrizeType(5);
+        var draw=ledger.accept(10L,snapshot);
+        var events=(org.springframework.context.ApplicationEventPublisher)ReflectionTestUtils.getField(ledger,"events");
+        verify(events).publishEvent(new LotteryLedger.JobReady(draw.getId(),15000));
+    }
     private JdbcTemplate jdbc;
     private LotteryLedger ledger;
     private LotteryDrawSnapshot snapshot;

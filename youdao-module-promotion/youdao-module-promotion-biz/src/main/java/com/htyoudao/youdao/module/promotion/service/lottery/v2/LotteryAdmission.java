@@ -42,8 +42,8 @@ public class LotteryAdmission {
             }
             if(draw) {
                 check(LotteryKeys.key(b,a,"rate","activity"),properties.getActivityDrawRate());
-                check(LotteryKeys.key(b,a,"rate","member:"+member),properties.getMemberDrawRate());
                 backpressure.checkDrawAllowed();
+                check(LotteryKeys.key(b,a,"rate","member:"+member),properties.getMemberDrawRate());
             }
             return new Permit(active,result?null:general);
         } catch(RuntimeException e) { active.decrementAndGet();if(!result)general.decrementAndGet();rejected(kind); throw exception(LOTTERY_SYSTEM_AGAIN); }

@@ -1,6 +1,5 @@
 package com.htyoudao.youdao.module.promotion.service.lottery.v2;
 
-import com.baomidou.dynamic.datasource.annotation.DS;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.*;
@@ -12,7 +11,6 @@ import java.util.*;
 
 /** 活动结束且流水结清满七天后，只清理登记过的可变缓存键。 */
 @Component
-@DS("master")
 @Slf4j
 public class LotteryCacheRetention {
     @Resource

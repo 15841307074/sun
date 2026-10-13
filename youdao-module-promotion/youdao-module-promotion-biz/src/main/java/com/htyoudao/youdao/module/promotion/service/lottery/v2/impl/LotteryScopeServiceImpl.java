@@ -2,7 +2,6 @@ package com.htyoudao.youdao.module.promotion.service.lottery.v2.impl;
 
 import com.htyoudao.youdao.module.promotion.service.lottery.v2.*;
 
-import com.baomidou.dynamic.datasource.annotation.DS;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.htyoudao.youdao.framework.common.util.object.BeanUtils;
 import com.htyoudao.youdao.framework.context.BusinessContextHolder;
@@ -29,7 +28,6 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @Service("lotteryScopeService")
-@DS("master")
 public class LotteryScopeServiceImpl implements LotteryScopeService {
     @Resource
     private ActivityStoreService stores;

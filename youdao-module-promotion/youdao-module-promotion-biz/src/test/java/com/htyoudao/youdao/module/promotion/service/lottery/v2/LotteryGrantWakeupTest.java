@@ -23,6 +23,21 @@ import static org.mockito.Mockito.*;
 import static org.awaitility.Awaitility.await;
 
 class LotteryGrantWakeupTest {
+    @Test void immediateGrantRetainsTheCallingDataSource() {
+        var observed=new AtomicReference<String>();
+        when(ledger.claim(eq(19L),anyString())).thenAnswer(call->{observed.set(com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder.peek());return false;});
+        com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder.push("uat-business");
+        try {ready(19);}finally{com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder.poll();}
+        verify(ledger,timeout(1000)).claim(eq(19L),anyString());assertEquals("uat-business",observed.get());
+    }
+    @Test void delayedGrantRetainsTheCallingDataSource() {
+        var observed=new AtomicReference<String>();
+        when(ledger.claim(eq(20L),anyString())).thenAnswer(call->{observed.set(com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder.peek());return false;});
+        com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder.push("uat-business");
+        try {context.publishEvent(new LotteryLedger.JobReady(20,10000));}
+        finally{com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder.poll();}
+        now.addAndGet(10000);worker.poll();verify(ledger,timeout(1000)).claim(eq(20L),anyString());assertEquals("uat-business",observed.get());
+    }
     private AnnotationConfigApplicationContext context;
     private LotteryLedger ledger;
     private LotteryGrantWorker worker,peer;

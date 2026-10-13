@@ -2,7 +2,6 @@ package com.htyoudao.youdao.module.promotion.service.lottery.v2.impl;
 
 import com.htyoudao.youdao.module.promotion.service.lottery.v2.*;
 
-import com.baomidou.dynamic.datasource.annotation.DS;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.Resource;
@@ -20,7 +19,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /** 次数缓存仅用于展示；受理和任务机会仍由持久化账本条件更新。 */
 @Service("lotteryCounterCache")
-@DS("master")
 @Slf4j
 public class LotteryCounterCacheImpl implements LotteryCounterCache {
     @Resource

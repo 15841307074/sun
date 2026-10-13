@@ -216,6 +216,8 @@ public class TransferToUser {
 
         @SerializedName("package_info")
         public String packageInfo;
+        @SerializedName("fail_reason")
+        public String failReason;
     }
 
     public static class TransferSceneReportInfo {

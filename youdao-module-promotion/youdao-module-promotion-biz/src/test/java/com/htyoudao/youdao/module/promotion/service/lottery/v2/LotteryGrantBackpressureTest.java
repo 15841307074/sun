@@ -31,19 +31,44 @@ class LotteryGrantBackpressureTest {
         var entered = new CountDownLatch(1);
         var release = new CountDownLatch(1);
         DataSource source = mock(DataSource.class);
-        when(source.getConnection()).thenAnswer(call -> {entered.countDown(); release.await(2, TimeUnit.SECONDS); throw new java.sql.SQLException("database unavailable");});
+        var route=new java.util.concurrent.atomic.AtomicReference<String>();
+        when(source.getConnection()).thenAnswer(call -> {route.set(com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder.peek());entered.countDown(); release.await(2, TimeUnit.SECONDS); throw new java.sql.SQLException("database unavailable");});
         var pressure = new LotteryGrantBackpressure();
         ReflectionTestUtils.setField(pressure, "redis", redis);
         ReflectionTestUtils.setField(pressure, "jdbc", new JdbcTemplate(source));
         try {
             long began = System.nanoTime();
-            assertThrows(ServiceException.class, pressure::checkDrawAllowed);
+            com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder.push("uat-business");
+            try {assertDoesNotThrow(pressure::checkDrawAllowed);}
+            finally{com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder.poll();}
             assertTrue(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - began) < 1000, "draw waited on the database refresh");
             assertTrue(entered.await(1, TimeUnit.SECONDS));
+            assertEquals("uat-business",route.get());
         } finally {
             release.countDown();
             pressure.stop();
         }
+    }
+
+    @Test void missingSnapshotAllowsOnlyOneBootstrapDrawAcrossInstances() {
+        var redis=mock(StringRedisTemplate.class);
+        @SuppressWarnings("unchecked") ValueOperations<String,String> values=mock(ValueOperations.class);
+        when(redis.opsForValue()).thenReturn(values);
+        java.util.concurrent.atomic.AtomicBoolean granted=new java.util.concurrent.atomic.AtomicBoolean();
+        when(values.setIfAbsent(contains("bootstrap"),anyString(),any(java.time.Duration.class))).thenAnswer(call->granted.compareAndSet(false,true));
+        var first=new LotteryGrantBackpressure();var peer=new LotteryGrantBackpressure();
+        ReflectionTestUtils.setField(first,"redis",redis);ReflectionTestUtils.setField(peer,"redis",redis);
+        try {assertDoesNotThrow(first::checkDrawAllowed);assertThrows(ServiceException.class,peer::checkDrawAllowed);}
+        finally {first.stop();peer.stop();}
+    }
+
+    @Test void pausedSnapshotStillRejectsEvenWhenItIsOld() {
+        var redis=mock(StringRedisTemplate.class);
+        @SuppressWarnings("unchecked") ValueOperations<String,String> values=mock(ValueOperations.class);
+        when(redis.opsForValue()).thenReturn(values);when(values.get(anyString())).thenReturn("100:1:1");
+        var pressure=new LotteryGrantBackpressure();ReflectionTestUtils.setField(pressure,"redis",redis);
+        try {assertThrows(ServiceException.class,pressure::checkDrawAllowed);}
+        finally {pressure.stop();}
     }
 
     @Test void stoppedAwardsDoNotConsumeTheActiveBacklogLimit() {

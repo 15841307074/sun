@@ -2,7 +2,6 @@ package com.htyoudao.youdao.module.promotion.service.lottery.v2.impl;
 
 import com.htyoudao.youdao.module.promotion.service.lottery.v2.*;
 
-import com.baomidou.dynamic.datasource.annotation.DS;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.htyoudao.youdao.module.promotion.controller.admin.lottery.vo.LotterySettingsCacheDataVO;
@@ -20,9 +19,8 @@ import java.util.*;
 import static com.htyoudao.youdao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static com.htyoudao.youdao.module.promotion.api.enums.ErrorCodeConstants.*;
 
-/** 仅使用主库；事务内不等待 Redis 锁、远程调用或线程池。 */
+/** 沿用当前环境的数据源路由；事务内不等待 Redis 锁、远程调用或线程池。 */
 @Service("lotteryLedger")
-@DS("master")
 @Slf4j
 public class LotteryLedgerImpl implements LotteryLedger {
     @Resource
@@ -180,7 +178,8 @@ public class LotteryLedgerImpl implements LotteryLedger {
         accepted.setDrawStatus("ACCEPTED"); accepted.setGrantStatus("PENDING"); accepted.setStockState(stocked?"RESERVED":"NONE");
         accepted.setScopeKey(chosen.getScope()); accepted.setSource(chosen.getSource()); accepted.setPointsCost(chosen.getPointsCost());
         accepted.setStockPrizeCode(prize.getCode()); accepted.setSnapshot(snapshot); accepted.setNewlyAccepted(true);
-        events.publishEvent(new JobReady(id));
+        // 红包由本次 lottery 请求先准备领取参数；延迟通知接管进程退出等异常。
+        events.publishEvent(new JobReady(id,Objects.equals(prize.getPrizeType(),5)?15000:0));
         return accepted;
     }
 

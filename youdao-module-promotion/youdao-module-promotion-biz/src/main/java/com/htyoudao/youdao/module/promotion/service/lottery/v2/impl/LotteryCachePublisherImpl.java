@@ -2,7 +2,6 @@ package com.htyoudao.youdao.module.promotion.service.lottery.v2.impl;
 
 import com.htyoudao.youdao.module.promotion.service.lottery.v2.*;
 
-import com.baomidou.dynamic.datasource.annotation.DS;
 import com.htyoudao.youdao.framework.context.BusinessContextHolder;
 import com.htyoudao.youdao.module.promotion.dal.dataobject.lottery.*;
 import jakarta.annotation.Resource;
@@ -19,7 +18,6 @@ import static com.htyoudao.youdao.module.promotion.dal.redis.RedisKeyConstants.*
 
 /** 配置按版本持久化发布，不删除库存、次数和请求结果。 */
 @Service("lotteryCachePublisher")
-@DS("master")
 @Slf4j
 public class LotteryCachePublisherImpl implements LotteryCachePublisher {
     @Resource

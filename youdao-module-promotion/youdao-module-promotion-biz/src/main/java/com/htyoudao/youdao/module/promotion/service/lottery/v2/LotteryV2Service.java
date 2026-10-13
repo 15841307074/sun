@@ -11,6 +11,7 @@ public interface LotteryV2Service {
     LotteryUserLogVO drawAfterResultMiss(LotteryVO req,LotterySettingsCacheDataVO cfg);
 
     LotteryUserLogVO query(LotteryVO req);
+    LotteryUserLogVO prepareCashResult(LotteryVO req);
 
     LotteryUserLogVO result(LotteryLedger.Draw draw);
 }
