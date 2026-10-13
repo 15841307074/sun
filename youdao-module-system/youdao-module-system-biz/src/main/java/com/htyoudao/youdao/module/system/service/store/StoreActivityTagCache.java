@@ -1,6 +1,5 @@
 package com.htyoudao.youdao.module.system.service.store;
 
-import com.baomidou.dynamic.datasource.annotation.DS;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.htyoudao.youdao.module.system.dal.dataobject.store.SystemStoreTagDO;
 import com.htyoudao.youdao.module.system.dal.mysql.store.SystemStoreTagMapper;
@@ -17,7 +16,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /** 门店标签以系统库为准；空标签明确缓存，Redis 异常时不放行。 */
 @Service
-@DS("master")
 public class StoreActivityTagCache {
     @Resource
     private SystemStoreTagMapper tags;
