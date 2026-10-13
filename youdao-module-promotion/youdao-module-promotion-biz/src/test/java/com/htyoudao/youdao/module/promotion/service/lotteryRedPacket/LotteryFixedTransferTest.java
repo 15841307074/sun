@@ -5,11 +5,13 @@ import com.htyoudao.youdao.module.promotion.controller.app.lotteryRedPacket.conf
 import com.htyoudao.youdao.module.promotion.controller.app.lotteryRedPacket.VO.LotteryRedPacketVo;
 import com.htyoudao.youdao.module.promotion.dal.dataobject.lotteryRedPacket.LotteryTransferRecordDO;
 import com.htyoudao.youdao.module.promotion.dal.dataobject.lotteryRedPacket.LotteryTransferSceneReportDO;
+import com.htyoudao.youdao.module.promotion.enums.LotteryTransferStatus;
 import com.htyoudao.youdao.module.promotion.util.WechatRedEnvelope.WXPayUtility;
 import okhttp3.Headers;
 import org.junit.jupiter.api.*;
 import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
+import java.time.LocalDateTime;
 import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -26,7 +28,8 @@ class LotteryFixedTransferTest {
         ReflectionTestUtils.setField(service,"weChatPayConfig",config);ReflectionTestUtils.setField(service,"self",self);
         vo=new LotteryRedPacketVo();vo.setActivityId(21L);vo.setOutBillNo("L2100000000000000001");vo.setOpenId("test-openid");vo.setTransferAmount(100);vo.setTransferRemark("抽奖活动红包");
         var info=new LotteryTransferSceneReportDO();info.setInfoType("活动名称");info.setInfoContent("红包活动");vo.setSceneReports(List.of(info));
-        record=new LotteryTransferRecordDO();record.setOutBillNo(vo.getOutBillNo());when(self.prepareFixedTransferRecord(vo)).thenReturn(record);
+        record=new LotteryTransferRecordDO();record.setOutBillNo(vo.getOutBillNo());record.setStatus(LotteryTransferStatus.PROCESSING);
+        when(self.prepareFixedTransferRecord(vo)).thenReturn(record);
     }
     @Test void notFoundSendsFullRequestAfterSavingTheRecord() {
         when(api.query(vo.getOutBillNo())).thenThrow(error(404,"NOT_FOUND"));
@@ -37,6 +40,42 @@ class LotteryFixedTransferTest {
         var captured=ArgumentCaptor.forClass(TransferToUser.TransferToUserRequest.class);order.verify(api).run(captured.capture());order.verify(self).saveFixedTransferResult(record,response);
         var request=captured.getValue();assertEquals("test-app",request.appid);assertEquals("1000",request.transferSceneId);assertEquals("https://example.test/notify",request.notifyUrl);
         assertEquals(vo.getOutBillNo(),request.outBillNo);assertEquals(vo.getOpenId(),request.openid);assertEquals(100,request.transferAmount);assertEquals("红包活动",request.transferSceneReportInfos.get(0).infoContent);
+    }
+    @Test void firstRequestPostsWithoutWaitingForWechatQuery() {
+        record.setStatus(LotteryTransferStatus.INIT);
+        when(self.claimFirstSend(record)).thenReturn(true);
+        var response=new TransferToUser.TransferToUserResponse();response.setState(TransferToUser.TransferBillStatus.WAIT_USER_CONFIRM);
+        response.setPackageInfo("claim-package");when(api.run(any())).thenReturn(response);
+        assertSame(response,service.transferUser(vo,api));
+        verify(api,never()).query(anyString());verify(api).run(any());
+        verify(self).saveFixedTransferResult(record,response);
+    }
+    @Test void anotherRequestCannotPostWhileFirstRequestIsInFlight() {
+        record.setStatus(LotteryTransferStatus.INIT);
+        assertEquals(TransferToUser.TransferBillStatus.PROCESSING,service.transferUser(vo,api).getState());
+        verify(self).claimFirstSend(record);verifyNoInteractions(api);
+    }
+    @Test void preparedClaimParametersAreReusedWithoutWechatCall() {
+        record.setStatus(LotteryTransferStatus.WAIT_USER_CONFIRM);record.setPackageInfo("claim-package");
+        var response=service.transferUser(vo,api);
+        assertEquals("claim-package",response.getPackageInfo());
+        assertEquals(TransferToUser.TransferBillStatus.WAIT_USER_CONFIRM,response.getState());
+        verifyNoInteractions(api);
+    }
+    @Test void notFoundDuringRecentInFlightPostDoesNotSendAgain() {
+        record.setUpdateTime(LocalDateTime.now());
+        when(api.query(vo.getOutBillNo())).thenThrow(error(404,"NOT_FOUND"));
+        assertEquals(TransferToUser.TransferBillStatus.PROCESSING,service.transferUser(vo,api).getState());
+        verify(api,never()).run(any());
+    }
+    @Test void expiredInFlightPostCanRecoverWithTheSameBill() {
+        record.setUpdateTime(LocalDateTime.now().minusMinutes(1));
+        when(api.query(vo.getOutBillNo())).thenThrow(error(404,"NOT_FOUND"));
+        var response=new TransferToUser.TransferToUserResponse();response.setState(TransferToUser.TransferBillStatus.WAIT_USER_CONFIRM);
+        response.setPackageInfo("claim-package");when(api.run(any())).thenReturn(response);
+        assertSame(response,service.transferUser(vo,api));
+        var request=ArgumentCaptor.forClass(TransferToUser.TransferToUserRequest.class);
+        verify(api).run(request.capture());assertEquals(vo.getOutBillNo(),request.getValue().outBillNo);
     }
     @Test void existingWechatBillIsQueriedWithoutResending() {
         var response=new TransferToUser.TransferToUserResponse();response.setState(TransferToUser.TransferBillStatus.SUCCESS);when(api.query(vo.getOutBillNo())).thenReturn(response);
