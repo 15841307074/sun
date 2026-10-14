@@ -52,4 +52,17 @@ class LotteryJobClaimTest {
         assertTrue(ledger.claim(1,"recovered"));assertEquals(3,jdbc.queryForObject("SELECT attempts FROM lottery_v2_job",Integer.class));
         assertFalse(ledger.claim(1,"other"));assertEquals("recovered",jdbc.queryForObject("SELECT lease_token FROM lottery_v2_job",String.class));
     }
+    @Test void legacyCashBillIsBoundOnceAndUncertainRetryCanBeStopped() {
+        job(0,null);
+        assertTrue(ledger.claim(1,"first"));
+        assertTrue(ledger.firstCashAttempt(1));
+        jdbc.execute("CREATE TABLE lottery_v2_request(id BIGINT PRIMARY KEY,out_bill_no VARCHAR(64) NOT NULL)");
+        jdbc.update("INSERT INTO lottery_v2_request VALUES(1,'L1')");
+        ledger.bindCashBill(1,"activity21Awechatbill");
+        ledger.bindCashBill(1,"activity21Awechatbill");
+        assertEquals("activity21Awechatbill",jdbc.queryForObject("SELECT out_bill_no FROM lottery_v2_request WHERE id=1",String.class));
+        ledger.stopJob(1,"first","人工核对");
+        assertEquals("STOPPED",jdbc.queryForObject("SELECT state FROM lottery_v2_job WHERE request_pk=1",String.class));
+        assertNull(jdbc.queryForObject("SELECT lease_token FROM lottery_v2_job WHERE request_pk=1",String.class));
+    }
 }

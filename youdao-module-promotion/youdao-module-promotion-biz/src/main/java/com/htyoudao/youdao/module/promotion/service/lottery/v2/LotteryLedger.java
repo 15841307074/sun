@@ -18,6 +18,8 @@ public interface LotteryLedger {
         private LotteryUserLogVO result;
         /** 仅在内存中标记本次新受理，区分幂等重放。 */
         private boolean newlyAccepted;
+        /** 积分扣退的幂等键不随微信商户单号绑定而改变。 */
+        public String pointsBusinessNo() { return "L" + id; }
         public String cashBillNo() {
             if (snapshot.getReissueCashBillNo()!=null && !snapshot.getReissueCashBillNo().isBlank()) return snapshot.getReissueCashBillNo();
             return snapshot.isFallbackApplied() ? outBillNo + "F" : outBillNo;
@@ -61,6 +63,10 @@ public interface LotteryLedger {
 
     void grantState(long id,String grant,LotteryUserLogVO result,boolean terminal,boolean success);
 
+    boolean firstCashAttempt(long id);
+
+    void bindCashBill(long id,String bill);
+
     void rejectUnpaid(long id);
 
     void fallback(long id);
@@ -83,6 +89,8 @@ public interface LotteryLedger {
     void finishJob(long id,String token);
 
     void retryJob(long id,String token,String message);
+
+    void stopJob(long id,String token,String message);
 
     void earn(long b,LotterySettingsCacheDataVO cfg,long m,String period,String scope,int source,int limit,boolean unlimited,int reward,int balance);
 

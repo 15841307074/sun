@@ -18,23 +18,30 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class LotteryCashGatewayTest {
-    @Test void fullLegacyVoIncludesActivityAndKeepsTheSameBillOnRetries() {
+    @Test void legacyServiceGeneratesTheFirstBillAndRetriesUseItsReturnedBill() {
         var config=new LotteryWeChatPayConfig();var api=mock(TransferToUser.class);var redPackets=mock(LotteryRedPacketService.class);
+        var ledger=mock(LotteryLedger.class);
         var gateway=new LotteryCashGatewayImpl();ReflectionTestUtils.setField(gateway,"config",config);
         ReflectionTestUtils.setField(gateway,"client",api);ReflectionTestUtils.setField(gateway,"clientConfig",Arrays.asList(null,null,null,null,null));
         ReflectionTestUtils.setField(gateway,"redPackets",redPackets);
-        var draw=new LotteryLedger.Draw();draw.setActivityId(21);draw.setOutBillNo("L2100000000000000001");
+        ReflectionTestUtils.setField(gateway,"ledger",ledger);
+        var draw=new LotteryLedger.Draw();draw.setId(7);draw.setActivityId(21);draw.setOutBillNo("L7");
+        when(ledger.firstCashAttempt(7)).thenReturn(true);
         var snapshot=new LotteryDrawSnapshot();var settings=new LotterySettingsCacheDataVO();settings.setLotteryTitle("红包活动");snapshot.setSettings(settings);
         var member=new WxMemberVO();member.setOpenid("test-openid");snapshot.setMember(member);
         var prize=new LotteryPrizeDO();prize.setPrizeValue(new BigDecimal("12.345"));snapshot.setPrize(prize);draw.setSnapshot(snapshot);
-        var response=new TransferToUser.TransferToUserResponse();response.setState(TransferToUser.TransferBillStatus.WAIT_USER_CONFIRM);response.setPackageInfo("test-package");
+        var response=new TransferToUser.TransferToUserResponse();response.setState(TransferToUser.TransferBillStatus.WAIT_USER_CONFIRM);response.setPackageInfo("test-package");response.setOutBillNo("activity21Awechatbill");
         when(redPackets.transferUser(any(LotteryRedPacketVo.class))).thenReturn(response);
-        assertSame(response,gateway.reconcileOrSend(draw));assertSame(response,gateway.reconcileOrSend(draw));
+        assertSame(response,gateway.reconcileOrSend(draw));
+        draw.setOutBillNo(response.getOutBillNo());
+        assertSame(response,gateway.reconcileOrSend(draw));
         var captured=ArgumentCaptor.forClass(LotteryRedPacketVo.class);verify(redPackets,times(2)).transferUser(captured.capture());
+        assertNull(captured.getAllValues().get(0).getOutBillNo());
+        assertEquals(response.getOutBillNo(),captured.getAllValues().get(1).getOutBillNo());
         for(var vo:captured.getAllValues()) {
-            assertEquals(21L,vo.getActivityId());assertEquals(draw.cashBillNo(),vo.getOutBillNo());assertEquals("test-openid",vo.getOpenId());
+            assertEquals(21L,vo.getActivityId());assertEquals("test-openid",vo.getOpenId());
             assertEquals(1235,vo.getTransferAmount());assertEquals("抽奖活动红包",vo.getTransferRemark());
-            assertEquals(2,vo.getSceneReports().size());assertEquals("红包活动",vo.getSceneReports().get(0).getInfoContent());
+            assertTrue(vo.getSceneReports().isEmpty());
         }
         verifyNoInteractions(api);
     }

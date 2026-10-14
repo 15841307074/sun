@@ -200,6 +200,22 @@ public class LotteryLedgerImpl implements LotteryLedger {
                 grant,terminal?(success?"COMPLETED":"FAILED"):"ACCEPTED",terminal&&"RESERVED".equals(draw.getStockState())?(success?"ISSUED":"RELEASED"):draw.getStockState(),result==null?null:encode(result),id);
     }
 
+    @Override
+    public boolean firstCashAttempt(long id) {
+        Integer attempts=jobs().queryForObject("SELECT attempts FROM lottery_v2_job WHERE request_pk=?",Integer.class,id);
+        return Objects.equals(attempts,1);
+    }
+
+    @Override
+    @Transactional(rollbackFor=Exception.class,timeout=5)
+    public void bindCashBill(long id,String bill) {
+        if(bill==null||bill.isBlank())throw new IllegalArgumentException("微信商户单号为空");
+        if(jdbc.update("UPDATE lottery_v2_request SET out_bill_no=? WHERE id=? AND out_bill_no=?",
+                bill,id,"L"+id)==1)return;
+        String existing=jdbc.queryForObject("SELECT out_bill_no FROM lottery_v2_request WHERE id=?",String.class,id);
+        if(!bill.equals(existing))throw new IllegalStateException("红包商户单号与抽奖记录不一致");
+    }
+
     @Transactional(rollbackFor=Exception.class,timeout=5)
     @Override
     public void rejectUnpaid(long id) {
@@ -341,6 +357,12 @@ public class LotteryLedgerImpl implements LotteryLedger {
             if("READY".equals(state))events.publishEvent(new JobReady(id,10000));
             else if("STOPPED".equals(state))log.warn("Lottery grant auto retry stopped: request={}, reason={}",id,message);
         }
+    }
+
+    @Override
+    public void stopJob(long id,String token,String message) {
+        jobs().update("UPDATE lottery_v2_job SET state='STOPPED',lease_token=NULL,lease_until=NULL,last_error=? WHERE request_pk=? AND lease_token=?",
+                message==null?null:message.substring(0,Math.min(512,message.length())),id,token);
     }
 
     @Transactional(rollbackFor=Exception.class)

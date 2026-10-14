@@ -31,13 +31,14 @@ class LotteryReissueWorkerTest {
         var snapshot=new LotteryDrawSnapshot();snapshot.setManualReissue(true);
         var prize=new LotteryPrizeDO();prize.setId(101L);prize.setPrizeType(2);prize.setPrizeValue(BigDecimal.valueOf(100));snapshot.setPrize(prize);draw.setSnapshot(snapshot);
         when(ledger.claim(eq(100L),anyString())).thenReturn(true);when(ledger.get(100)).thenReturn(draw);
+        doAnswer(call->{draw.setOutBillNo(call.getArgument(1));return null;}).when(ledger).bindCashBill(eq(100L),anyString());
         when(service.result(draw)).thenReturn(new com.htyoudao.youdao.module.promotion.controller.app.lottery.vo.LotteryUserLogVO());
         doAnswer(call->{draw.setGrantStatus(call.getArgument(1));draw.setResult(call.getArgument(2));if(call.getArgument(3,Boolean.class)){draw.setDrawStatus(call.getArgument(4,Boolean.class)?"COMPLETED":"FAILED");draw.setStockState(call.getArgument(4,Boolean.class)?"ISSUED":"RELEASED");}return null;})
                 .when(ledger).grantState(eq(100L),anyString(),any(),anyBoolean(),anyBoolean());
     }
     @Test void waitingCashStillRecordsTheWinnerAndPackage() {
         draw.getSnapshot().getPrize().setPrizeType(5);
-        var response=new TransferToUser.TransferToUserResponse();response.setState(TransferToUser.TransferBillStatus.WAIT_USER_CONFIRM);response.setPackageInfo("test-package");response.setOutBillNo("L100");
+        var response=new TransferToUser.TransferToUserResponse();response.setState(TransferToUser.TransferBillStatus.WAIT_USER_CONFIRM);response.setPackageInfo("test-package");response.setOutBillNo("activity21Awechatbill");
         when(cash.reconcileOrSend(draw)).thenReturn(response);
         assertSame(draw,ReflectionTestUtils.invokeMethod(worker,"run",100L));
         var order=inOrder(storage,cash);order.verify(cash).reconcileOrSend(draw);order.verify(storage).log(draw);
@@ -48,7 +49,7 @@ class LotteryReissueWorkerTest {
     }
     @Test void cashApiExceptionKeepsTheWinnerRecordForManualRecovery() {
         draw.getSnapshot().getPrize().setPrizeType(5);when(cash.reconcileOrSend(draw)).thenThrow(new IllegalArgumentException("test invalid bill"));
-        ReflectionTestUtils.invokeMethod(worker,"run",100L);verify(storage).log(draw);verify(ledger).retryJob(eq(100L),anyString(),eq("IllegalArgumentException"));
+        ReflectionTestUtils.invokeMethod(worker,"run",100L);verify(storage).log(draw);verify(ledger).stopJob(eq(100L),anyString(),eq("红包转账单号未落账，需人工核对"));
         verify(ledger,never()).fallback(anyLong());verify(ledger,never()).finishJob(anyLong(),anyString());
     }
     @Test void manualPointsAwardDoesNotDebitOriginalCost() {
@@ -62,7 +63,7 @@ class LotteryReissueWorkerTest {
     }
     @Test void manualCashFailureDoesNotFallbackOrRefundAgain() {
         draw.getSnapshot().getPrize().setPrizeType(5);
-        var response=new TransferToUser.TransferToUserResponse();response.state=TransferToUser.TransferBillStatus.FAIL;response.setOutBillNo("L100");
+        var response=new TransferToUser.TransferToUserResponse();response.state=TransferToUser.TransferBillStatus.FAIL;response.setOutBillNo("activity21Awechatbill");
         when(cash.reconcileOrSend(draw)).thenReturn(response);
         ReflectionTestUtils.invokeMethod(worker,"run",100L);
         verify(ledger).grantState(eq(100L),eq("FAILED"),any(),eq(true),eq(false));

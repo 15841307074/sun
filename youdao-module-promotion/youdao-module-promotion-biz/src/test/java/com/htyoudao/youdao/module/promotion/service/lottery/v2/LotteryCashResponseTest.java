@@ -42,17 +42,17 @@ class LotteryCashResponseTest {
     }
     @AfterEach void clear(){BusinessContextHolder.clear();}
     private void ready() {
-        doAnswer(call->{draw.setGrantStatus("WAIT_USER_CONFIRM");var result=new LotteryUserLogVO();result.setPrizeType(5);result.setLotteryPrizeId(100L);result.setPackageInfo("test-package");draw.setResult(result);return draw;}).when(grants).prepareCash(7);
+        doAnswer(call->{draw.setGrantStatus("WAIT_USER_CONFIRM");draw.setOutBillNo("activity21Awechatbill");var result=new LotteryUserLogVO();result.setPrizeType(5);result.setLotteryPrizeId(100L);result.setPackageInfo("test-package");result.setOutBillNo(draw.getOutBillNo());draw.setResult(result);return draw;}).when(grants).prepareCash(7);
     }
     @Test void lotteryReturnsReadyCashParametersAfterReleasingTheInventoryLock() {
         ready();var response=service.drawAfterResultMiss(req,cfg);
-        assertEquals("test-package",response.getPackageInfo());assertEquals("L7",response.getOutBillNo());assertEquals("WAIT_USER_CONFIRM",response.getGrantStatus());
+        assertEquals("test-package",response.getPackageInfo());assertEquals("activity21Awechatbill",response.getOutBillNo());assertEquals("WAIT_USER_CONFIRM",response.getGrantStatus());
         var order=inOrder(reservation,grants);order.verify(reservation).commit();order.verify(reservation).close();order.verify(grants).prepareCash(7);
         verify(ledger,times(1)).accept(anyLong(),any());
         verify(ledger,never()).get(anyLong());
     }
     @Test void retryOnlyPreparesTheOriginalBillWithoutAcceptingAnotherDraw() {
-        ready();var response=service.prepareCashResult(req);assertEquals("test-package",response.getPackageInfo());assertEquals("L7",response.getOutBillNo());
+        ready();var response=service.prepareCashResult(req);assertEquals("test-package",response.getPackageInfo());assertEquals("activity21Awechatbill",response.getOutBillNo());
         verify(ledger,never()).accept(anyLong(),any());verify(grants).prepareCash(7);
     }
     @Test void unavailableCashParametersAreNotReturnedAsClaimableSuccess() {
@@ -60,7 +60,7 @@ class LotteryCashResponseTest {
         verify(ledger,times(1)).accept(anyLong(),any());verify(ledger,never()).find(anyLong(),anyLong(),anyLong(),anyString());verify(reservation).close();
     }
     @Test void resultRemainsReadOnlyAndNeverTriggersCashSending() {
-        var response=service.query(req);assertEquals("PENDING",response.getGrantStatus());assertNull(response.getPackageInfo());verifyNoInteractions(grants);verify(ledger,never()).accept(anyLong(),any());
+        var response=service.query(req);assertEquals("PENDING",response.getGrantStatus());assertNull(response.getPackageInfo());assertNull(response.getOutBillNo());verifyNoInteractions(grants);verify(ledger,never()).accept(anyLong(),any());
     }
     @Test void aDefinitivelyFailedCashRequestIsNotSentAgain() {
         draw.setDrawStatus("FAILED");draw.setGrantStatus("FAILED");var error=assertThrows(ServiceException.class,()->service.prepareCashResult(req));

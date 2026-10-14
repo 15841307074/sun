@@ -33,12 +33,12 @@ class LotteryCashLogTest {
     }
     @Test void pendingCashWinnerIsRecordedBeforeWechatSuccess() {
         storage.log(draw);var captured=ArgumentCaptor.forClass(LotteryLogDO.class);verify(logs).insert(captured.capture());
-        assertEquals("L100",captured.getValue().getOutBillNo());assertEquals(1,captured.getValue().getClaimStatus());assertNull(captured.getValue().getPackageInfo());verifyNoInteractions(feed);
+        assertNull(captured.getValue().getOutBillNo());assertEquals(1,captured.getValue().getClaimStatus());assertNull(captured.getValue().getPackageInfo());verifyNoInteractions(feed);
     }
     @Test void waitingCashWritesThePackageIntoTheExistingRecord() {
-        existing();draw.setGrantStatus("WAIT_USER_CONFIRM");var result=new LotteryUserLogVO();result.setPackageInfo("test-package");draw.setResult(result);
+        existing();draw.setGrantStatus("WAIT_USER_CONFIRM");draw.setOutBillNo("activity21Awechatbill");var result=new LotteryUserLogVO();result.setPackageInfo("test-package");result.setOutBillNo(draw.getOutBillNo());draw.setResult(result);
         storage.log(draw);var captured=ArgumentCaptor.forClass(LotteryLogDO.class);verify(logs).update(captured.capture(),any());
-        assertEquals("test-package",captured.getValue().getPackageInfo());assertEquals("L100",captured.getValue().getOutBillNo());assertEquals(1,captured.getValue().getClaimStatus());verifyNoInteractions(feed);
+        assertEquals("test-package",captured.getValue().getPackageInfo());assertEquals("activity21Awechatbill",captured.getValue().getOutBillNo());assertEquals(1,captured.getValue().getClaimStatus());verifyNoInteractions(feed);
     }
     @Test void successfulCashUpdatesClaimStatusInsteadOfIgnoringTheDuplicate() {
         existing();draw.setGrantStatus("SUCCESS");draw.setDrawStatus("COMPLETED");
@@ -55,7 +55,7 @@ class LotteryCashLogTest {
         assertEquals(202L,captured.getValue().getLotteryPrizeId());assertEquals(4,captured.getValue().getPrizeType());assertNull(captured.getValue().getOutBillNo());assertNull(captured.getValue().getPackageInfo());
     }
     private void existing() {
-        var previous=new LotteryLogDO();previous.setId(100L);previous.setBusinessId(10L);previous.setMemberId(40L);previous.setPrizeType(5);previous.setOutBillNo("L100");
+        var previous=new LotteryLogDO();previous.setId(100L);previous.setBusinessId(10L);previous.setMemberId(40L);previous.setPrizeType(5);
         when(logs.insert(any(LotteryLogDO.class))).thenThrow(new DuplicateKeyException("same draw"));when(logs.selectOne(any())).thenReturn(previous);
     }
 }

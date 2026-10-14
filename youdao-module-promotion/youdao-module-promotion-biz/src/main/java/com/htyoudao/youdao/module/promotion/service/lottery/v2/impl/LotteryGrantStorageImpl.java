@@ -76,7 +76,10 @@ public class LotteryGrantStorageImpl implements LotteryGrantStorage {
         row.setPrice(draw.getPointsCost());row.setLotteryType(cfg.getLotteryType());row.setLotteryStartTime(cfg.getLotteryStartTime());row.setLotteryEndTime(cfg.getLotteryEndTime());
         row.setPrizeState(Objects.equals(prize.getPrizeType(),3)?1:0);row.setClaimStatus(Objects.equals(prize.getPrizeType(),5)&&"SUCCESS".equals(draw.getGrantStatus())?2:1);
         row.setCreateTime(LocalDateTime.ofInstant(Instant.ofEpochMilli(s.getAcceptedAt()),ZoneId.systemDefault()));row.setUpdateTime(row.getCreateTime());
-        if(Objects.equals(prize.getPrizeType(),5)){row.setOutBillNo(draw.cashBillNo());if(draw.getResult()!=null)row.setPackageInfo(draw.getResult().getPackageInfo());}
+        if(Objects.equals(prize.getPrizeType(),5)){
+            if(draw.getOutBillNo()!=null&&!draw.getOutBillNo().equals("L"+draw.getId()))row.setOutBillNo(draw.cashBillNo());
+            if(draw.getResult()!=null)row.setPackageInfo(draw.getResult().getPackageInfo());
+        }
         try{logs.insert(row);}catch(DuplicateKeyException e){
             LotteryLogDO previous=logs.selectOne(new LambdaQueryWrapper<LotteryLogDO>().eq(LotteryLogDO::getId,draw.getId()).eq(LotteryLogDO::getMemberId,draw.getMemberId()));
             if(previous==null||!Objects.equals(previous.getBusinessId(),draw.getBusinessId()))throw e;

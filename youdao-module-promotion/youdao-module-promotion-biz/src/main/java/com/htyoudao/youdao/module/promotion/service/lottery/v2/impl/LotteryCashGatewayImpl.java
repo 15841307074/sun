@@ -7,7 +7,6 @@ import com.htyoudao.youdao.module.promotion.service.lottery.v2.*;
 import com.htyoudao.youdao.module.promotion.controller.admin.wechatDemo.TransferToUser;
 import com.htyoudao.youdao.module.promotion.controller.app.lotteryRedPacket.config.LotteryWeChatPayConfig;
 import com.htyoudao.youdao.module.promotion.controller.app.lotteryRedPacket.VO.LotteryRedPacketVo;
-import com.htyoudao.youdao.module.promotion.dal.dataobject.lotteryRedPacket.LotteryTransferSceneReportDO;
 import com.htyoudao.youdao.module.promotion.service.lotteryRedPacket.LotteryRedPacketService;
 import com.htyoudao.youdao.module.promotion.util.WechatRedEnvelope.WXPayUtility;
 import jakarta.annotation.Resource;
@@ -27,6 +26,7 @@ public class LotteryCashGatewayImpl implements LotteryCashGateway {
     @Resource
     private LotteryWeChatPayConfig config;
     @Resource private LotteryRedPacketService redPackets;
+    @Resource private LotteryLedger ledger;
     private volatile TransferToUser client;
     private volatile List<String> clientConfig;
     /** 服务就绪时加载密钥和客户端，避免首个红包承担本地初始化耗时；不调用微信、不发款。 */
@@ -47,24 +47,27 @@ public class LotteryCashGatewayImpl implements LotteryCashGateway {
     @Override
     @DS(DsNameConstants.SHARDING)
     public TransferToUser.TransferToUserResponse reconcileOrSend(LotteryLedger.Draw draw) {
-        // 沿用原抽奖红包发送方法；传入原商户单号以保证重试仍指向同一笔转账。
+        // 首次由原红包服务生成商户单号；后续只复用已记录的微信商户单号。
+        if((draw.getOutBillNo()==null||draw.getOutBillNo().equals("L"+draw.getId()))
+                &&!ledger.firstCashAttempt(draw.getId()))
+            throw new IllegalStateException("上次红包转账单号未落账，停止自动重发，需人工核对");
         return redPackets.transferUser(buildRedPacketVo(draw));
     }
     private LotteryRedPacketVo buildRedPacketVo(LotteryLedger.Draw draw) {
         var snapshot=draw.getSnapshot();
         LotteryRedPacketVo vo=new LotteryRedPacketVo();
-        vo.setActivityId(draw.getActivityId());vo.setOutBillNo(draw.cashBillNo());vo.setOpenId(snapshot.getMember().getOpenid());
+        vo.setActivityId(draw.getActivityId());
+        if(draw.getOutBillNo()!=null&&!draw.getOutBillNo().equals("L"+draw.getId()))vo.setOutBillNo(draw.cashBillNo());
+        vo.setOpenId(snapshot.getMember().getOpenid());
         vo.setTransferAmount(snapshot.getPrize().getPrizeValue().movePointRight(2).setScale(0,RoundingMode.HALF_UP).intValueExact());
         vo.setTransferRemark("抽奖活动红包");
-        LotteryTransferSceneReportDO activity=new LotteryTransferSceneReportDO();activity.setInfoType("活动名称");
-        String title=snapshot.getSettings().getLotteryTitle();activity.setInfoContent(title==null||title.isBlank()?"抽奖活动":title);
-        LotteryTransferSceneReportDO reason=new LotteryTransferSceneReportDO();reason.setInfoType("奖励说明");reason.setInfoContent("参与活动抽奖获得奖励");
-        vo.setSceneReports(List.of(activity,reason));
         return vo;
     }
     /** 人工补发前只查单，不直接发起支付；未知状态不能换新支付单号。 */
     @Override
     public TransferToUser.TransferToUserResponse queryForReissue(LotteryLedger.Draw draw) {
+        if(draw.getOutBillNo()==null||draw.getOutBillNo().equals("L"+draw.getId()))
+            throw new IllegalStateException("红包商户单号尚未记录，须先人工核对转账");
         try { return client().query(draw.cashBillNo()); }
         catch(WXPayUtility.ApiException e) {
             if(e.getStatusCode()==404&&"NOT_FOUND".equals(e.getErrorCode()))return null;
