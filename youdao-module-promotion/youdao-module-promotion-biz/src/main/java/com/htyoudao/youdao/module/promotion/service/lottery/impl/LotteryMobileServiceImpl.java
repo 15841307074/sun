@@ -452,6 +452,7 @@ public class LotteryMobileServiceImpl implements LotteryMobileService {
         lotteryVo.setLotteryId(lotterySettings.getId());
         // 3. 校验活动基础状态（是否关闭、是否在有效期内）
         validateLotteryBasicStatus(lotterySettings);
+        if (!LotteryQuota.hasSource(lotterySettings)) throw exception(LOTTERY_NO_CHANCE);
 
         // 4. 获取并校验用户信息（用户是否存在）
         WxMemberVO wxMember = getAndValidateWxMember(lotteryVo.getMemberId());
@@ -471,7 +472,13 @@ public class LotteryMobileServiceImpl implements LotteryMobileService {
         }
         // 8. 新规则支持多来源组合，老规则继续走原有单来源校验。
         if (lotteryV2Service.enabled(lotterySettings)) {
-            if (v2Quota(lotterySettings, lotteryVo.getMemberId(), wxMember, true).getNum() == 0) throw exception(LOTTERY_NO_CHANCE);
+            if (v2Quota(lotterySettings, lotteryVo.getMemberId(), wxMember, true).getNum() == 0) {
+                // 发布异常只保留记录，不空闲补查；拒绝之前按账本核验，避免旧缓存误拦刚完成的任务。
+                String period=buildTaskScope(lotterySettings).scopeKey;
+                if(LotteryQuota.calculate(lotterySettings,lotteryLedger.counters(BusinessContextHolder.getRequiredBusinessId(),
+                        lotterySettings.getActivityId(),lotteryVo.getMemberId(),period),period,defaultZero(wxMember.getMemberIntegral()),true).getNum()==0)
+                    throw exception(LOTTERY_NO_CHANCE);
+            }
             return CommonResult.success(true);
         }
         if (isMultiChanceMode(lotterySettings)) {
@@ -1385,6 +1392,7 @@ public class LotteryMobileServiceImpl implements LotteryMobileService {
      * @return 抽奖结果对象
      */
     public LotteryDrawSnapshot prepareV2Draw(LotteryVO req, LotterySettingsCacheDataVO cfg, List<LotteryPrizeDO> prizes) {
+        if (!LotteryQuota.hasSource(cfg)) throw exception(LOTTERY_NO_CHANCE);
         validateLotteryBasicStatus(cfg); validateLotteryTime(cfg); validateLotteryStore(cfg, req);
         WxMemberVO member = getAndValidateWxMember(req.getMemberId());
         validateUserCrowd(cfg, member);
@@ -1397,11 +1405,11 @@ public class LotteryMobileServiceImpl implements LotteryMobileService {
         List<LotteryDrawSnapshot.Chance> choices = snapshot.getChances();
         if (isMultiChanceMode(cfg)) {
             if (Objects.equals(cfg.getFreeStatus(), 1)) choices.add(new LotteryDrawSnapshot.Chance(1, period, defaultZero(cfg.getFreeCount()), 0, false));
-            if (Objects.equals(cfg.getOrderStatus(), 1)) choices.add(new LotteryDrawSnapshot.Chance(3, isUnlimitedOrderTask(cfg) ? "TOTAL" : period, 0, 0, true));
+            if (Objects.equals(cfg.getOrderStatus(), 1)) choices.add(new LotteryDrawSnapshot.Chance(3, LotteryQuota.sourceScope(cfg,period,isUnlimitedOrderTask(cfg)), 0, 0, true));
             if (Objects.equals(cfg.getShareEvent(), 1)) choices.add(new LotteryDrawSnapshot.Chance(4, period, 0, 0, true));
             if (Objects.equals(cfg.getBrowseType(), 1)) choices.add(new LotteryDrawSnapshot.Chance(5, period, 0, 0, true));
             if (Objects.equals(cfg.getPointsStatus(), 1) && defaultZero(member.getMemberIntegral()) >= defaultZero(cfg.getPrice()))
-                choices.add(new LotteryDrawSnapshot.Chance(2, isUnlimitedPoints(cfg) ? "TOTAL" : period,
+                choices.add(new LotteryDrawSnapshot.Chance(2, LotteryQuota.sourceScope(cfg,period,isUnlimitedPoints(cfg)),
                         isUnlimitedPoints(cfg) ? -1 : defaultZero(cfg.getPointsCount()), defaultZero(cfg.getPrice()), false));
         } else {
             int method = defaultZero(cfg.getLotteryMethod());
@@ -2278,13 +2286,16 @@ public class LotteryMobileServiceImpl implements LotteryMobileService {
     }
 
     private TaskScope buildTaskScope(LotterySettingsCacheDataVO settings) {
-        if (Objects.equals(settings.getCalculationRules(), 2)) {
+        if (Objects.equals(settings.getCalculationRules(), 2) || Objects.equals(settings.getLotteryRulesReset(), 1)) {
             List<SessionTime> sessionTimes = parseSessionTime(settings.getTimeRange());
             SessionTime currentSession = getCurrentSession(sessionTimes, LocalTime.now());
             if (currentSession == null) {
                 throw exception(LOTTERY_SESSION_NOT_IN_RANGE);
             }
             LocalDate today = LocalDate.now();
+            // 每日全天计数继续使用原日期键；仅多场次/按场次的配置切换场次键。
+            if(currentSession.isAllDay()&&!Objects.equals(settings.getCalculationRules(),2))
+                return new TaskScope(today.format(DateTimeFormatter.BASIC_ISO_DATE),today.atStartOfDay(),today.plusDays(1).atStartOfDay(),false);
             LocalDateTime start = LocalDateTime.of(today, currentSession.getStartLocalTime());
             LocalDateTime end = currentSession.isAllDay()
                     ? LocalDateTime.of(today, LocalTime.of(23, 59, 59))
@@ -2314,7 +2325,7 @@ public class LotteryMobileServiceImpl implements LotteryMobileService {
         LotterySettingsCacheDataVO config = getLotterySettings(activityId);
         if (lotteryV2Service.enabled(config)) {
             long[] values = lotteryLedger.counter(BusinessContextHolder.getRequiredBusinessId(), activityId, memberId,
-                    unlimited ? "TOTAL" : scope.scopeKey, taskType);
+                    LotteryQuota.sourceScope(config,scope.scopeKey,unlimited), taskType);
             LotteryTaskDO row = new LotteryTaskDO(); row.setActivityId(activityId); row.setMemberId(memberId); row.setTaskType(taskType);
             row.setGainCount(Math.toIntExact(values[0])); row.setConsumeCount(Math.toIntExact(values[1])); row.setFinishCount(Math.toIntExact(values[2]));
             return row;
@@ -2350,7 +2361,7 @@ public class LotteryMobileServiceImpl implements LotteryMobileService {
                 }
             }
         }
-        if (!unlimited && scope != null && !isTaskInScope(taskDO, scope)) {
+        if ((!unlimited || Objects.equals(config.getLotteryRulesReset(),1)) && scope != null && !isTaskInScope(taskDO, scope)) {
             taskDO.setFinishCount(0);
             taskDO.setGainCount(0);
             taskDO.setConsumeCount(0);
@@ -3128,6 +3139,7 @@ public class LotteryMobileServiceImpl implements LotteryMobileService {
                 .toList();
         Map<Long, List<Long>> commodityMap = buildLotteryCommodityMap(commodityActivityIds);
         for (LotterySettingsDO settingsDO : settingsList) {
+            try {
             ActivityDO activityDO = activityMap.get(settingsDO.getActivityId());
             if (activityDO == null) {
                 continue;
@@ -3149,11 +3161,20 @@ public class LotteryMobileServiceImpl implements LotteryMobileService {
             if (cacheData == null) {
                 continue;
             }
-            completeLotteryTask(cacheData, reqDTO.getMemberId(), LotteryTaskTypeEnum.ORDER,
+            if (lotteryV2Service.enabled(cacheData)) {
+                String period=buildTaskScope(cacheData).scopeKey;
+                lotteryLedger.earnOrder(BusinessContextHolder.getRequiredBusinessId(),cacheData,reqDTO.getMemberId(),period,
+                        LotteryQuota.sourceScope(cacheData,period,isUnlimitedOrderTask(cacheData)),defaultZero(settingsDO.getPlaceOrderLotteryNumber()),
+                        isUnlimitedOrderTask(cacheData),reqDTO.getOrderSn());
+            } else completeLotteryTask(cacheData, reqDTO.getMemberId(), LotteryTaskTypeEnum.ORDER,
                     buildTaskScope(cacheData),
                     defaultZero(settingsDO.getPlaceOrderLotteryNumber()),
                     isUnlimitedOrderTask(cacheData),
                     1);
+            } catch (Exception e) {
+                // 一个活动封顶/配置变更/失败，不影响同一订单给其他符合条件的活动奖励。
+                log.info("下单抽奖任务未完成，activityId={}, orderSn={}, reason={}",settingsDO.getActivityId(),reqDTO.getOrderSn(),e.getMessage());
+            }
         }
     }
 
@@ -3206,11 +3227,6 @@ public class LotteryMobileServiceImpl implements LotteryMobileService {
         if (currentSummary.totalRemaining == 0) {
             throw exception(LOTTERY_TOT_LIMIT_REACHED_AGAIN);
         }
-        if (currentSummary.totalRemaining > 0
-                && (currentSummary.aggregateAvailableCount < 0
-                || currentSummary.aggregateAvailableCount >= currentSummary.totalRemaining)) {
-            throw exception(LOTTERY_TOT_LIMIT_REACHED_AGAIN);
-        }
         LotteryTaskDO taskDO = getScopedLotteryTask(resolveLotteryBizActivityId(settings), memberId,
                 LotteryTaskTypeEnum.SHARE.getCode(), false, scope, false);
         if (defaultZero(taskDO == null ? 0 : taskDO.getFinishCount()) >= defaultZero(settings.getShareCount())) {
@@ -3229,7 +3245,7 @@ public class LotteryMobileServiceImpl implements LotteryMobileService {
         if (lotteryV2Service.enabled(settings)) {
             WxMemberVO member = getAndValidateWxMember(memberId);
             lotteryLedger.earn(BusinessContextHolder.getRequiredBusinessId(), settings, memberId, scope.scopeKey,
-                    unlimited ? "TOTAL" : scope.scopeKey, taskTypeEnum.getCode(), taskLimit, unlimited, rewardCount, defaultZero(member.getMemberIntegral()));
+                    LotteryQuota.sourceScope(settings,scope.scopeKey,unlimited), taskTypeEnum.getCode(), taskLimit, unlimited, rewardCount, defaultZero(member.getMemberIntegral()));
             return;
         }
         Long activityId = resolveLotteryBizActivityId(settings);
@@ -3244,11 +3260,6 @@ public class LotteryMobileServiceImpl implements LotteryMobileService {
             WxMemberVO wxMember = getAndValidateWxMember(memberId);
             MultiChanceSummary currentSummary = buildMultiChanceSummary(settings, memberId, wxMember, false);
             if (currentSummary.totalRemaining == 0) {
-                throw exception(LOTTERY_TOT_LIMIT_REACHED_AGAIN);
-            }
-            if (currentSummary.totalRemaining > 0
-                    && (currentSummary.aggregateAvailableCount < 0
-                    || currentSummary.aggregateAvailableCount >= currentSummary.totalRemaining)) {
                 throw exception(LOTTERY_TOT_LIMIT_REACHED_AGAIN);
             }
             LotteryTaskDO taskDO = getScopedLotteryTask(activityId, memberId, taskTypeEnum.getCode(), unlimited, scope, true);

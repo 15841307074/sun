@@ -39,7 +39,9 @@ class LotteryReissueWorkerTest {
         draw.getSnapshot().getPrize().setPrizeType(5);
         var response=new TransferToUser.TransferToUserResponse();response.setState(TransferToUser.TransferBillStatus.WAIT_USER_CONFIRM);response.setPackageInfo("test-package");
         when(cash.reconcileOrSend(draw)).thenReturn(response);ReflectionTestUtils.invokeMethod(worker,"run",100L);
-        var order=inOrder(storage,cash);order.verify(storage).log(draw);order.verify(cash).reconcileOrSend(draw);order.verify(storage).log(draw);
+        var order=inOrder(storage,cash);order.verify(cash).reconcileOrSend(draw);order.verify(storage).log(draw);
+        verify(storage,times(1)).log(draw);
+        verify(ledger,never()).grantState(eq(100L),eq("PROCESSING"),any(),anyBoolean(),anyBoolean());
         verify(ledger).retryJob(eq(100L),anyString(),eq("微信红包处理中"));assertEquals("test-package",draw.getResult().getPackageInfo());
     }
     @Test void cashApiExceptionKeepsTheWinnerRecordForManualRecovery() {

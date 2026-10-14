@@ -167,9 +167,8 @@ public class LotteryGrantWorker {
                     var result=service.result(draw);
                     int type=draw.getSnapshot().getPrize().getPrizeType();
                     if(type==5) {
-                        // 中奖结果已确定，先落未领取记录；微信异常/待确认也保留人工排查入口。
-                        storage.log(draw);
-                        ledger.grantState(id,"PROCESSING",result,false,false);
+                        // 持久化受理记录及任务已存在。先获取领取参数，再一次写入最新小票记录，
+                        // 省去请求线程中重复的日志插入/读取/更新和中间状态事务。
                         var response=cash.reconcileOrSend(draw);
                         if(response.getState()==null)throw new IllegalStateException("红包状态未知");
                         String state=response.getState().name();result.setPackageInfo(response.getPackageInfo());
@@ -202,7 +201,11 @@ public class LotteryGrantWorker {
             if("COMPLETED".equals(draw.getDrawStatus())||Objects.equals(draw.getSnapshot().getPrize().getPrizeType(),5)||draw.getSnapshot().isFallbackApplied())storage.log(draw);
             if("ACCEPTED".equals(draw.getDrawStatus()))ledger.retryJob(id,token,"保底发放待处理");
             else {ledger.finishJob(id,token);delayed.remove(id);}
-        } catch(Exception e){ledger.retryJob(id,token,e.getClass().getSimpleName());log.warn("Lottery grant deferred: request={}, reason={}",id,e.getClass().getSimpleName());}
+        } catch(Exception e){
+            // 微信调用失败仍保留中奖记录；记录失败不掩盖原异常、不重复转账。
+            try {var failed=ledger.get(id);if(failed!=null&&Objects.equals(failed.getSnapshot().getPrize().getPrizeType(),5))storage.log(failed);}
+            catch(Exception logging){log.warn("Lottery cash log deferred: request={}, reason={}",id,logging.getClass().getSimpleName());}
+            ledger.retryJob(id,token,e.getClass().getSimpleName());log.warn("Lottery grant deferred: request={}, reason={}",id,e.getClass().getSimpleName());}
         finally{BusinessContextHolder.setBusinessId(previousBusiness);}
     }
     /** 保持原红包按钮契约：lottery 返回前准备微信单与领取参数，到账确认仍异步。 */

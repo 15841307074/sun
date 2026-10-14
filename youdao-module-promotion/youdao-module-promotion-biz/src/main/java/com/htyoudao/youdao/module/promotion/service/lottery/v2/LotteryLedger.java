@@ -85,4 +85,6 @@ public interface LotteryLedger {
     void retryJob(long id,String token,String message);
 
     void earn(long b,LotterySettingsCacheDataVO cfg,long m,String period,String scope,int source,int limit,boolean unlimited,int reward,int balance);
+
+    void earnOrder(long b,LotterySettingsCacheDataVO cfg,long m,String period,String scope,int limit,boolean unlimited,String orderSn);
 }

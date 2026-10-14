@@ -1124,7 +1124,8 @@ public class BzOrderPayServiceImpl extends ServiceImpl<BzOrderPayMapper, BzOrder
                                         productDOList.stream().map(BzOrderProductDO::getCommodityId).collect(Collectors.toList())
                                 )
                                 .setOrderProductType(productTypeSet.size() == 1 ? productTypeSet.iterator().next() : 3)
-                                .setPaymentAmount(bzOrderDO.getPayAmount());
+                                .setPaymentAmount(bzOrderDO.getPayAmount())
+                                .setOrderSn(bzOrderDO.getOrderSn());
 
                         activityJkApi.getActivityJkList(reqDTO);
 //                        activityCqApi.getActivityCqList(reqDTO);

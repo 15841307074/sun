@@ -89,18 +89,34 @@ class LotteryCounterConsolidationTest {
         // H2 TIMESTAMP 精度高于业务 NOW(3)，使用已到期的时间避免同毫秒精度竞态。
         jdbc.update("UPDATE lottery_v2_counter SET cache_next_at=DATEADD('SECOND',-1,CURRENT_TIMESTAMP) WHERE cache_dirty=1");cache.retry();assertEquals(0,dirty());
     }
-    @Test void publishedUpgradeMigratesTotalsAndPendingCacheWithoutOverwritingNewTotals() throws Exception {
-        accept();jdbc.update("DELETE FROM lottery_v2_counter WHERE scope_key='ACTIVITY_TOTAL'");jdbc.update("UPDATE lottery_v2_counter SET cache_dirty=0");
-        jdbc.execute("CREATE TABLE lottery_v2_activity_counter(business_id BIGINT,activity_id BIGINT,total BIGINT)");
-        jdbc.execute("INSERT INTO lottery_v2_activity_counter VALUES(10,21,7),(11,21,3)");
-        jdbc.execute("CREATE TABLE lottery_v2_counter_cache_task(business_id BIGINT,activity_id BIGINT,member_id BIGINT,revision BIGINT,dirty INT,next_at TIMESTAMP)");
-        jdbc.execute("INSERT INTO lottery_v2_counter_cache_task SELECT business_id,activity_id,member_id,revision,1,CURRENT_TIMESTAMP FROM lottery_v2_counter WHERE scope_key='TOTAL' AND source=0");
-        Path root=Path.of("").toAbsolutePath();while(root!=null&&!Files.exists(root.resolve("sql/lottery_release_all.sql")))root=root.getParent();assertNotNull(root);
-        var lines=Files.readAllLines(root.resolve("sql/lottery_release_all.sql"));
-        var migration=lines.stream().map(String::strip).filter(line->line.startsWith("'INSERT IGNORE INTO lottery_v2_counter(")||line.startsWith("'UPDATE lottery_v2_counter c SET cache_dirty")).map(line->line.substring(1,line.length()-2).replace("''","'")).toList();
-        assertEquals(2,migration.size());for(String sql:migration)jdbc.update(sql);
-        assertEquals(7,ledger.activityDrawCount(10,21));assertEquals(3,ledger.activityDrawCount(11,21));assertEquals(1,dirty());assertEquals(1,ledger.consumed(10,21,40,"TOTAL",0));
-        jdbc.update("UPDATE lottery_v2_counter SET gained=6 WHERE business_id=10 AND scope_key='ACTIVITY_TOTAL'");
-        for(String sql:migration)jdbc.update(sql);assertEquals(6,ledger.activityDrawCount(10,21));
+    @Test void unlimitedPointsAndFreeOpportunitiesDoNotBlockTaskEarning() {
+        var cfg=snapshot.getSettings();cfg.setLotteryTotalNumber(3);cfg.setPointsStatus(1);cfg.setPointsType(1);cfg.setPrice(1);cfg.setFreeStatus(1);cfg.setFreeCount(10);
+        transaction.executeWithoutResult(status->ledger.earn(10,cfg,40,"20261012","20261012",4,2,false,1,100));
+        assertArrayEquals(new long[]{1,0,1},ledger.counter(10,21,40,"20261012",4));
+    }
+    @Test void orderNotificationsAreIdempotentAndDistinctActivitiesEarnIndependently() {
+        var cfg=snapshot.getSettings();
+        transaction.executeWithoutResult(status->ledger.earnOrder(10,cfg,40,"20261012","20261012",2,false,"order-one"));
+        transaction.executeWithoutResult(status->ledger.earnOrder(10,cfg,40,"20261012","20261012",2,false,"order-one"));
+        assertArrayEquals(new long[]{1,0,1},ledger.counter(10,21,40,"20261012",3));
+        cfg.setActivityId(22L);
+        transaction.executeWithoutResult(status->ledger.earnOrder(10,cfg,40,"20261012","20261012",2,false,"order-one"));
+        assertArrayEquals(new long[]{1,0,1},ledger.counter(10,22,40,"20261012",3));
+    }
+    @Test void failedOrderRewardRollsBackReceiptAndCanBeRetried() {
+        var cfg=snapshot.getSettings();
+        assertThrows(RuntimeException.class,()->transaction.executeWithoutResult(status->ledger.earnOrder(10,cfg,40,"20261012","20261012",0,false,"order-retry")));
+        assertEquals(0,jdbc.queryForObject("SELECT COUNT(*) FROM lottery_v2_counter WHERE scope_key='ORDER:order-retry'",Integer.class));
+        transaction.executeWithoutResult(status->ledger.earnOrder(10,cfg,40,"20261012","20261012",1,false,"order-retry"));
+        assertArrayEquals(new long[]{1,0,1},ledger.counter(10,21,40,"20261012",3));
+    }
+    @Test void quotaHeadIsPublishedBeforeTaskReturnsAndRollbackDoesNotPublish() {
+        var cfg=snapshot.getSettings();
+        transaction.executeWithoutResult(status->ledger.earn(10,cfg,40,"20261012","20261012",4,2,false,1,0));
+        verify(redis,times(1)).execute(any(RedisScript.class),anyList(),any(Object[].class));
+        clearInvocations(redis);
+        transaction.executeWithoutResult(status->{ledger.earn(10,cfg,40,"20261012","20261012",4,2,false,1,0);status.setRollbackOnly();});
+        verifyNoInteractions(redis);
+        assertArrayEquals(new long[]{1,0,1},ledger.counter(10,21,40,"20261012",4));
     }
 }

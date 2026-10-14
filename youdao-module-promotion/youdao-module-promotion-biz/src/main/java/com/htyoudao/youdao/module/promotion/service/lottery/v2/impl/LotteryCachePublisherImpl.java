@@ -9,7 +9,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -36,17 +35,19 @@ public class LotteryCachePublisherImpl implements LotteryCachePublisher {
         jdbc.update("INSERT INTO lottery_v2_cache_task(business_id,activity_id,settings_id,config_version) VALUES(?,?,?,?) " +
                 "ON DUPLICATE KEY UPDATE settings_id=VALUES(settings_id),config_version=GREATEST(config_version,VALUES(config_version)),dirty=1,next_at=NOW(3)",
                 b, settings.getActivityId(), settings.getId(), settings.getConfigVersion());
-        // 提交后只发布固定数量的键；旧门店缓存由后台任务分批清理。
+        // 仅在配置实际变更后发布；无业务变更时不扫描数据库。
         Runnable publish = () -> { try {
             redis.execute(PUBLISH, List.of(LotteryKeys.key(b,settings.getActivityId(),"config-version",0)), Long.toString(settings.getConfigVersion()));
             redis.opsForValue().increment(LotteryKeys.key(b,0,"store-list-version",0));
+            executor.submit(() -> {try {clearPublished(b,settings.getActivityId(),settings.getId(),settings.getConfigVersion());}
+                catch(Exception e){log.warn("Lottery cache cleanup retained: activity={}, reason={}",settings.getActivityId(),e.getClass().getSimpleName());}});
         } catch (Exception e) {
-            log.warn("Lottery cache publication queued for retry: activity={}", settings.getActivityId());
+            log.warn("Lottery cache publication retained: activity={}, reason={}", settings.getActivityId(),e.getClass().getSimpleName());
         }};
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
-                public void afterCommit() { executor.submit(publish); }
+                public void afterCommit() { publish.run(); }
             });
         } else publish.run();
     }
@@ -85,7 +86,7 @@ public class LotteryCachePublisherImpl implements LotteryCachePublisher {
                 prize.getStoreId() == null ? 0 : prize.getStoreId(), prize.getCode(), prize.getId(), prize.getPrizeNum());
     }
 
-    @Scheduled(fixedDelay = 3000)
+    /** 仅供人工恢复调用；正常空闲时不扫描数据库。 */
     @Override
     public void retry() {
         try {
@@ -107,6 +108,10 @@ public class LotteryCachePublisherImpl implements LotteryCachePublisher {
         long version=((Number)row.get("config_version")).longValue(), settings=((Number)row.get("settings_id")).longValue();
         redis.execute(PUBLISH, List.of(LotteryKeys.key(b,a,"config-version",0)), Long.toString(version));
         redis.opsForValue().increment(LotteryKeys.key(b,0,"store-list-version",0));
+        clearPublished(b,a,settings,version);
+    }
+
+    private void clearPublished(long b,long a,long settings,long version) {
         // 仅清理旧版展示缓存，不触碰库存键。
         List<Long> stores=jdbc.queryForList("SELECT DISTINCT store_id FROM lottery_prize WHERE lottery_id=? AND business_id=? AND store_id IS NOT NULL",Long.class,settings,b);
         for(long id : new long[]{a,settings}) {

@@ -9,7 +9,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.*;
 import java.time.*;
@@ -39,10 +38,17 @@ public class LotteryCounterCacheImpl implements LotteryCounterCache {
     public void changed(long b,long a,long member) {
         long revision=jdbc.queryForObject("SELECT revision FROM lottery_v2_counter WHERE business_id=? AND activity_id=? AND member_id=? AND scope_key='TOTAL' AND source=0",Long.class,b,a,member);
         jdbc.update("UPDATE lottery_v2_counter SET cache_dirty=1,cache_next_at=NOW(3) WHERE business_id=? AND activity_id=? AND member_id=? AND scope_key='TOTAL' AND source=0",b,a,member);
-        Runnable publish=()->{try{publishHead(b,a,member,revision);}catch(Exception e){log.debug("Lottery quota publication deferred: activity={}",a);}};
+        // 提交后先同步推进缓存版本，任务接口返回时下一次查询即使用新次数。
+        // 清除脏标记在独立工作线程执行，避免 afterCommit 复用已提交事务的连接。
+        Runnable publish=()->{try{
+            publishHead(b,a,member,revision);
+            executor.submit(()->{try{
+                jdbc.update("UPDATE lottery_v2_counter SET cache_dirty=0 WHERE business_id=? AND activity_id=? AND member_id=? AND scope_key='TOTAL' AND source=0 AND revision=?",b,a,member,revision);
+            }catch(Exception e){log.warn("Lottery quota acknowledgment retained: activity={}, member={}, reason={}",a,member,e.getClass().getSimpleName());}});
+        }catch(Exception e){log.warn("Lottery quota publication retained: activity={}, member={}, reason={}",a,member,e.getClass().getSimpleName());}};
         if(TransactionSynchronizationManager.isActualTransactionActive())TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization(){
             @Override
-            public void afterCommit(){executor.submit(publish);}
+            public void afterCommit(){publish.run();}
         });
         else publish.run();
     }
@@ -66,7 +72,7 @@ public class LotteryCounterCacheImpl implements LotteryCounterCache {
             return data;
         }finally{refills.decrementAndGet();if(locked)redis.execute(new DefaultRedisScript<>("if redis.call('GET',KEYS[1])==ARGV[1] then return redis.call('DEL',KEYS[1]) end return 0",Long.class),List.of(lock),token);}
     }
-    @Scheduled(fixedDelay=1000)
+    /** 仅供人工恢复调用；正常空闲时不扫描数据库。 */
     @Override
     public void retry() {
         try{for(var row:jdbc.queryForList("SELECT business_id,activity_id,member_id,revision FROM lottery_v2_counter WHERE scope_key='TOTAL' AND source=0 AND cache_dirty=1 AND cache_next_at<=NOW(3) ORDER BY cache_next_at LIMIT 64")){

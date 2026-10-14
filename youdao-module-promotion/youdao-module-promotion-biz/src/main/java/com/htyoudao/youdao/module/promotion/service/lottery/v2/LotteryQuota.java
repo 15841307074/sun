@@ -7,12 +7,22 @@ import java.util.*;
 /** 展示与任务机会事务共用次数计算规则。 */
 public final class LotteryQuota {
     private LotteryQuota() {}
+    /** 免费、积分均为独立来源，不依赖下单/分享/浏览任务开关。 */
+    public static boolean hasSource(LotterySettingsCacheDataVO cfg) {
+        if (on(cfg.getFreeStatus()) || on(cfg.getPointsStatus()) || on(cfg.getOrderStatus())
+                || on(cfg.getShareEvent()) || on(cfg.getBrowseType())) return true;
+        // 兼容旧版单来源配置，但无效/缺失的方式不能退化为无限免费抽奖。
+        return cfg.getLotteryMethod()!=null && cfg.getLotteryMethod()>=1 && cfg.getLotteryMethod()<=3;
+    }
+    public static String sourceScope(LotterySettingsCacheDataVO cfg,String period,boolean unlimited) {
+        return unlimited&&!on(cfg.getLotteryRulesReset())?"TOTAL":period;
+    }
     public static LotterySettingsNumVo calculate(LotterySettingsCacheDataVO cfg,Map<String,long[]> counters,String period,int balance,boolean applyLimits) {
         var result=new LotterySettingsNumVo();
         int total=remaining(zero(cfg.getLotteryTotalNumber()),get(counters,"TOTAL",0)[1]);result.setSum(total);
         boolean multi=on(cfg.getFreeStatus())||on(cfg.getPointsStatus())||on(cfg.getOrderStatus())||on(cfg.getShareEvent())||on(cfg.getBrowseType());
-        String orderScope=on(cfg.getPlaceOrderLottery())?"TOTAL":period;
-        String pointsScope=on(cfg.getPointsType())?"TOTAL":period;
+        String orderScope=sourceScope(cfg,period,on(cfg.getPlaceOrderLottery()));
+        String pointsScope=sourceScope(cfg,period,on(cfg.getPointsType()));
         if(multi) {
             if(on(cfg.getFreeStatus()))result.setFreeAvailableCount(finite(zero(cfg.getFreeCount())-get(counters,period,1)[1]));
             if(on(cfg.getPointsStatus())&&balance>=zero(cfg.getPrice()))result.setPointsAvailableCount(on(cfg.getPointsType())?-1:finite(zero(cfg.getPointsCount())-get(counters,pointsScope,2)[1]));

@@ -345,13 +345,27 @@ public class LotteryLedgerImpl implements LotteryLedger {
     @Transactional(rollbackFor=Exception.class)
     @Override
     public void earn(long b,LotterySettingsCacheDataVO cfg,long m,String period,String scope,int source,int limit,boolean unlimited,int reward,int balance) {
+        earn(b,cfg,m,period,scope,source,limit,unlimited,reward,balance,null);
+    }
+
+    @Transactional(rollbackFor=Exception.class,timeout=5)
+    @Override
+    public void earnOrder(long b,LotterySettingsCacheDataVO cfg,long m,String period,String scope,int limit,boolean unlimited,String orderSn) {
+        if(orderSn!=null&&!orderSn.isBlank()&&orderSn.length()>120)throw new IllegalArgumentException("订单号过长");
+        earn(b,cfg,m,period,scope,3,limit,unlimited,1,0,orderSn);
+    }
+
+    private void earn(long b,LotterySettingsCacheDataVO cfg,long m,String period,String scope,int source,int limit,boolean unlimited,int reward,int balance,String orderSn) {
         long a=cfg.getActivityId();
         var versions=jdbc.queryForList("SELECT config_version FROM lottery_settings WHERE id=? AND business_id=? AND state=1 AND deleted=0 LOCK IN SHARE MODE",cfg.getId(),b);
         if(versions.isEmpty()||n(versions.get(0),"config_version")!=cfg.getConfigVersion())throw exception(LOTTERY_SYSTEM_AGAIN);
         ensureCounter(b,a,m,"TOTAL",0); // 与受理时保持相同的会员计数锁顺序。
-        jdbc.queryForObject("SELECT consumed FROM lottery_v2_counter WHERE business_id=? AND activity_id=? AND member_id=? AND scope_key='TOTAL' AND source=0 FOR UPDATE",Long.class,b,a,m);
-        var available=LotteryQuota.calculate(cfg,counters(b,a,m,period),period,balance,false);
-        if(available.getSum()==0 || (available.getSum()>0 && (available.getNum()<0 || available.getNum()>=available.getSum())))
+        Long totalConsumed=jdbc.queryForObject("SELECT consumed FROM lottery_v2_counter WHERE business_id=? AND activity_id=? AND member_id=? AND scope_key='TOTAL' AND source=0 FOR UPDATE",Long.class,b,a,m);
+        // 复用计数表唯一键，订单回执与奖励在同一事务提交；不增加业务表。
+        // 回执不属于 TOTAL/日期计数，不参与次数展示及场次重置。
+        if(orderSn!=null&&!orderSn.isBlank()&&jdbc.update("INSERT IGNORE INTO lottery_v2_counter(business_id,activity_id,member_id,scope_key,source) VALUES(?,?,?,?,3)",b,a,m,"ORDER:"+orderSn)!=1)return;
+        // 尚未消耗的免费/积分机会不占任务奖励额度，尤其不能用无限积分阻止任务奖励。
+        if(cfg.getLotteryTotalNumber()!=null&&cfg.getLotteryTotalNumber()>0&&totalConsumed>=cfg.getLotteryTotalNumber())
             throw exception(LOTTERY_TOT_LIMIT_REACHED_AGAIN);
         ensureCounter(b,a,m,scope,source);
         if(jdbc.update("UPDATE lottery_v2_counter SET gained=gained+?,finished=finished+1 WHERE business_id=? AND activity_id=? AND member_id=? AND scope_key=? AND source=? AND (?=1 OR finished<?)",reward,b,a,m,scope,source,unlimited?1:0,limit)!=1)

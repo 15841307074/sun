@@ -11,18 +11,28 @@ import com.htyoudao.youdao.module.promotion.util.WechatRedEnvelope.WXPayUtility;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.context.event.EventListener;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import lombok.extern.slf4j.Slf4j;
 import java.math.RoundingMode;
 import java.util.Arrays;
 import java.util.List;
 
 /** 微信调用不占用数据库事务，复用客户端和密钥。 */
 @Service("lotteryCashGateway")
+@Slf4j
 public class LotteryCashGatewayImpl implements LotteryCashGateway {
     @Resource
     private LotteryWeChatPayConfig config;
     @Resource private LotteryRedPacketService redPackets;
     private volatile TransferToUser client;
     private volatile List<String> clientConfig;
+    /** 服务就绪时加载密钥和客户端，避免首个红包承担本地初始化耗时；不调用微信、不发款。 */
+    @EventListener(ApplicationReadyEvent.class)
+    public void warmClient() {
+        try {client();}
+        catch(RuntimeException e){log.info("Lottery cash client initialization deferred: {}",e.getClass().getSimpleName());}
+    }
     private TransferToUser client() {
         List<String> current=Arrays.asList(config.getMchId(),config.getCertSerialNo(),config.getPrivateKeyPath(),config.getWechatPublicKeyId(),config.getWechatPublicKeyPath());
         if(client==null||!current.equals(clientConfig)) synchronized(this) {

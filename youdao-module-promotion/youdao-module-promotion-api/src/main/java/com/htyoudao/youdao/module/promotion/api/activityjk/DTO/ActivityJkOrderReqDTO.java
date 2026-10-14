@@ -23,6 +23,9 @@ public class ActivityJkOrderReqDTO implements java.io.Serializable{
     @Schema(description = "用户ID")
     private Long memberId;
 
+    @Schema(description = "订单号，用于抽奖下单任务重复通知去重")
+    private String orderSn;
+
     @Schema(description = "下单商品ID集合")
     private List<Long> commodityIds;
 

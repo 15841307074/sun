@@ -195,7 +195,7 @@ public class ActivityJkApiImpl implements ActivityJkApi {
         try {
             lotteryMobileService.handleOrderTask(reqDTO);
         } catch (Exception e) {
-            // 不影响集卡原有下单任务链路。
+            log.info("下单抽奖任务调用未完成，orderSn={}, reason={}", reqDTO.getOrderSn(), e.getMessage());
         }
         try {
             activityCqApi.getActivityCqList(reqDTO);
