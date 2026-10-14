@@ -2,6 +2,7 @@ package com.htyoudao.youdao.module.promotion.service.lottery.v2;
 
 import com.htyoudao.youdao.framework.context.BusinessContextHolder;
 import com.htyoudao.youdao.module.member.api.wxmember.WxMemberApi;
+import com.htyoudao.youdao.module.promotion.controller.admin.wechatDemo.TransferToUser;
 import jakarta.annotation.Resource;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
@@ -143,14 +144,18 @@ public class LotteryGrantWorker {
             if(ids.size()==free)requestAudit(now+BUSY_AUDIT_MILLIS);
         } catch(RuntimeException e){log.warn("Lottery work audit deferred: {}",e.getClass().getSimpleName());}
     }
-    private void run(long id) {
+    private LotteryLedger.Draw run(long id) {
+        long started=System.nanoTime(), transferNanos=0;
+        boolean cashDraw=false;
         String token=UUID.randomUUID().toString();
-        if(!ledger.claim(id,token))return;
+        if(!ledger.claim(id,token))return null;
         Long previousBusiness=BusinessContextHolder.getBusinessId();
         try {
             LotteryLedger.Draw draw=ledger.get(id);
+            Integer prizeType=draw.getSnapshot()==null||draw.getSnapshot().getPrize()==null?null:draw.getSnapshot().getPrize().getPrizeType();
+            cashDraw=Objects.equals(prizeType,5);
             BusinessContextHolder.setBusinessId(draw.getBusinessId());
-            if(ledger.isReturnJob(id)) {
+            if(Objects.equals(prizeType,3)&&ledger.isReturnJob(id)) {
                 if(storage.claimPhysicalReturn(draw)) {
                     ledger.confirmPhysicalReturn(id);draw=ledger.get(id);
                     if("RETURNED".equals(draw.getDrawStatus())) {
@@ -158,7 +163,7 @@ public class LotteryGrantWorker {
                         stockCache.reconcile(draw);service.result(draw);
                     }
                 }
-                ledger.finishJob(id,token);return;
+                ledger.finishJob(id,token);return draw;
             }
             if("ACCEPTED".equals(draw.getDrawStatus())) {
                 if(!draw.getSnapshot().isManualReissue()&&draw.getPointsCost()>0&&!members.changeLotteryPoints(draw.getMemberId(),draw.getOutBillNo()+":DEBIT",-draw.getPointsCost())) {
@@ -169,7 +174,10 @@ public class LotteryGrantWorker {
                     if(type==5) {
                         // 持久化受理记录及任务已存在。先获取领取参数，再一次写入最新小票记录，
                         // 省去请求线程中重复的日志插入/读取/更新和中间状态事务。
-                        var response=cash.reconcileOrSend(draw);
+                        long transferStarted=System.nanoTime();
+                        TransferToUser.TransferToUserResponse response;
+                        try {response=cash.reconcileOrSend(draw);}
+                        finally {transferNanos=System.nanoTime()-transferStarted;}
                         if(response.getState()==null)throw new IllegalStateException("红包状态未知");
                         String state=response.getState().name();result.setPackageInfo(response.getPackageInfo());
                         if("SUCCESS".equals(state))ledger.grantState(id,"SUCCESS",result,true,true);
@@ -180,8 +188,9 @@ public class LotteryGrantWorker {
                         }
                         else {
                             ledger.grantState(id,state,result,false,false);
-                            storage.log(ledger.get(id));
-                            ledger.retryJob(id,token,"微信红包处理中");return;
+                            LotteryLedger.Draw current=ledger.get(id);
+                            storage.log(current);
+                            ledger.retryJob(id,token,"微信红包处理中");return current;
                         }
                     } else {
                         if(type==1)storage.coupon(draw);
@@ -201,14 +210,22 @@ public class LotteryGrantWorker {
             if("COMPLETED".equals(draw.getDrawStatus())||Objects.equals(draw.getSnapshot().getPrize().getPrizeType(),5)||draw.getSnapshot().isFallbackApplied())storage.log(draw);
             if("ACCEPTED".equals(draw.getDrawStatus()))ledger.retryJob(id,token,"保底发放待处理");
             else {ledger.finishJob(id,token);delayed.remove(id);}
+            return draw;
         } catch(Exception e){
             // 微信调用失败仍保留中奖记录；记录失败不掩盖原异常、不重复转账。
-            try {var failed=ledger.get(id);if(failed!=null&&Objects.equals(failed.getSnapshot().getPrize().getPrizeType(),5))storage.log(failed);}
+            LotteryLedger.Draw failed=null;
+            try {failed=ledger.get(id);if(failed!=null&&Objects.equals(failed.getSnapshot().getPrize().getPrizeType(),5))storage.log(failed);}
             catch(Exception logging){log.warn("Lottery cash log deferred: request={}, reason={}",id,logging.getClass().getSimpleName());}
-            ledger.retryJob(id,token,e.getClass().getSimpleName());log.warn("Lottery grant deferred: request={}, reason={}",id,e.getClass().getSimpleName());}
-        finally{BusinessContextHolder.setBusinessId(previousBusiness);}
+            ledger.retryJob(id,token,e.getClass().getSimpleName());log.warn("Lottery grant deferred: request={}, reason={}",id,e.getClass().getSimpleName());return failed;}
+        finally{
+            BusinessContextHolder.setBusinessId(previousBusiness);
+            long total=System.nanoTime()-started;
+            if(cashDraw&&total>=TimeUnit.MILLISECONDS.toNanos(500))
+                log.info("红包处理耗时 requestPk={}, totalMs={}, transferMs={}, localMs={}",id,
+                        TimeUnit.NANOSECONDS.toMillis(total),TimeUnit.NANOSECONDS.toMillis(transferNanos),TimeUnit.NANOSECONDS.toMillis(total-transferNanos));
+        }
     }
     /** 保持原红包按钮契约：lottery 返回前准备微信单与领取参数，到账确认仍异步。 */
-    public void prepareCash(long id){run(id);}
+    public LotteryLedger.Draw prepareCash(long id){return run(id);}
     @PreDestroy public void stop(){stopped=true;executor.shutdown();delayed.clear();}
 }

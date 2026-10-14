@@ -44,7 +44,9 @@ public class LotteryV2ServiceImpl implements LotteryV2Service {
         if(!enabled(cfg))throw new IllegalArgumentException("历史活动请在管理端重新启用，初始化后使用新版抽奖流程");
         if(!properties.isAccepting())throw exception(LOTTERY_SYSTEM_AGAIN);
         try(var permit=admission.enter("draw",b,cfg.getActivityId(),req.getMemberId())) {
+            long validationStarted=System.nanoTime();
             LotteryDrawSnapshot snapshot=legacy.prepareV2Draw(req,cfg,cache.prizes(cfg,req.getStoreId()));
+            long validatedAt=System.nanoTime();
             LotteryStockCache.Reservation reserved=null;
             try {
                 LotteryLedger.Draw accepted;
@@ -61,6 +63,12 @@ public class LotteryV2ServiceImpl implements LotteryV2Service {
                 if(accepted.isNewlyAccepted())commit(reserved);else reconcile(reserved);
                 // 微信调用前释放库存锁，红包准备不会阻塞同奖品的其他抽奖。
                 if(reserved!=null){reserved.close();reserved=null;}
+                if(Objects.equals(snapshot.getPrize().getPrizeType(),5)) {
+                    long readyAt=System.nanoTime();
+                    if(readyAt-validationStarted>=java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(500))
+                        log.info("红包受理耗时 requestId={}, validationMs={}, acceptMs={}",req.getRequestId(),
+                                (validatedAt-validationStarted)/1000000,(readyAt-validatedAt)/1000000);
+                }
                 return drawResponse(accepted);
             } catch(DuplicateKeyException duplicate) {
                 reconcile(reserved);
@@ -93,8 +101,9 @@ public class LotteryV2ServiceImpl implements LotteryV2Service {
     private LotteryUserLogVO drawResponse(LotteryLedger.Draw draw) {
         if(Objects.equals(draw.getSnapshot().getPrize().getPrizeType(),5)&&"ACCEPTED".equals(draw.getDrawStatus())
                 &&(draw.getResult()==null||draw.getResult().getPackageInfo()==null||draw.getResult().getPackageInfo().isBlank())) {
-            grants.prepareCash(draw.getId());
-            LotteryLedger.Draw refreshed=ledger.get(draw.getId());if(refreshed!=null)draw=refreshed;
+            // 发奖方法已经读取当前持久化状态，复用返回值；未抢到租约才补读原单。
+            LotteryLedger.Draw refreshed=grants.prepareCash(draw.getId());
+            if(refreshed==null)refreshed=ledger.get(draw.getId());if(refreshed!=null)draw=refreshed;
         }
         LotteryUserLogVO response=result(draw);
         if(response.getPrizeType()==5) {

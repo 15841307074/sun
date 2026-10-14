@@ -29,21 +29,21 @@ class LotteryFixedTransferTest {
         vo=new LotteryRedPacketVo();vo.setActivityId(21L);vo.setOutBillNo("L2100000000000000001");vo.setOpenId("test-openid");vo.setTransferAmount(100);vo.setTransferRemark("抽奖活动红包");
         var info=new LotteryTransferSceneReportDO();info.setInfoType("活动名称");info.setInfoContent("红包活动");vo.setSceneReports(List.of(info));
         record=new LotteryTransferRecordDO();record.setOutBillNo(vo.getOutBillNo());record.setStatus(LotteryTransferStatus.PROCESSING);
-        when(self.prepareFixedTransferRecord(vo)).thenReturn(record);
+        when(self.prepareAndClaimFixedTransfer(vo)).thenReturn(new LotteryRedPacketService.FixedTransferPreparation(record,false));
     }
     @Test void notFoundSendsFullRequestAfterSavingTheRecord() {
         when(api.query(vo.getOutBillNo())).thenThrow(error(404,"NOT_FOUND"));
         var response=new TransferToUser.TransferToUserResponse();response.setState(TransferToUser.TransferBillStatus.WAIT_USER_CONFIRM);response.setPackageInfo("test-package");
         when(api.run(any())).thenReturn(response);
         assertSame(response,service.transferUser(vo,api));assertEquals(vo.getOutBillNo(),response.getOutBillNo());assertEquals(200,response.getCode());
-        var order=inOrder(self,api);order.verify(self).prepareFixedTransferRecord(vo);order.verify(api).query(vo.getOutBillNo());
+        var order=inOrder(self,api);order.verify(self).prepareAndClaimFixedTransfer(vo);order.verify(api).query(vo.getOutBillNo());
         var captured=ArgumentCaptor.forClass(TransferToUser.TransferToUserRequest.class);order.verify(api).run(captured.capture());order.verify(self).saveFixedTransferResult(record,response);
         var request=captured.getValue();assertEquals("test-app",request.appid);assertEquals("1000",request.transferSceneId);assertEquals("https://example.test/notify",request.notifyUrl);
         assertEquals(vo.getOutBillNo(),request.outBillNo);assertEquals(vo.getOpenId(),request.openid);assertEquals(100,request.transferAmount);assertEquals("红包活动",request.transferSceneReportInfos.get(0).infoContent);
     }
     @Test void firstRequestPostsWithoutWaitingForWechatQuery() {
         record.setStatus(LotteryTransferStatus.INIT);
-        when(self.claimFirstSend(record)).thenReturn(true);
+        when(self.prepareAndClaimFixedTransfer(vo)).thenReturn(new LotteryRedPacketService.FixedTransferPreparation(record,true));
         var response=new TransferToUser.TransferToUserResponse();response.setState(TransferToUser.TransferBillStatus.WAIT_USER_CONFIRM);
         response.setPackageInfo("claim-package");when(api.run(any())).thenReturn(response);
         assertSame(response,service.transferUser(vo,api));
@@ -53,7 +53,7 @@ class LotteryFixedTransferTest {
     @Test void anotherRequestCannotPostWhileFirstRequestIsInFlight() {
         record.setStatus(LotteryTransferStatus.INIT);
         assertEquals(TransferToUser.TransferBillStatus.PROCESSING,service.transferUser(vo,api).getState());
-        verify(self).claimFirstSend(record);verifyNoInteractions(api);
+        verify(self).prepareAndClaimFixedTransfer(vo);verifyNoInteractions(api);
     }
     @Test void preparedClaimParametersAreReusedWithoutWechatCall() {
         record.setStatus(LotteryTransferStatus.WAIT_USER_CONFIRM);record.setPackageInfo("claim-package");
@@ -91,6 +91,26 @@ class LotteryFixedTransferTest {
         assertSame(failure,assertThrows(WXPayUtility.ApiException.class,()->service.transferUser(vo,api)));
         verify(api,never()).run(any());verify(self).saveFixedTransferFailure(record,"test-error");verify(self,never()).saveFixedTransferResult(any(),any());
         assertEquals("L2100000000000000001",vo.getOutBillNo());
+    }
+    @Test void recordAndFirstSendClaimCommitTogetherBeforeCallingWechat() {
+        record.setStatus(LotteryTransferStatus.INIT);
+        var inner=spy(new LotteryRedPacketService());
+        doAnswer(call->{assertTrue(org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive());return record;}).when(inner).prepareFixedTransferRecord(vo);
+        doAnswer(call->{assertTrue(org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive());return true;}).when(inner).claimFirstSend(record);
+        doNothing().when(inner).saveFixedTransferResult(eq(record),any());
+        var source=new org.springframework.jdbc.datasource.DriverManagerDataSource("jdbc:h2:mem:transfer"+java.util.UUID.randomUUID(),"sa","");
+        var manager=spy(new org.springframework.jdbc.datasource.DataSourceTransactionManager(source));
+        var factory=new org.springframework.aop.framework.ProxyFactory(inner);
+        var advice=new org.springframework.transaction.interceptor.TransactionInterceptor();
+        advice.setTransactionManager(manager);advice.setTransactionAttributeSource(new org.springframework.transaction.annotation.AnnotationTransactionAttributeSource());
+        factory.addAdvice(advice);
+        ReflectionTestUtils.setField(service,"self",factory.getProxy());
+        var response=new TransferToUser.TransferToUserResponse();response.setState(TransferToUser.TransferBillStatus.WAIT_USER_CONFIRM);response.setPackageInfo("test-package");
+        when(api.run(any())).thenAnswer(call->{
+            assertFalse(org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive());
+            verify(manager,times(1)).commit(any());return response;
+        });
+        assertSame(response,service.transferUser(vo,api));verify(api,never()).query(anyString());verify(manager,times(2)).commit(any());
     }
     private WXPayUtility.ApiException error(int status,String code) {return new WXPayUtility.ApiException(status,"{\"code\":\""+code+"\",\"message\":\"test-error\"}",new Headers.Builder().build());}
 }

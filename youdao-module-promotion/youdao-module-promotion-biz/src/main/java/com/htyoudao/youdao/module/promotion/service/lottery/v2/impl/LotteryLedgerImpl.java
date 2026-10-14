@@ -324,10 +324,11 @@ public class LotteryLedgerImpl implements LotteryLedger {
     public List<Long> due(int count) {return jobs().queryForList("SELECT request_pk FROM lottery_v2_job WHERE (state='READY' AND next_at<=NOW(3)) OR (state='RUNNING' AND lease_until<NOW(3)) ORDER BY next_at LIMIT ?",Long.class,count);}
     @Override
     public boolean claim(long id,String token) {
+        // 正常领取只做一次条件更新；抢到租约后无需先查询/更新“停止重试”状态。
+        if(jobs().update("UPDATE lottery_v2_job SET state='RUNNING',lease_token=?,lease_until=DATE_ADD(NOW(3),INTERVAL 60 SECOND),attempts=attempts+1 WHERE request_pk=? AND attempts<CASE WHEN last_error='微信红包处理中' THEN 30 ELSE 8 END AND ((state='READY' AND next_at<=NOW(3)) OR (state='RUNNING' AND lease_until<NOW(3)))",token,id)==1)return true;
         // 即便上次实例在异常处理中退出，也不无限重领同一条卡住的记录。
-        int stopped=jobs().update("UPDATE lottery_v2_job SET state='STOPPED',lease_token=NULL,lease_until=NULL,last_error=LEFT(CONCAT('自动重试已停止；',COALESCE(last_error,'')),512) WHERE request_pk=? AND attempts>=CASE WHEN last_error='微信红包处理中' THEN 30 ELSE 8 END AND ((state='READY' AND next_at<=NOW(3)) OR (state='RUNNING' AND lease_until<NOW(3)))",id);
-        if(stopped>0)return false;
-        return jobs().update("UPDATE lottery_v2_job SET state='RUNNING',lease_token=?,lease_until=DATE_ADD(NOW(3),INTERVAL 60 SECOND),attempts=attempts+1 WHERE request_pk=? AND ((state='READY' AND next_at<=NOW(3)) OR (state='RUNNING' AND lease_until<NOW(3)))",token,id)==1;
+        jobs().update("UPDATE lottery_v2_job SET state='STOPPED',lease_token=NULL,lease_until=NULL,last_error=LEFT(CONCAT('自动重试已停止；',COALESCE(last_error,'')),512) WHERE request_pk=? AND attempts>=CASE WHEN last_error='微信红包处理中' THEN 30 ELSE 8 END AND ((state='READY' AND next_at<=NOW(3)) OR (state='RUNNING' AND lease_until<NOW(3)))",id);
+        return false;
     }
     @Override
     public void finishJob(long id,String token){jobs().update("UPDATE lottery_v2_job SET state='DONE',lease_token=NULL,lease_until=NULL,last_error=NULL WHERE request_pk=? AND lease_token=?",id,token);}

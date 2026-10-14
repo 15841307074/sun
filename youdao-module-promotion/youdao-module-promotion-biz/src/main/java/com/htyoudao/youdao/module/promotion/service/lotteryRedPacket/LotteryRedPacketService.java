@@ -59,9 +59,20 @@ public class LotteryRedPacketService {
     @Resource @Lazy
     private LotteryRedPacketService self;
 
+    public record FixedTransferPreparation(LotteryTransferRecordDO record,boolean firstSend) {}
+
+    /** 保存原单和首次发送权合并为一次短事务；提交后才调用微信。 */
+    @DS(DsNameConstants.SHARDING)
+    @Transactional(rollbackFor=Exception.class,timeout=5)
+    public FixedTransferPreparation prepareAndClaimFixedTransfer(LotteryRedPacketVo vo) {
+        LotteryTransferRecordDO record=prepareFixedTransferRecord(vo);
+        return new FixedTransferPreparation(record,record.getStatus()==LotteryTransferStatus.INIT&&claimFirstSend(record));
+    }
+
     /** 新版异步抽奖沿用原红包参数和转账记录，微信查询/发送在数据库事务外。 */
     public TransferToUser.TransferToUserResponse transferUser(LotteryRedPacketVo vo,TransferToUser client) {
-        LotteryTransferRecordDO record=self.prepareFixedTransferRecord(vo);
+        FixedTransferPreparation prepared=self.prepareAndClaimFixedTransfer(vo);
+        LotteryTransferRecordDO record=prepared.record();
         if(record.getStatus()==LotteryTransferStatus.SUCCESS||record.getStatus()==LotteryTransferStatus.FAIL
                 ||record.getStatus()==LotteryTransferStatus.WAIT_USER_CONFIRM&&record.getPackageInfo()!=null&&!record.getPackageInfo().isBlank()) {
             var known=new TransferToUser.TransferToUserResponse();known.setCode(200);known.setOutBillNo(record.getOutBillNo());
@@ -71,7 +82,7 @@ public class LotteryRedPacketService {
             return known;
         }
         // 唯一商户单号的 INIT 记录只允许一个请求首次发起转账；重试必须先查原单。
-        boolean firstSend=record.getStatus()==LotteryTransferStatus.INIT&&self.claimFirstSend(record);
+        boolean firstSend=prepared.firstSend();
         if(record.getStatus()==LotteryTransferStatus.INIT&&!firstSend)return processing(record);
         try {
             TransferToUser.TransferToUserResponse response;
@@ -105,15 +116,20 @@ public class LotteryRedPacketService {
     private TransferToUser.TransferToUserResponse queryFixedTransfer(TransferToUser client,LotteryTransferRecordDO record) {
         long started=System.nanoTime();
         try{return client.query(record.getOutBillNo());}
-        finally{io.micrometer.core.instrument.Metrics.timer("lottery.cash.wechat.duration","operation","query")
-                .record(System.nanoTime()-started,java.util.concurrent.TimeUnit.NANOSECONDS);}
+        finally{recordWechatTiming(record.getOutBillNo(),"query",System.nanoTime()-started);}
     }
 
     private TransferToUser.TransferToUserResponse sendFixedTransfer(TransferToUser client,LotteryRedPacketVo vo,LotteryTransferRecordDO record) {
         long started=System.nanoTime();
         try{return client.run(transferRequest(vo,record));}
-        finally{io.micrometer.core.instrument.Metrics.timer("lottery.cash.wechat.duration","operation","send")
-                .record(System.nanoTime()-started,java.util.concurrent.TimeUnit.NANOSECONDS);}
+        finally{recordWechatTiming(record.getOutBillNo(),"send",System.nanoTime()-started);}
+    }
+
+    private void recordWechatTiming(String outBillNo,String operation,long nanos) {
+        io.micrometer.core.instrument.Metrics.timer("lottery.cash.wechat.duration","operation",operation)
+                .record(nanos,java.util.concurrent.TimeUnit.NANOSECONDS);
+        if(nanos>=java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(500))
+            log.info("红包微信接口耗时 outBillNo={}, operation={}, elapsedMs={}",outBillNo,operation,nanos/1000000);
     }
 
     private TransferToUser.TransferToUserRequest transferRequest(LotteryRedPacketVo vo,LotteryTransferRecordDO record) {

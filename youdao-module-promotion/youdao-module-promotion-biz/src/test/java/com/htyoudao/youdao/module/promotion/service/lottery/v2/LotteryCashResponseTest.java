@@ -42,13 +42,14 @@ class LotteryCashResponseTest {
     }
     @AfterEach void clear(){BusinessContextHolder.clear();}
     private void ready() {
-        doAnswer(call->{draw.setGrantStatus("WAIT_USER_CONFIRM");var result=new LotteryUserLogVO();result.setPrizeType(5);result.setLotteryPrizeId(100L);result.setPackageInfo("test-package");draw.setResult(result);return null;}).when(grants).prepareCash(7);
+        doAnswer(call->{draw.setGrantStatus("WAIT_USER_CONFIRM");var result=new LotteryUserLogVO();result.setPrizeType(5);result.setLotteryPrizeId(100L);result.setPackageInfo("test-package");draw.setResult(result);return draw;}).when(grants).prepareCash(7);
     }
     @Test void lotteryReturnsReadyCashParametersAfterReleasingTheInventoryLock() {
         ready();var response=service.drawAfterResultMiss(req,cfg);
         assertEquals("test-package",response.getPackageInfo());assertEquals("L7",response.getOutBillNo());assertEquals("WAIT_USER_CONFIRM",response.getGrantStatus());
         var order=inOrder(reservation,grants);order.verify(reservation).commit();order.verify(reservation).close();order.verify(grants).prepareCash(7);
         verify(ledger,times(1)).accept(anyLong(),any());
+        verify(ledger,never()).get(anyLong());
     }
     @Test void retryOnlyPreparesTheOriginalBillWithoutAcceptingAnotherDraw() {
         ready();var response=service.prepareCashResult(req);assertEquals("test-package",response.getPackageInfo());assertEquals("L7",response.getOutBillNo());

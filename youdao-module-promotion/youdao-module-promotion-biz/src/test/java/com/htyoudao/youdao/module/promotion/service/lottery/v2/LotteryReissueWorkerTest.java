@@ -38,10 +38,12 @@ class LotteryReissueWorkerTest {
     @Test void waitingCashStillRecordsTheWinnerAndPackage() {
         draw.getSnapshot().getPrize().setPrizeType(5);
         var response=new TransferToUser.TransferToUserResponse();response.setState(TransferToUser.TransferBillStatus.WAIT_USER_CONFIRM);response.setPackageInfo("test-package");
-        when(cash.reconcileOrSend(draw)).thenReturn(response);ReflectionTestUtils.invokeMethod(worker,"run",100L);
+        when(cash.reconcileOrSend(draw)).thenReturn(response);
+        assertSame(draw,ReflectionTestUtils.invokeMethod(worker,"run",100L));
         var order=inOrder(storage,cash);order.verify(cash).reconcileOrSend(draw);order.verify(storage).log(draw);
         verify(storage,times(1)).log(draw);
         verify(ledger,never()).grantState(eq(100L),eq("PROCESSING"),any(),anyBoolean(),anyBoolean());
+        verify(ledger,never()).isReturnJob(anyLong());
         verify(ledger).retryJob(eq(100L),anyString(),eq("微信红包处理中"));assertEquals("test-package",draw.getResult().getPackageInfo());
     }
     @Test void cashApiExceptionKeepsTheWinnerRecordForManualRecovery() {
@@ -68,5 +70,13 @@ class LotteryReissueWorkerTest {
         verifyNoInteractions(members);
         assertEquals(101L,draw.getSnapshot().getPrize().getId());
         assertEquals("FAILED",draw.getDrawStatus());
+    }
+    @Test void physicalReturnStillRunsTheOriginalReturnAndRefundFlow() {
+        draw.getSnapshot().getPrize().setPrizeType(3);draw.setDrawStatus("COMPLETED");draw.setStockState("ISSUED");
+        when(ledger.isReturnJob(100)).thenReturn(true);when(storage.claimPhysicalReturn(draw)).thenReturn(true);
+        doAnswer(call->{draw.setDrawStatus("RETURNED");draw.setStockState("RETURNED");return null;}).when(ledger).confirmPhysicalReturn(100);
+        assertSame(draw,ReflectionTestUtils.invokeMethod(worker,"run",100L));
+        verify(ledger).confirmPhysicalReturn(100);verify(members).refundLotteryPoints(40L,"L100");
+        verify(ledger).finishJob(eq(100L),anyString());verifyNoInteractions(cash);verify(storage,never()).log(any());
     }
 }
