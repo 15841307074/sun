@@ -2,54 +2,45 @@
 -- 覆盖：标签适用范围、V2 库存/请求/任务账本、门店标签通知、会员积分幂等、最近中奖、人工补发权限。
 -- 仅执行本轮新增对象与必要索引，不清零库存或次数，不迁移或删除旧表。
 --
--- 使用方法：在正确的实际数据库连接中设置下方执行类型，执行整个文件。
---   PROMOTION：营销主库，必须已有 activity、lottery_settings、lottery_prize。
---   SYSTEM   ：系统主库，必须已有 system_menu；包含标签通知表及人工补发按钮权限。
---   MEMBER   ：会员物理库，仅给已有 points_log_0..9 增加查询索引，不创建表。
---   LOG      ：中奖记录物理库，仅修改该库已存在的 lottery_log / lottery_log_0..9。
--- 库若分布在不同实例，分别用对应连接执行本文件；数据库同实例也不要把四类内容盲目建入同一库。
--- 示例：先选营销库，将类型设 PROMOTION 执行；再选系统库，将类型设 SYSTEM 执行。
--- 会员及日志有多个物理库时，对每个实际物理库执行对应类型。
+-- 使用方法：在 Navicat 查询窗口选择实际业务数据库，完整执行本文件一次；不需要填写模块类型或库名。
+-- 本文件适用于活动、系统、会员积分和中奖记录都在同一个库的部署。
+-- 当前库必须已有 activity、lottery_settings、lottery_prize；否则全部变更跳过并提示基础表缺失。
+-- 脚本自动处理系统表、积分流水和中奖记录；仅修改已有的普通表或分片表，不创建缺失分片。
+-- 已存在的字段和索引自动跳过；缺失的基础表会在执行前后的结果中显示，不能将跳过视为已完成。
 -- 前置 release_status 应为 READY，最终为 COMPLETED_CHECK_OBJECTS。
 -- 工具执行过程中若有 SQL 错误，应停止并核对，不使用忽略错误/--force。
 --
 -- 可重复执行：只新增不存在的字段/索引/表；已存在对象不会被覆盖，但仍需核对原有结构。
--- 包含 CHECK 约束，建议使用 MySQL 8.0.16+；本文件没有连接实际数据库验证。
+-- 包含 CHECK 约束，使用 MySQL 8.0.16+；请按执行结果核对实际业务库的表结构。
 -- 执行前备份，并暂停旧版抽奖/发奖/缓存发布实例；完成本脚本后整体切换新版，历史活动禁止批量改为 V2。
 -- 会员积分复用现有 wx_member / points_log 路由，无需新增 Nacos 分表规则；二者须在同一事务数据源。
 -- 人工补发不再扣次数或消耗积分；新增 JSON 快照字段不需要改表结构。
--- SYSTEM 类型只新增按钮，不给任何角色自动授权；执行后在角色管理按需授权。
+-- 系统部分只新增按钮，不给任何角色自动授权；执行后在角色管理按需授权。
 
 -- 说明：设置本连接字符集，确保中文注释及菜单名称正确写入。
--- 约定：每个变更块的 SET 根据目标库及对象是否已存在生成 DDL，否则生成 DO 0（跳过）。
+-- 约定：每个变更块的 SET 根据当前库的基础表及对象是否已存在生成 DDL，否则生成 DO 0（跳过）。
 -- 约定：随后 PREPARE 编译该语句，EXECUTE 执行，DEALLOCATE PREPARE 释放预处理句柄。
 SET NAMES utf8mb4;
--- 说明：指定本次连接执行的模块；按实际库改为 PROMOTION、SYSTEM、MEMBER 或 LOG。
-SET @lottery_release_target = 'PROMOTION'; -- 按当前连接选择：PROMOTION / SYSTEM / MEMBER / LOG
--- 说明：标准化模块名称，避免大小写和首尾空格造成误判。
-SET @lottery_release_target = UPPER(TRIM(@lottery_release_target));
--- 说明：记录当前数据库名，供执行前后核对。
+-- 说明：自动取得 Navicat 查询窗口当前选中的库名，不切换库、不要求手工填写库名。
 SET @lottery_release_database = DATABASE();
--- 说明：检查当前库是否具有该模块的基础表；不匹配时后续变更均执行空操作。
-SET @lottery_release_ready = CASE @lottery_release_target
-  WHEN 'PROMOTION' THEN (SELECT COUNT(*)=3 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME IN ('activity','lottery_settings','lottery_prize'))
-  WHEN 'SYSTEM' THEN EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='system_menu')
-  WHEN 'MEMBER' THEN EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME REGEXP '^wx_member_[0-9]$')
-  WHEN 'LOG' THEN EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME REGEXP '^lottery_log(_[0-9])?$')
-  ELSE 0 END;
--- 说明：仅当营销库前置检查通过时启用营销库变更。
-SET @lottery_do_promotion = @lottery_release_ready AND @lottery_release_target='PROMOTION';
--- 说明：仅当系统库前置检查通过时启用系统库变更。
-SET @lottery_do_system = @lottery_release_ready AND @lottery_release_target='SYSTEM';
--- 说明：仅当会员库前置检查通过时启用会员库变更。
-SET @lottery_do_member = @lottery_release_ready AND @lottery_release_target='MEMBER';
--- 说明：仅当日志库前置检查通过时启用日志库变更。
-SET @lottery_do_log = @lottery_release_ready AND @lottery_release_target='LOG';
--- 说明：执行前展示库名、模块和基础表检查结果；非 READY 时停止核对连接。
-SELECT @lottery_release_database AS target_database,@lottery_release_target AS target_type,
-       IF(@lottery_release_ready,'READY','WRONG_TARGET_OR_DATABASE') AS release_status;
+-- 说明：检查已选择业务库且三个抽奖基础表齐全，避免误在空库或错误连接中创建业务表。
+SET @lottery_release_ready = @lottery_release_database IS NOT NULL
+  AND (SELECT COUNT(*)=3 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME IN ('activity','lottery_settings','lottery_prize'));
+-- 说明：基础检查通过后执行本库所有活动和抽奖变更，不再按手动类型筛选。
+SET @lottery_do_promotion = @lottery_release_ready;
+-- 说明：本库存在系统菜单表时，同时执行标签通知和人工补发按钮变更。
+SET @lottery_do_system = @lottery_release_ready AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='system_menu');
+-- 说明：本库存在积分流水普通表或分片表时，同时执行对应的积分索引变更。
+SET @lottery_do_member = @lottery_release_ready AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME REGEXP '^points_log(_[0-9])?$');
+-- 说明：本库存在中奖记录普通表或分片表时，同时执行对应的中奖记录变更。
+SET @lottery_do_log = @lottery_release_ready AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME REGEXP '^lottery_log(_[0-9])?$');
+-- 说明：执行前展示实际库名及各类基础表是否存在；READY=可执行，缺失部分不执行。
+SELECT @lottery_release_database AS target_database,
+       IF(@lottery_release_ready,'READY','NO_DATABASE_OR_MISSING_LOTTERY_BASE_TABLES') AS release_status,
+       @lottery_do_promotion AS lottery_enabled,@lottery_do_system AS system_enabled,
+       @lottery_do_member AS points_enabled,@lottery_do_log AS log_enabled;
 
--- ==================== A · PROMOTION：营销主库 ====================
+-- ==================== A · 活动和抽奖 ====================
 
 -- 说明：为活动增加门店/标签适用范围标识，已有数据默认按门店。
 SET @lottery_release_ddl = IF(@lottery_do_promotion AND NOT EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='activity' AND COLUMN_NAME='app_scope'),
@@ -254,7 +245,7 @@ PREPARE lottery_release_stmt FROM @lottery_release_ddl;
 EXECUTE lottery_release_stmt;
 DEALLOCATE PREPARE lottery_release_stmt;
 
--- ==================== B · SYSTEM：系统主库 ====================
+-- ==================== B · 门店标签和菜单权限 ====================
 
 -- 说明：创建门店标签变更通知表，供异步发送并失败重试。
 SET @lottery_release_ddl = IF(@lottery_do_system,
@@ -305,8 +296,16 @@ PREPARE lottery_release_stmt FROM @lottery_release_ddl;
 EXECUTE lottery_release_stmt;
 DEALLOCATE PREPARE lottery_release_stmt;
 
--- ==================== C · MEMBER：会员实际物理库 ====================
--- 复用 points_log，不新增积分账本表。仅为每个已有分片增加业务号查询索引，不变更会员余额。
+-- ==================== C · 会员积分流水索引 ====================
+-- 复用 points_log，不新增积分账本表。仅为已有普通表或分片增加业务号查询索引，不变更会员余额。
+
+-- 说明：若本库使用未分片的 points_log，也为它增加业务号查询索引；表或索引不存在条件不满足时跳过。
+SET @lottery_release_ddl = IF(@lottery_do_member AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='points_log') AND NOT EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='points_log' AND INDEX_NAME='idx_lottery_points_code'),
+  'ALTER TABLE `points_log` ADD INDEX `idx_lottery_points_code` (`business_id`,`member_id`,`log_code`)',
+  'DO 0');
+PREPARE lottery_release_stmt FROM @lottery_release_ddl;
+EXECUTE lottery_release_stmt;
+DEALLOCATE PREPARE lottery_release_stmt;
 
 -- 说明：为会员积分流水分片 points_log_0 增加按项目、会员和业务号查询的索引；表或索引不存在条件不满足时跳过。
 SET @lottery_release_ddl = IF(@lottery_do_member AND EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='points_log_0') AND NOT EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='points_log_0' AND INDEX_NAME='idx_lottery_points_code'),
@@ -388,7 +387,7 @@ PREPARE lottery_release_stmt FROM @lottery_release_ddl;
 EXECUTE lottery_release_stmt;
 DEALLOCATE PREPARE lottery_release_stmt;
 
--- ==================== D · LOG：中奖记录实际物理库 ====================
+-- ==================== D · 中奖记录字段和索引 ====================
 -- 历史 is_guarantees 保持 NULL，不自动回填，不将未知历史记录当作非兜底。
 
 -- 说明：为中奖记录表 lottery_log 增加是否保底奖品的历史快照字段；旧记录保持 NULL。
@@ -570,8 +569,12 @@ DEALLOCATE PREPARE lottery_release_stmt;
 -- 说明：以下查询只读，用于人工确认本次执行目标及创建结果。
 -- ==================== 执行后核对 ====================
 -- 说明：再次确认目标库及前置表检查结果；此状态不能代替逐项对象核对。
-SELECT @lottery_release_database AS target_database,@lottery_release_target AS target_type,
-       IF(@lottery_release_ready,'COMPLETED_CHECK_OBJECTS','SKIPPED_WRONG_TARGET_OR_DATABASE') AS release_status;
+SELECT @lottery_release_database AS target_database,
+       CASE WHEN NOT @lottery_release_ready THEN 'SKIPPED_NO_DATABASE_OR_MISSING_LOTTERY_BASE_TABLES'
+            WHEN @lottery_do_system AND @lottery_do_member AND @lottery_do_log THEN 'COMPLETED_CHECK_OBJECTS'
+            ELSE 'COMPLETED_WITH_MISSING_BASE_TABLES' END AS release_status,
+       @lottery_do_promotion AS lottery_enabled,@lottery_do_system AS system_enabled,
+       @lottery_do_member AS points_enabled,@lottery_do_log AS log_enabled;
 -- 说明：列出本库 V2 账本、活动标签和标签通知表，检查应建表是否存在。
 SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE()
   AND (TABLE_NAME LIKE 'lottery_v2_%'
@@ -589,5 +592,5 @@ SELECT TABLE_NAME,INDEX_NAME FROM information_schema.STATISTICS WHERE TABLE_SCHE
 
 -- 历史兜底快照回填不属于本次必执行 SQL：必须核对当时奖品配置后分批处理，未知数据保留 NULL。
 -- 不会批量启用旧活动，不会把 runtime_version 全部改为 2，不会覆盖 V2 历史账本。
--- 未定义 USE 数据库名，必须先在 SQL 客户端选择实际数据库，再执行正确 target 类型。
+-- 未定义 USE 数据库名；在 Navicat 查询窗口选择实际业务库后，执行整个文件即可，无需更改模块参数。
 
