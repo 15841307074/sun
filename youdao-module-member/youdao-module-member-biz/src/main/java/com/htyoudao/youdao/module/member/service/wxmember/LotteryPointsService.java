@@ -75,7 +75,8 @@ public class LotteryPointsService {
             var log=new PointsLogDO();
             log.setPointsLogId(IdWorker.getId());log.setBusinessId(businessId);log.setMemberId(memberId);
             log.setMemberMobile((String)member.get("member_mobile"));log.setMemberNickName((String)member.get("member_nick_name"));
-            log.setShardingValue((int)(memberId%10));log.setPointsChange((long)delta);log.setPointsType(delta<0?2:1);
+            // 抽奖扣积分与商品兑换分开标记；PC 兑换记录仅查询类型 2、3。
+            log.setShardingValue((int)(memberId%10));log.setPointsChange((long)delta);log.setPointsType(businessNo.endsWith(":DEBIT")?5:delta<0?2:1);
             log.setIsPointsProduct(2);log.setPointsLogStatus(changed==1?1:0);log.setDeleted(changed!=1);
             log.setLogCode(businessNo);log.setProductName(businessNo.endsWith(":REFUND")?"抽奖积分退回":delta<0?"抽奖消耗积分":"抽奖奖励积分");
             // 状态0为内部失败标记，软删除使它不出现在用户明细；成功流水沿用状态1。

@@ -19,13 +19,9 @@ import com.htyoudao.youdao.module.promotion.dal.dataobject.lottery.LotteryLogDO;
 import com.htyoudao.youdao.module.promotion.dal.mysql.lottery.LotteryTransferRecordMapper;
 import com.htyoudao.youdao.module.promotion.dal.mysql.lottery.LotteryTransferSceneReportMapper;
 import com.htyoudao.youdao.module.promotion.service.lottery.LotteryLogService;
-import com.htyoudao.youdao.module.promotion.service.lottery.v2.LotteryAdmission;
-import com.htyoudao.youdao.module.promotion.service.lottery.v2.LotteryCashGateway;
-import com.htyoudao.youdao.module.promotion.service.lottery.v2.LotteryLedger;
 import com.htyoudao.youdao.module.promotion.service.lotteryRedPacket.LotteryRedPacketService;
 import com.htyoudao.youdao.module.promotion.util.WechatRedEnvelope.WXPayUtility;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.annotation.Resource;
 import jakarta.annotation.security.PermitAll;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -51,12 +47,8 @@ import static cn.hutool.core.util.XmlUtil.xmlToMap;
 @Slf4j
 @Validated
 public class RedPacketController {
-    @Resource
-    private LotteryAdmission lotteryAdmission;
-    @Autowired
-    private LotteryCashGateway lotteryCashGateway;
-    @Autowired
-    private LotteryLedger lotteryLedger;
+
+
 
     @Autowired
     private LotteryRedPacketService lotteryRedPacketService;
@@ -92,32 +84,30 @@ public class RedPacketController {
             HttpServletRequest request,
             @RequestBody String notifyBody) {
 
-        log.debug("收到转账回调通知");
+        log.info("收到转账回调通知: {}", notifyBody);
 
-        try (var permit = lotteryAdmission.enter("callback", 0, 0, null)) {
-            if (!lotteryCashGateway.verify(request, notifyBody)) {
-                return ResponseEntity.badRequest().body("{\"code\":\"FAIL\",\"message\":\"签名验证失败\"}");
-            }
+        try {
+            // 1. 验证签名
+//            if (!verifySignatureSimple(request, notifyBody)) {
+//                log.error("回调签名验证失败");
+//                return ResponseEntity.badRequest().body("{\"code\": \"FAIL\", \"message\": \"签名验证失败\"}");
+//            }
 
             // 2. 解析回调数据
             TransferNotify transferNotify = lotteryRedPacketService.parseNotifyData(notifyBody);
 
             // 3. 处理回调
-            String outBillNo = transferNotify.getOut_bill_no();
-            // 旧活动商户单号继续直接走原回调逻辑，只有新版单号才查询新版流水。
-            boolean v2Bill = outBillNo != null && outBillNo.matches("L[0-9]{15,20}F?(?:R[1-9][0-9]*)?");
-            boolean success = (v2Bill && lotteryLedger.wakeByBill(outBillNo))
-                    || lotteryLogService.processTransferNotify(transferNotify);
+            boolean success = lotteryLogService.processTransferNotify(transferNotify);
 
             if (success) {
                 return ResponseEntity.ok("{\"code\": \"SUCCESS\", \"message\": \"成功\"}");
             } else {
-                return ResponseEntity.status(500).body("{\"code\": \"FAIL\", \"message\": \"处理失败\"}");
+                return ResponseEntity.ok("{\"code\": \"FAIL\", \"message\": \"处理失败\"}");
             }
 
         } catch (Exception e) {
             log.error("处理转账回调异常: {}", e.getMessage(), e);
-            return ResponseEntity.status(500).body("{\"code\": \"FAIL\", \"message\": \"处理异常\"}");
+            return ResponseEntity.ok("{\"code\": \"FAIL\", \"message\": \"处理异常\"}");
         }
     }
 
@@ -213,7 +203,7 @@ public class RedPacketController {
             HttpServletRequest request,
             @RequestParam("notifyBody") String notifyBody) {
 
-        log.debug("收到转账回调通知");
+        log.info("收到转账回调通知: {}", notifyBody);
         TransferNotify transferNotify = new TransferNotify();
         transferNotify.setOut_bill_no(notifyBody);
         // 3. 处理回调

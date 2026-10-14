@@ -1,5 +1,7 @@
 package com.htyoudao.youdao.module.promotion.service.lottery.v2.impl;
 
+import com.baomidou.dynamic.datasource.annotation.DS;
+import com.htyoudao.youdao.framework.sharding.core.enums.DsNameConstants;
 import com.htyoudao.youdao.module.promotion.service.lottery.v2.*;
 
 import com.htyoudao.youdao.module.promotion.controller.admin.wechatDemo.TransferToUser;
@@ -43,8 +45,10 @@ public class LotteryCashGatewayImpl implements LotteryCashGateway {
         return client;
     }
     @Override
+    @DS(DsNameConstants.SHARDING)
     public TransferToUser.TransferToUserResponse reconcileOrSend(LotteryLedger.Draw draw) {
-        return redPackets.transferUser(buildRedPacketVo(draw),client());
+        // 沿用原抽奖红包发送方法；传入原商户单号以保证重试仍指向同一笔转账。
+        return redPackets.transferUser(buildRedPacketVo(draw));
     }
     private LotteryRedPacketVo buildRedPacketVo(LotteryLedger.Draw draw) {
         var snapshot=draw.getSnapshot();

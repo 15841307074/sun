@@ -140,7 +140,7 @@ public class LotteryV2ServiceImpl implements LotteryV2Service {
         LotteryUserLogVO result=draw.getResult();
         if(result==null){result=new LotteryUserLogVO();var prize=draw.getSnapshot().getPrize();result.setLotteryPrizeId(prize.getId());result.setPrizeName(prize.getPrizeName());result.setPrizeType(prize.getPrizeType());result.setPrizeImgUrl(prize.getPrizeImgUrl());}
         result.setRequestId(draw.getRequestId());result.setGrantStatus(draw.getGrantStatus());
-        if(Objects.equals(draw.getSnapshot().getPrize().getPrizeType(),5))result.setOutBillNo(draw.cashBillNo());
+        if(Objects.equals(draw.getSnapshot().getPrize().getPrizeType(),5)&&result.getOutBillNo()==null)result.setOutBillNo(draw.cashBillNo());
         results.publish(draw,result);
         return result;
     }

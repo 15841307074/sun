@@ -907,6 +907,7 @@ public class PointsLogServiceImpl extends ServiceImpl<PointsLogMapper, PointsLog
             pointsTypeMap.put(2, "消耗积分");
             pointsTypeMap.put(3, "过期积分");
             pointsTypeMap.put(4, "冻结积分");
+            pointsTypeMap.put(5, "消耗积分"); // 抽奖扣积分，保留在小程序积分明细。
 
             long totalPoints = 0;
             for (PointsLogDO log : pointsLogs) {

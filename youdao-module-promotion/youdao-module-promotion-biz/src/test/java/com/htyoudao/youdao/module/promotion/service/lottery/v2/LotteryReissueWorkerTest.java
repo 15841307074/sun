@@ -37,7 +37,7 @@ class LotteryReissueWorkerTest {
     }
     @Test void waitingCashStillRecordsTheWinnerAndPackage() {
         draw.getSnapshot().getPrize().setPrizeType(5);
-        var response=new TransferToUser.TransferToUserResponse();response.setState(TransferToUser.TransferBillStatus.WAIT_USER_CONFIRM);response.setPackageInfo("test-package");
+        var response=new TransferToUser.TransferToUserResponse();response.setState(TransferToUser.TransferBillStatus.WAIT_USER_CONFIRM);response.setPackageInfo("test-package");response.setOutBillNo("L100");
         when(cash.reconcileOrSend(draw)).thenReturn(response);
         assertSame(draw,ReflectionTestUtils.invokeMethod(worker,"run",100L));
         var order=inOrder(storage,cash);order.verify(cash).reconcileOrSend(draw);order.verify(storage).log(draw);
@@ -62,7 +62,7 @@ class LotteryReissueWorkerTest {
     }
     @Test void manualCashFailureDoesNotFallbackOrRefundAgain() {
         draw.getSnapshot().getPrize().setPrizeType(5);
-        var response=new TransferToUser.TransferToUserResponse();response.state=TransferToUser.TransferBillStatus.FAIL;
+        var response=new TransferToUser.TransferToUserResponse();response.state=TransferToUser.TransferBillStatus.FAIL;response.setOutBillNo("L100");
         when(cash.reconcileOrSend(draw)).thenReturn(response);
         ReflectionTestUtils.invokeMethod(worker,"run",100L);
         verify(ledger).grantState(eq(100L),eq("FAILED"),any(),eq(true),eq(false));

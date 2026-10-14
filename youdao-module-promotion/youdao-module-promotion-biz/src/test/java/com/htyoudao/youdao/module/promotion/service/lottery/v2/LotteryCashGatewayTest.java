@@ -28,9 +28,9 @@ class LotteryCashGatewayTest {
         var member=new WxMemberVO();member.setOpenid("test-openid");snapshot.setMember(member);
         var prize=new LotteryPrizeDO();prize.setPrizeValue(new BigDecimal("12.345"));snapshot.setPrize(prize);draw.setSnapshot(snapshot);
         var response=new TransferToUser.TransferToUserResponse();response.setState(TransferToUser.TransferBillStatus.WAIT_USER_CONFIRM);response.setPackageInfo("test-package");
-        when(redPackets.transferUser(any(LotteryRedPacketVo.class),same(api))).thenReturn(response);
+        when(redPackets.transferUser(any(LotteryRedPacketVo.class))).thenReturn(response);
         assertSame(response,gateway.reconcileOrSend(draw));assertSame(response,gateway.reconcileOrSend(draw));
-        var captured=ArgumentCaptor.forClass(LotteryRedPacketVo.class);verify(redPackets,times(2)).transferUser(captured.capture(),same(api));
+        var captured=ArgumentCaptor.forClass(LotteryRedPacketVo.class);verify(redPackets,times(2)).transferUser(captured.capture());
         for(var vo:captured.getAllValues()) {
             assertEquals(21L,vo.getActivityId());assertEquals(draw.cashBillNo(),vo.getOutBillNo());assertEquals("test-openid",vo.getOpenId());
             assertEquals(1235,vo.getTransferAmount());assertEquals("抽奖活动红包",vo.getTransferRemark());

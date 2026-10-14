@@ -52,6 +52,8 @@ class LotteryPointsServiceTest {
         assertTrue(service.change(40,"L100:AWARD",50));assertTrue(service.change(40,"L100:AWARD",50));
         service.refund(40,"L100");service.refund(40,"L100");
         assertEquals(150,balance());assertEquals(3,count("deleted=FALSE"));
+        assertEquals(1,count("log_code='L100:DEBIT' AND points_type=5 AND deleted=FALSE"));
+        assertEquals(0,count("log_code='L100:DEBIT' AND points_type IN (2,3)"));
     }
     @Test void rejectedDebitRemainsRejectedAfterBalanceIsReplenished(){
         assertFalse(service.change(40,"L100:DEBIT",-200));jdbc.update("UPDATE wx_member SET member_integral=300");

@@ -179,7 +179,9 @@ public class LotteryGrantWorker {
                         try {response=cash.reconcileOrSend(draw);}
                         finally {transferNanos=System.nanoTime()-transferStarted;}
                         if(response.getState()==null)throw new IllegalStateException("红包状态未知");
+                        if(!draw.cashBillNo().equals(response.getOutBillNo()))throw new IllegalStateException("红包返回单号与原抽奖不一致");
                         String state=response.getState().name();result.setPackageInfo(response.getPackageInfo());
+                        result.setOutBillNo(response.getOutBillNo());
                         if("SUCCESS".equals(state))ledger.grantState(id,"SUCCESS",result,true,true);
                         else if("FAIL".equals(state)||"CANCELLED".equals(state)) {
                             if(draw.getSnapshot().isManualReissue())ledger.grantState(id,"FAILED",result,true,false);
