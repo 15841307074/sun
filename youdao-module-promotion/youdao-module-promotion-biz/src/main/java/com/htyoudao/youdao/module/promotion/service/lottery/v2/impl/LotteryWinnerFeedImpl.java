@@ -41,15 +41,25 @@ public class LotteryWinnerFeedImpl implements LotteryWinnerFeed {
         if (activityId == null || activityId <= 0) throw new IllegalArgumentException("activityId 必须为正数活动ID");
         long b = BusinessContextHolder.getRequiredBusinessId();
         String key = key(b, activityId);
-        Set<String> values = redis.opsForZSet().reverseRange(key, 0, LIMIT - 1);
-        if (values == null || values.isEmpty()) return List.of();
+        Set<String> values;
         try {
-            List<LotteryRecentWinnerRespVO> result = new ArrayList<>(values.size());
-            for (String value : values) result.add(json.readValue(value.substring(value.indexOf('|') + 1), LotteryRecentWinnerRespVO.class));
-            return result;
+            values = redis.opsForZSet().reverseRange(key, 0, LIMIT - 1);
         } catch (Exception e) {
-            throw new IllegalStateException("中奖展示数据解析失败", e);
+            log.warn("Lottery winner display cache read failed: business={}, activity={}", b, activityId);
+            return List.of();
         }
+        if (values == null || values.isEmpty()) return List.of();
+        List<LotteryRecentWinnerRespVO> result = new ArrayList<>(values.size());
+        for (String value : values) {
+            try {
+                int separator = value.indexOf('|');
+                if (separator < 0) throw new IllegalArgumentException("missing separator");
+                result.add(json.readValue(value.substring(separator + 1), LotteryRecentWinnerRespVO.class));
+            } catch (Exception e) {
+                log.warn("Lottery winner display cache entry ignored: business={}, activity={}", b, activityId);
+            }
+        }
+        return result;
     }
 
     /** 只发布已提交记录；缓存失败不回滚已发放奖品。 */

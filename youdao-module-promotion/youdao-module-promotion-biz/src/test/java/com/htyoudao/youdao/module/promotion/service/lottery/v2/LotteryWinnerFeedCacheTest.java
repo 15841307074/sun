@@ -72,4 +72,16 @@ class LotteryWinnerFeedCacheTest {
         when(redis.execute(any(RedisScript.class),anyList(),anyString(),anyString())).thenThrow(new IllegalStateException("redis unavailable"));
         assertDoesNotThrow(()->feed.afterLogSaved(30,row));
     }
+    @Test void cacheReadFailureReturnsEmptyList() {
+        var zset=mock(ZSetOperations.class);when(redis.opsForZSet()).thenReturn(zset);
+        when(zset.reverseRange(anyString(),eq(0L),eq(19L))).thenThrow(new IllegalStateException("redis unavailable"));
+        assertTrue(feed.latest(30L).isEmpty());
+    }
+    @Test void malformedCacheEntryIsIgnored() {
+        var zset=mock(ZSetOperations.class);when(redis.opsForZSet()).thenReturn(zset);
+        String valid="00000000000000000000000000000000|{\"memberMobile\":\"138****5678\",\"prizeName\":\"积分奖品\"}";
+        when(zset.reverseRange(anyString(),eq(0L),eq(19L))).thenReturn(new LinkedHashSet<>(List.of("broken",valid)));
+        var result=feed.latest(30L);
+        assertEquals(1,result.size());assertEquals("积分奖品",result.get(0).getPrizeName());
+    }
 }
