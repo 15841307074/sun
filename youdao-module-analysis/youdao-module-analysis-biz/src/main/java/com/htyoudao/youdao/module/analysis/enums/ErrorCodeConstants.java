@@ -32,4 +32,10 @@ public interface ErrorCodeConstants {
     ErrorCode TIME_RANGE_EXCEED_LIMIT = new ErrorCode(1_008_000_010, "选择的时间范围不能超过 90 天");
 
 
+    // ========== 月度门店组织快照 ==========
+    ErrorCode STORE_ORG_MONTH_INVALID = new ErrorCode(1_008_000_020, "月份格式错误，请使用 yyyy-MM");
+    ErrorCode STORE_ORG_PERMISSION_DENIED = new ErrorCode(1_008_000_021, "当前用户无权查看该组织");
+    ErrorCode STORE_ORG_SNAPSHOT_NOT_FOUND = new ErrorCode(1_008_000_022, "指定月份的门店组织快照尚未生成");
+    ErrorCode STORE_ORG_SNAPSHOT_DATA_INVALID = new ErrorCode(1_008_000_023, "门店组织快照数据异常");
+
 }

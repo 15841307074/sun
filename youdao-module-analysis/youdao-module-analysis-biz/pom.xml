@@ -90,6 +90,12 @@
             <artifactId>youdao-spring-boot-starter-monitor</artifactId>
         </dependency>
 
+        <!-- XXL-Job 定时任务 -->
+        <dependency>
+            <groupId>com.htyoudao.cloud</groupId>
+            <artifactId>youdao-spring-boot-starter-job</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>de.codecentric</groupId>
             <artifactId>spring-boot-admin-starter-server</artifactId> <!-- 实现 Spring Boot Admin Server 服务端 -->
