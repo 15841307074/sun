@@ -8,8 +8,8 @@ import lombok.Data;
  */
 @Data
 public class LotteryVO {
-    /** 同一次抽奖点击及重试使用相同的请求标识；新版抽奖和结果查询时校验。 */
-    @Schema(name = "requestId", description = "抽奖请求唯一标识，同一次点击重试保持不变")
+    /** 同一次抽奖点击及重试使用相同标识；抽奖接口兼容未传值，结果查询仍需原标识。 */
+    @Schema(name = "requestId", description = "抽奖请求唯一标识，同一次点击重试保持不变；/lottery 未传或传空时由服务端生成，/result 需传原值")
     private String requestId;
 
     /** 活动ID */

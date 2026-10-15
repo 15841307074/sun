@@ -82,15 +82,15 @@ class RecentWinnersActivityIdTest {
         when(values.get(LotteryKeys.key(10,0,"activity-mapping",30))).thenReturn("31");assertEquals(30L,cache.settingsByActivity(30).getActivityId());verify(values,never()).get(LotteryKeys.key(10,31,"config-version",0));
     }
     @Test void otherBusinessActivityIsRejected(){activity.setBusinessId(11L);assertThrows(ServiceException.class,()->cache.settingsByActivity(30));}
-    @Test void winnerFeedUsesActivityLookupAndActivityScopedCache(){
-        var configuration=mock(LotteryConfigurationCache.class);var feed=new LotteryWinnerFeedImpl();var cfgView=new LotterySettingsCacheDataVO();cfgView.setId(20L);cfgView.setActivityId(30L);
-        when(configuration.settingsByActivity(30L)).thenReturn(cfgView);ReflectionTestUtils.setField(feed,"configuration",configuration);ReflectionTestUtils.setField(feed,"redis",redis);
-        var zset=mock(ZSetOperations.class);when(redis.opsForZSet()).thenReturn(zset);when(redis.hasKey(anyString())).thenReturn(true);
-        assertTrue(feed.latest(30L).isEmpty());verify(configuration).settingsByActivity(30L);verify(configuration,never()).settings(anyLong());
+    @Test void winnerFeedReadsActivityScopedRedisWithoutConfigurationOrDatabaseLookup(){
+        var feed=new LotteryWinnerFeedImpl();ReflectionTestUtils.setField(feed,"redis",redis);
+        var zset=mock(ZSetOperations.class);when(redis.opsForZSet()).thenReturn(zset);
+        assertTrue(feed.latest(30L).isEmpty());verifyNoInteractions(settings,activities);
         verify(zset).reverseRange(LotteryKeys.key(10,30,"winners","recent"),0,19);
+        verify(redis,never()).hasKey(anyString());verify(redis,never()).execute(any(RedisScript.class),anyList(),any(Object[].class));
     }
     @Test void invalidActivityIdDoesNotQueryAnyData(){
-        var feed=new LotteryWinnerFeedImpl();var configuration=mock(LotteryConfigurationCache.class);ReflectionTestUtils.setField(feed,"configuration",configuration);
-        assertThrows(IllegalArgumentException.class,()->feed.latest(null));assertThrows(IllegalArgumentException.class,()->feed.latest(0L));assertThrows(IllegalArgumentException.class,()->feed.latest(-1L));verifyNoInteractions(configuration);
+        var feed=new LotteryWinnerFeedImpl();ReflectionTestUtils.setField(feed,"redis",redis);clearInvocations(redis);
+        assertThrows(IllegalArgumentException.class,()->feed.latest(null));assertThrows(IllegalArgumentException.class,()->feed.latest(0L));assertThrows(IllegalArgumentException.class,()->feed.latest(-1L));verifyNoInteractions(redis);
     }
 }

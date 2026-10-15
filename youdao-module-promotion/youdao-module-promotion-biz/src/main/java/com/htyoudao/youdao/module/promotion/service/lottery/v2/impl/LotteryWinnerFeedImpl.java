@@ -14,9 +14,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.ZoneId;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /** 仅用于展示，不参与库存和发奖事务。 */
 @Service("lotteryWinnerFeed")
@@ -28,29 +28,19 @@ public class LotteryWinnerFeedImpl implements LotteryWinnerFeed {
             for i=2,#ARGV do redis.call('ZADD',KEYS[1],0,ARGV[i]) end
             local n=redis.call('ZCARD',KEYS[1])
             if n>20 then redis.call('ZREMRANGEBYRANK',KEYS[1],0,n-21) end
-            if n>0 then redis.call('EXPIRE',KEYS[1],86400) end
-            if ARGV[1]=='1' then redis.call('SET',KEYS[2],'1','EX',60) end
+            if n>0 then redis.call('PEXPIREAT',KEYS[1],ARGV[1]) end
             return 1
             """, Long.class);
-    private static final DefaultRedisScript<Long> UNLOCK = new DefaultRedisScript<>(
-            "if redis.call('GET',KEYS[1])==ARGV[1] then return redis.call('DEL',KEYS[1]) end return 0", Long.class);
     @Resource
     private StringRedisTemplate redis;
     @Resource
     private ObjectMapper json;
-    @Resource
-    private LotteryConfigurationCache configuration;
-    @Resource
-    private LotteryWinnerQuery query;
-    private final AtomicInteger refills = new AtomicInteger();
 
     @Override
     public List<LotteryRecentWinnerRespVO> latest(Long activityId) {
         if (activityId == null || activityId <= 0) throw new IllegalArgumentException("activityId 必须为正数活动ID");
-        var cfg = configuration.settingsByActivity(activityId);
         long b = BusinessContextHolder.getRequiredBusinessId();
-        String key = key(b, cfg.getActivityId());
-        if (!Boolean.TRUE.equals(redis.hasKey(key + ":ready"))) refill(b, cfg.getActivityId(), cfg.getId(), key);
+        String key = key(b, activityId);
         Set<String> values = redis.opsForZSet().reverseRange(key, 0, LIMIT - 1);
         if (values == null || values.isEmpty()) return List.of();
         try {
@@ -58,22 +48,7 @@ public class LotteryWinnerFeedImpl implements LotteryWinnerFeed {
             for (String value : values) result.add(json.readValue(value.substring(value.indexOf('|') + 1), LotteryRecentWinnerRespVO.class));
             return result;
         } catch (Exception e) {
-            redis.delete(key + ":ready");
-            throw new IllegalStateException("中奖记录缓存恢复中，请稍后重试", e);
-        }
-    }
-
-    private void refill(long b, long a, long settingsId, String key) {
-        if (refills.incrementAndGet() > 4) { refills.decrementAndGet(); throw new IllegalStateException("中奖记录缓存恢复中，请稍后重试"); }
-        String token = UUID.randomUUID().toString();
-        boolean locked = false;
-        try {
-            locked = Boolean.TRUE.equals(redis.opsForValue().setIfAbsent(key + ":refill", token, Duration.ofSeconds(10)));
-            if (!locked) throw new IllegalStateException("中奖记录缓存恢复中，请稍后重试");
-            if (!Boolean.TRUE.equals(redis.hasKey(key + ":ready"))) merge(key, query.latest(b, a, settingsId), true);
-        } finally {
-            refills.decrementAndGet();
-            if (locked) redis.execute(UNLOCK, List.of(key + ":refill"), token);
+            throw new IllegalStateException("中奖展示数据解析失败", e);
         }
     }
 
@@ -83,10 +58,9 @@ public class LotteryWinnerFeedImpl implements LotteryWinnerFeed {
         if (!eligible(row)) return;
         String key = key(Objects.requireNonNull(row.getBusinessId()), activityId);
         Runnable publish = () -> {
-            try { merge(key, List.of(row), false); }
+            try { publish(key, row); }
             catch (Exception e) {
-                try { redis.delete(key + ":ready"); } catch (Exception ignored) { /* 标记将在 60 秒内过期。 */ }
-                log.warn("Lottery winner display cache deferred: activity={}, log={}", activityId, row.getId());
+                log.warn("Lottery winner display cache write failed: activity={}, log={}", activityId, row.getId());
             }
         };
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
@@ -97,10 +71,16 @@ public class LotteryWinnerFeedImpl implements LotteryWinnerFeed {
         } else publish.run();
     }
 
-    private void merge(String key, List<LotteryLogDO> rows, boolean ready) {
-        List<String> args = new ArrayList<>(); args.add(ready ? "1" : "0");
-        for (LotteryLogDO row : rows) if (eligible(row)) args.add(encode(row));
-        redis.execute(MERGE, List.of(key, key + ":ready"), args.toArray());
+    private void publish(String key, LotteryLogDO row) {
+        // 直接使用中奖记录中的活动结束时间；展示缓存缺失时不查库补齐。
+        if (row.getLotteryEndTime() == null) {
+            log.warn("Lottery winner display skipped: missing activity end time, log={}", row.getId());
+            return;
+        }
+        long expiresAt = Instant.ofEpochMilli(row.getLotteryEndTime().getTime()).plus(Duration.ofDays(7)).toEpochMilli();
+        if (expiresAt <= Instant.now().toEpochMilli()) return;
+        // 合并、裁剪和设置固定过期时刻在一个脚本内完成，适用于多实例并发写入。
+        redis.execute(MERGE, List.of(key), Long.toString(expiresAt), encode(row));
     }
 
     static boolean eligible(LotteryLogDO row) {

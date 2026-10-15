@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/promotion/lottery-mobile")
@@ -78,6 +79,10 @@ public class AppLotteryController {
     @PostMapping("/lottery")
     @Operation(summary = "抽奖")
     public CommonResult<LotteryUserLogVO> lottery(@RequestBody LotteryVO lotteryVO) {
+        // 兼容旧版小程序；已传入的标识保留，用于同一次抽奖重试去重。
+        if (lotteryVO.getRequestId() == null || lotteryVO.getRequestId().isBlank()) {
+            lotteryVO.setRequestId(UUID.randomUUID().toString());
+        }
         return lotteryMobileservice.lottery(lotteryVO);
     }
 
