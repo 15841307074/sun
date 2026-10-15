@@ -49,7 +49,7 @@ class StoreOrgStatisticsServiceTest {
     }
 
     @Test
-    void shouldGroupByImmediateChildAndProvinceIncludingDirectStores() throws Exception {
+    void shouldReturnDynamicOrganizationTreeFromSelectedOrganization() throws Exception {
         when(storeOrgSnapshotApi.listManageableOrgIds(7L))
                 .thenReturn(CommonResult.success(Set.of(100L, 200L, 300L, 400L)));
         when(snapshotMapper.selectListByMonth(10L, LocalDate.of(2026, 8, 1))).thenReturn(List.of(
@@ -57,24 +57,49 @@ class StoreOrgStatisticsServiceTest {
                 snapshot(2L, "辽宁省", List.of(node(100L, "东北区域", 0L, 1, 1),
                         node(200L, "王子彬组", 100L, 2, 2))),
                 snapshot(3L, "吉林省", List.of(node(100L, "东北区域", 0L, 1, 1),
-                        node(200L, "王子彬组", 100L, 2, 2), node(300L, "下级", 200L, 3, 1))),
+                        node(200L, "王子彬组", 100L, 2, 2), node(300L, "辽宁省组织", 200L, 3, 1),
+                        node(400L, "沈阳市", 300L, 4, 1))),
                 snapshot(4L, "辽宁省", List.of(node(100L, "东北区域", 0L, 1, 1),
-                        node(400L, "孙鑫洋组", 100L, 2, 3)))));
+                        node(200L, "王子彬组", 100L, 2, 2), node(300L, "辽宁省组织", 200L, 3, 1),
+                        node(400L, "沈阳市", 300L, 4, 1)))));
 
         StoreOrgStatisticsRespVO result = service.getStatistics(7L, 100L, "2026-08");
 
         assertEquals("东北区域", result.getOrgName());
         assertEquals(4L, result.getTotalStoreCount());
-        assertEquals(4, result.getItems().size());
-        assertEquals("100", result.getItems().get(0).getGroupOrgId());
-        assertEquals("未设置", result.getItems().get(0).getProvinceName());
-        assertEquals("200", result.getItems().get(1).getGroupOrgId());
-        assertEquals("吉林省", result.getItems().get(1).getProvinceName());
-        assertEquals("200", result.getItems().get(2).getGroupOrgId());
-        assertEquals("辽宁省", result.getItems().get(2).getProvinceName());
-        assertEquals("400", result.getItems().get(3).getGroupOrgId());
-        assertEquals(result.getTotalStoreCount(),
-                result.getItems().stream().mapToLong(item -> item.getStoreCount()).sum());
+        assertEquals(1L, result.getDirectStoreCount());
+        assertEquals(1, result.getItems().size());
+        var group = result.getItems().get(0);
+        assertEquals("200", group.getOrgId());
+        assertEquals(3L, group.getStoreCount());
+        assertEquals(1L, group.getDirectStoreCount());
+        var province = group.getChildren().get(0);
+        assertEquals("300", province.getOrgId());
+        assertEquals(2L, province.getStoreCount());
+        assertEquals(0L, province.getDirectStoreCount());
+        var city = province.getChildren().get(0);
+        assertEquals("400", city.getOrgId());
+        assertEquals(2L, city.getStoreCount());
+        assertEquals(2L, city.getDirectStoreCount());
+        assertTrue(city.getChildren().isEmpty());
+
+        StoreOrgStatisticsRespVO groupResult = service.getStatistics(7L, 200L, "2026-08");
+        assertEquals("王子彬组", groupResult.getOrgName());
+        assertEquals(3L, groupResult.getTotalStoreCount());
+        assertEquals(1L, groupResult.getDirectStoreCount());
+        assertEquals("300", groupResult.getItems().get(0).getOrgId());
+
+        StoreOrgStatisticsRespVO provinceResult = service.getStatistics(7L, 300L, "2026-08");
+        assertEquals("辽宁省组织", provinceResult.getOrgName());
+        assertEquals(2L, provinceResult.getTotalStoreCount());
+        assertEquals(0L, provinceResult.getDirectStoreCount());
+        assertEquals("400", provinceResult.getItems().get(0).getOrgId());
+
+        StoreOrgStatisticsRespVO cityResult = service.getStatistics(7L, 400L, "2026-08");
+        assertEquals("沈阳市", cityResult.getOrgName());
+        assertEquals(2L, cityResult.getTotalStoreCount());
+        assertEquals(2L, cityResult.getDirectStoreCount());
+        assertTrue(cityResult.getItems().isEmpty());
     }
 
     @Test

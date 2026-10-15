@@ -4,7 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.htyoudao.youdao.framework.context.BusinessContextHolder;
-import com.htyoudao.youdao.module.analysis.controller.app.vo.anomaly.StoreOrgStatisticsItemRespVO;
+import com.htyoudao.youdao.module.analysis.controller.app.vo.anomaly.StoreOrgStatisticsNodeRespVO;
 import com.htyoudao.youdao.module.analysis.controller.app.vo.anomaly.StoreOrgStatisticsRespVO;
 import com.htyoudao.youdao.module.analysis.dal.dataobject.anomaly.StoreOrgSnapshotDO;
 import com.htyoudao.youdao.module.analysis.dal.mysql.anomaly.StoreOrgSnapshotMapper;
@@ -27,7 +27,6 @@ import static com.htyoudao.youdao.module.analysis.enums.ErrorCodeConstants.*;
 @Service
 public class StoreOrgStatisticsService {
 
-    private static final String UNKNOWN_PROVINCE = "未设置";
     private static final DateTimeFormatter MONTH_FORMATTER = DateTimeFormatter.ofPattern("uuuu-MM");
     private static final TypeReference<List<StoreOrgPathNodeDTO>> PATH_TYPE = new TypeReference<>() {
     };
@@ -52,10 +51,10 @@ public class StoreOrgStatisticsService {
             throw exception(STORE_ORG_SNAPSHOT_NOT_FOUND);
         }
 
-        Map<GroupProvinceKey, Long> counts = new HashMap<>();
-        Map<Long, StoreOrgPathNodeDTO> groupNodes = new HashMap<>();
+        Map<Long, NodeAccumulator> rootNodes = new HashMap<>();
         String selectedOrgName = null;
         long total = 0L;
+        long direct = 0L;
         for (StoreOrgSnapshotDO snapshot : snapshots) {
             List<StoreOrgPathNodeDTO> path = readPath(snapshot.getOrgPathJson());
             int selectedIndex = indexOf(path, orgId);
@@ -66,18 +65,27 @@ public class StoreOrgStatisticsService {
             if (selectedOrgName == null) {
                 selectedOrgName = selectedNode.getName();
             }
-            StoreOrgPathNodeDTO groupNode = selectedIndex + 1 < path.size()
-                    ? path.get(selectedIndex + 1) : selectedNode;
-            String province = normalizeProvince(snapshot.getStoreProvince());
-            GroupProvinceKey key = new GroupProvinceKey(groupNode.getId(), province);
-            counts.merge(key, 1L, Long::sum);
-            groupNodes.putIfAbsent(groupNode.getId(), groupNode);
             total++;
+            if (selectedIndex == path.size() - 1) {
+                direct++;
+                continue;
+            }
+            Map<Long, NodeAccumulator> children = rootNodes;
+            for (int i = selectedIndex + 1; i < path.size(); i++) {
+                StoreOrgPathNodeDTO node = path.get(i);
+                NodeAccumulator accumulator = children.computeIfAbsent(node.getId(),
+                        ignored -> new NodeAccumulator(node));
+                accumulator.storeCount++;
+                if (i == path.size() - 1) {
+                    accumulator.directStoreCount++;
+                }
+                children = accumulator.children;
+            }
         }
 
-        List<StoreOrgStatisticsItemRespVO> items = counts.entrySet().stream()
-                .sorted(groupingComparator(groupNodes))
-                .map(entry -> toItem(entry, groupNodes))
+        List<StoreOrgStatisticsNodeRespVO> items = rootNodes.values().stream()
+                .sorted(nodeComparator())
+                .map(this::toNode)
                 .toList();
 
         StoreOrgStatisticsRespVO response = new StoreOrgStatisticsRespVO();
@@ -85,6 +93,7 @@ public class StoreOrgStatisticsService {
         response.setOrgId(orgId.toString());
         response.setOrgName(selectedOrgName);
         response.setTotalStoreCount(total);
+        response.setDirectStoreCount(direct);
         response.setItems(items);
         return response;
     }
@@ -117,32 +126,37 @@ public class StoreOrgStatisticsService {
         return -1;
     }
 
-    private String normalizeProvince(String province) {
-        return province == null || province.isBlank() ? UNKNOWN_PROVINCE : province.trim();
-    }
-
-    private Comparator<Map.Entry<GroupProvinceKey, Long>> groupingComparator(
-            Map<Long, StoreOrgPathNodeDTO> groupNodes) {
+    private Comparator<NodeAccumulator> nodeComparator() {
         return Comparator
-                .comparing((Map.Entry<GroupProvinceKey, Long> entry) -> groupNodes.get(entry.getKey().orgId()).getSort(),
+                .comparing((NodeAccumulator accumulator) -> accumulator.node.getSort(),
                         Comparator.nullsLast(Integer::compareTo))
-                .thenComparing(entry -> groupNodes.get(entry.getKey().orgId()).getLevel(),
+                .thenComparing(accumulator -> accumulator.node.getLevel(),
                         Comparator.nullsLast(Integer::compareTo))
-                .thenComparing(entry -> entry.getKey().orgId(), Comparator.nullsLast(Long::compareTo))
-                .thenComparing(entry -> entry.getKey().province());
+                .thenComparing(accumulator -> accumulator.node.getId(), Comparator.nullsLast(Long::compareTo));
     }
 
-    private StoreOrgStatisticsItemRespVO toItem(Map.Entry<GroupProvinceKey, Long> entry,
-                                                 Map<Long, StoreOrgPathNodeDTO> groupNodes) {
-        StoreOrgPathNodeDTO group = groupNodes.get(entry.getKey().orgId());
-        StoreOrgStatisticsItemRespVO item = new StoreOrgStatisticsItemRespVO();
-        item.setGroupOrgId(group.getId().toString());
-        item.setGroupOrgName(group.getName());
-        item.setProvinceName(entry.getKey().province());
-        item.setStoreCount(entry.getValue());
-        return item;
+    private StoreOrgStatisticsNodeRespVO toNode(NodeAccumulator accumulator) {
+        StoreOrgStatisticsNodeRespVO node = new StoreOrgStatisticsNodeRespVO();
+        node.setOrgId(accumulator.node.getId().toString());
+        node.setOrgName(accumulator.node.getName());
+        node.setLevel(accumulator.node.getLevel());
+        node.setDirectStoreCount(accumulator.directStoreCount);
+        node.setStoreCount(accumulator.storeCount);
+        node.setChildren(accumulator.children.values().stream()
+                .sorted(nodeComparator())
+                .map(this::toNode)
+                .toList());
+        return node;
     }
 
-    private record GroupProvinceKey(Long orgId, String province) {
+    private static final class NodeAccumulator {
+        private final StoreOrgPathNodeDTO node;
+        private final Map<Long, NodeAccumulator> children = new HashMap<>();
+        private long directStoreCount;
+        private long storeCount;
+
+        private NodeAccumulator(StoreOrgPathNodeDTO node) {
+            this.node = node;
+        }
     }
 }

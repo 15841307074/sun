@@ -21,6 +21,9 @@ public class StoreOrgStatisticsRespVO {
     @Schema(description = "所选组织及全部下级的去重门店数")
     private Long totalStoreCount;
 
-    @Schema(description = "直属子组织与省份的平铺统计")
-    private List<StoreOrgStatisticsItemRespVO> items;
+    @Schema(description = "直接归属于所选组织的门店数")
+    private Long directStoreCount;
+
+    @Schema(description = "所选组织的直属子组织树，按组织层级动态返回")
+    private List<StoreOrgStatisticsNodeRespVO> items;
 }
