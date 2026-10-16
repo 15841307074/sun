@@ -29,7 +29,7 @@ public class ComplaintAnomalyLocalTestController {
     private ComplaintAnomalyWeekJob complaintAnomalyWeekJob;
 
     /**
-     * 手动执行指定项目、指定自然周的投诉异常指标计算。
+     * 手动执行投诉异常指标计算；未指定统计周时按正式调度口径统计上一个完整自然周。
      *
      * @return 写入或更新 MySQL 周异常表的行数
      */
@@ -39,9 +39,12 @@ public class ComplaintAnomalyLocalTestController {
     public CommonResult<Integer> runComplaintAnomalyWeek(
             @Parameter(description = "项目ID", required = true, example = "10")
             @RequestParam("businessId") Long businessId,
-            @Parameter(description = "统计周的周一，格式 yyyy-MM-dd", required = true, example = "2026-10-05")
-            @RequestParam("periodStart")
+            @Parameter(description = "可选；历史补跑时传统计周的周一，未传则自动统计上周", example = "2026-10-05")
+            @RequestParam(value = "periodStart", required = false)
             @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate periodStart) {
-        return success(complaintAnomalyWeekJob.execute(businessId, periodStart));
+        int affectedRows = periodStart == null
+                ? complaintAnomalyWeekJob.executePreviousCompleteWeek(businessId)
+                : complaintAnomalyWeekJob.execute(businessId, periodStart);
+        return success(affectedRows);
     }
 }

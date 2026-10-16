@@ -81,4 +81,14 @@ class ComplaintAnomalyWeekJobTest {
         assertEquals(12, job.execute(10L, periodStart));
         assertNull(BusinessContextHolder.getBusinessId());
     }
+
+    @Test
+    void shouldCalculatePreviousCompleteWeekForNormalLocalRun() {
+        LocalDate today = LocalDate.of(2026, 10, 16);
+        LocalDate previousMonday = LocalDate.of(2026, 10, 5);
+        when(clickHouseService.calculateAndSaveWeek(10L, previousMonday)).thenReturn(7);
+
+        assertEquals(7, job.executePreviousCompleteWeek(10L, today));
+        assertNull(BusinessContextHolder.getBusinessId());
+    }
 }

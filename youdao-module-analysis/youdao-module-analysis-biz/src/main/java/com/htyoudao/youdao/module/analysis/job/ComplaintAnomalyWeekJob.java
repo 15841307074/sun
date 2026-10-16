@@ -41,7 +41,7 @@ public class ComplaintAnomalyWeekJob {
      *
      * <p>供 XXL-Job 和本地测试接口共同复用，执行结束后始终清理项目上下文。</p>
      *
-     * @return 本次写入 ClickHouse 的版本行数
+     * @return 本次写入或更新 MySQL 周异常表的行数
      */
     public int execute(Long businessId, LocalDate periodStart) {
         if (businessId == null || businessId <= 0) {
@@ -66,6 +66,15 @@ public class ComplaintAnomalyWeekJob {
         }
     }
 
+    /** 按正式调度口径计算上一个完整自然周。 */
+    public int executePreviousCompleteWeek(Long businessId) {
+        return executePreviousCompleteWeek(businessId, LocalDate.now());
+    }
+
+    int executePreviousCompleteWeek(Long businessId, LocalDate today) {
+        return execute(businessId, previousCompleteWeekStart(today));
+    }
+
     JobParam parseParam(String rawParam, LocalDate today) {
         if (rawParam == null || rawParam.isBlank()) {
             throw new IllegalArgumentException("任务参数不能为空，必须传 businessId");
@@ -82,7 +91,7 @@ public class ComplaintAnomalyWeekJob {
             }
             JsonNode periodNode = root.get("periodStart");
             LocalDate periodStart = periodNode == null || periodNode.asText().isBlank()
-                    ? today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).minusWeeks(1)
+                    ? previousCompleteWeekStart(today)
                     : LocalDate.parse(periodNode.asText());
             if (periodStart.getDayOfWeek() != DayOfWeek.MONDAY) {
                 throw new IllegalArgumentException("任务参数 periodStart 必须是周一");
@@ -96,6 +105,10 @@ public class ComplaintAnomalyWeekJob {
             throw new IllegalArgumentException(
                     "任务参数格式错误，应为 JSON，例如 {\"businessId\":10,\"periodStart\":\"2026-10-05\"}", e);
         }
+    }
+
+    private LocalDate previousCompleteWeekStart(LocalDate today) {
+        return today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).minusWeeks(1);
     }
 
     record JobParam(Long businessId, LocalDate periodStart) {
