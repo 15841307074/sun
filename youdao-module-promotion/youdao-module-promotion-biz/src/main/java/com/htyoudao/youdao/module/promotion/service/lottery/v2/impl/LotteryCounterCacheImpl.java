@@ -16,6 +16,9 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static com.htyoudao.youdao.framework.common.exception.util.ServiceExceptionUtil.exception;
+import static com.htyoudao.youdao.module.promotion.api.enums.ErrorCodeConstants.LOTTERY_SYSTEM_AGAIN;
+
 /** 次数缓存仅用于展示；受理和任务机会仍由持久化账本条件更新。 */
 @Service("lotteryCounterCache")
 @Slf4j
@@ -57,18 +60,18 @@ public class LotteryCounterCacheImpl implements LotteryCounterCache {
     public Map<String,long[]> read(long b,long a,long m,String period) {
         String head=head(b,a,m),version=redis.opsForValue().get(head);
         if(version!=null){String cached=redis.opsForValue().get(view(b,a,m,period,version));if(cached!=null)return decode(cached);}
-        if(refills.incrementAndGet()>4){refills.decrementAndGet();throw new IllegalStateException("抽奖次数缓存恢复中，请重试");}
+        if(refills.incrementAndGet()>4){refills.decrementAndGet();throw exception(LOTTERY_SYSTEM_AGAIN);}
         String lock=head+":refill",token=UUID.randomUUID().toString();boolean locked=false;
         try {
             locked=Boolean.TRUE.equals(redis.opsForValue().setIfAbsent(lock,token,Duration.ofSeconds(5)));
-            if(!locked)throw new IllegalStateException("抽奖次数缓存恢复中，请重试");
+            if(!locked)throw exception(LOTTERY_SYSTEM_AGAIN);
             Map<String,long[]> data=new HashMap<>();long revision=0;
             var rows=jdbc.queryForList("SELECT c.scope_key,c.source,c.gained,c.consumed,c.finished,t.revision FROM lottery_v2_counter c JOIN lottery_v2_counter t ON t.business_id=c.business_id AND t.activity_id=c.activity_id AND t.member_id=c.member_id AND t.scope_key='TOTAL' AND t.source=0 WHERE c.business_id=? AND c.activity_id=? AND c.member_id=? AND c.scope_key IN ('TOTAL',?)",b,a,m,period);
             for(var row:rows){revision=((Number)row.get("revision")).longValue();data.put(row.get("scope_key")+":"+row.get("source"),new long[]{num(row,"gained"),num(row,"consumed"),num(row,"finished")});}
             Map<String,long[]> total=new HashMap<>();data.forEach((k,v)->{if(k.startsWith("TOTAL:"))total.put(k,v);});
             Long applied=redis.execute(SNAPSHOT,List.of(head,view(b,a,m,period,Long.toString(revision)),LotteryKeys.key(b,a,"quota-total",m),registry(b,a)),
                     Long.toString(revision),encode(data),Long.toString(rows.isEmpty()?15:ttl(period)),encode(total));
-            if(!Objects.equals(applied,1L))throw new IllegalStateException("抽奖次数已更新，请重试");
+            if(!Objects.equals(applied,1L))throw exception(LOTTERY_SYSTEM_AGAIN);
             return data;
         }finally{refills.decrementAndGet();if(locked)redis.execute(new DefaultRedisScript<>("if redis.call('GET',KEYS[1])==ARGV[1] then return redis.call('DEL',KEYS[1]) end return 0",Long.class),List.of(lock),token);}
     }
