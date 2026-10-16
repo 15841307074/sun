@@ -49,9 +49,9 @@ class ComplaintAnomalyWeekJobTest {
     }
 
     @Test
-    void shouldAcceptMondayForHistoricalRerun() {
+    void shouldUsePreviousWeekOfSpecifiedExecutionMonday() {
         ComplaintAnomalyWeekJob.JobParam param = job.parseParam(
-                "{\"businessId\":99,\"periodStart\":\"2026-10-05\"}", LocalDate.now());
+                "{\"businessId\":99,\"periodStart\":\"2026-10-12\"}", LocalDate.now());
 
         assertEquals(99L, param.businessId());
         assertEquals(LocalDate.of(2026, 10, 5), param.periodStart());
@@ -69,7 +69,7 @@ class ComplaintAnomalyWeekJobTest {
                 .calculateAndSaveWeek(10L, LocalDate.of(2026, 10, 5));
 
         assertThrows(IllegalStateException.class, () -> job.execute(
-                "{\"businessId\":10,\"periodStart\":\"2026-10-05\"}", LocalDate.now()));
+                "{\"businessId\":10,\"periodStart\":\"2026-10-12\"}", LocalDate.now()));
         assertNull(BusinessContextHolder.getBusinessId());
     }
 
@@ -84,11 +84,17 @@ class ComplaintAnomalyWeekJobTest {
 
     @Test
     void shouldCalculatePreviousCompleteWeekForNormalLocalRun() {
-        LocalDate today = LocalDate.of(2026, 10, 16);
+        LocalDate executionMonday = LocalDate.of(2026, 10, 12);
         LocalDate previousMonday = LocalDate.of(2026, 10, 5);
         when(clickHouseService.calculateAndSaveWeek(10L, previousMonday)).thenReturn(7);
 
-        assertEquals(7, job.executePreviousCompleteWeek(10L, today));
+        assertEquals(7, job.executePreviousCompleteWeek(10L, executionMonday));
         assertNull(BusinessContextHolder.getBusinessId());
+    }
+
+    @Test
+    void shouldRejectNonMondayExecutionWeekStart() {
+        assertThrows(IllegalArgumentException.class,
+                () -> job.executePreviousCompleteWeek(10L, LocalDate.of(2026, 10, 13)));
     }
 }

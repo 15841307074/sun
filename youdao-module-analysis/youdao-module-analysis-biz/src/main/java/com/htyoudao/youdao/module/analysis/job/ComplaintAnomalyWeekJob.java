@@ -25,7 +25,10 @@ public class ComplaintAnomalyWeekJob {
     @Resource
     private ComplaintAnomalyClickHouseService clickHouseService;
 
-    /** 参数示例：{"businessId":10}；历史补跑可增加 periodStart。 */
+    /**
+     * 参数示例：{"businessId":10}。
+     * periodStart 表示任务执行周的周一，实际统计它前一个完整自然周。
+     */
     @XxlJob("analysisComplaintAnomalyWeekJobHandler")
     public void calculateWeek() {
         execute(XxlJobHelper.getJobParam(), LocalDate.now());
@@ -68,11 +71,15 @@ public class ComplaintAnomalyWeekJob {
 
     /** 按正式调度口径计算上一个完整自然周。 */
     public int executePreviousCompleteWeek(Long businessId) {
-        return executePreviousCompleteWeek(businessId, LocalDate.now());
+        return execute(businessId, previousCompleteWeekStart(LocalDate.now()));
     }
 
-    int executePreviousCompleteWeek(Long businessId, LocalDate today) {
-        return execute(businessId, previousCompleteWeekStart(today));
+    /** 按指定执行周的周一，计算它前面的完整自然周。 */
+    public int executePreviousCompleteWeek(Long businessId, LocalDate executionWeekStart) {
+        if (executionWeekStart == null || executionWeekStart.getDayOfWeek() != DayOfWeek.MONDAY) {
+            throw new IllegalArgumentException("执行周开始日期必须是周一");
+        }
+        return execute(businessId, executionWeekStart.minusWeeks(1));
     }
 
     JobParam parseParam(String rawParam, LocalDate today) {
@@ -90,11 +97,15 @@ public class ComplaintAnomalyWeekJob {
                 throw new IllegalArgumentException("任务参数 businessId 必须大于 0");
             }
             JsonNode periodNode = root.get("periodStart");
-            LocalDate periodStart = periodNode == null || periodNode.asText().isBlank()
-                    ? previousCompleteWeekStart(today)
-                    : LocalDate.parse(periodNode.asText());
-            if (periodStart.getDayOfWeek() != DayOfWeek.MONDAY) {
-                throw new IllegalArgumentException("任务参数 periodStart 必须是周一");
+            LocalDate periodStart;
+            if (periodNode == null || periodNode.asText().isBlank()) {
+                periodStart = previousCompleteWeekStart(today);
+            } else {
+                LocalDate executionWeekStart = LocalDate.parse(periodNode.asText());
+                if (executionWeekStart.getDayOfWeek() != DayOfWeek.MONDAY) {
+                    throw new IllegalArgumentException("任务参数 periodStart 必须是执行周的周一");
+                }
+                periodStart = executionWeekStart.minusWeeks(1);
             }
             return new JobParam(businessId, periodStart);
         } catch (IllegalArgumentException e) {
@@ -103,7 +114,7 @@ public class ComplaintAnomalyWeekJob {
             throw new IllegalArgumentException("任务参数 periodStart 格式错误，应为 yyyy-MM-dd", e);
         } catch (Exception e) {
             throw new IllegalArgumentException(
-                    "任务参数格式错误，应为 JSON，例如 {\"businessId\":10,\"periodStart\":\"2026-10-05\"}", e);
+                    "任务参数格式错误，应为 JSON，例如 {\"businessId\":10,\"periodStart\":\"2026-10-12\"}", e);
         }
     }
 
