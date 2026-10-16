@@ -38,6 +38,7 @@ public class StoreOrgStatisticsService {
     @DubboReference
     private StoreOrgSnapshotApi storeOrgSnapshotApi;
 
+    /** 查询指定月份、指定组织及其全部下级的门店统计。 */
     public StoreOrgStatisticsRespVO getStatistics(Long userId, Long orgId, String month) {
         Long businessId = BusinessContextHolder.getRequiredBusinessId();
         LocalDate snapshotMonth = parseMonth(month);
@@ -56,6 +57,7 @@ public class StoreOrgStatisticsService {
         long total = 0L;
         long direct = 0L;
         for (StoreOrgSnapshotDO snapshot : snapshots) {
+            // 只统计组织路径中包含所选组织的门店。
             List<StoreOrgPathNodeDTO> path = readPath(snapshot.getOrgPathJson());
             int selectedIndex = indexOf(path, orgId);
             if (selectedIndex < 0) {
@@ -70,6 +72,7 @@ public class StoreOrgStatisticsService {
                 direct++;
                 continue;
             }
+            // 从所选组织的直属子级开始，逐层累计各节点及其下级门店数。
             Map<Long, NodeAccumulator> children = rootNodes;
             for (int i = selectedIndex + 1; i < path.size(); i++) {
                 StoreOrgPathNodeDTO node = path.get(i);
@@ -98,6 +101,7 @@ public class StoreOrgStatisticsService {
         return response;
     }
 
+    /** 校验 yyyy-MM 月份参数，并转换为当月第一天。 */
     private LocalDate parseMonth(String month) {
         try {
             return YearMonth.parse(month, MONTH_FORMATTER).atDay(1);
@@ -106,6 +110,7 @@ public class StoreOrgStatisticsService {
         }
     }
 
+    /** 将快照中的组织路径 JSON 解析为从根组织到直属组织的节点列表。 */
     private List<StoreOrgPathNodeDTO> readPath(String json) {
         if (json == null || json.isBlank()) {
             return Collections.emptyList();
@@ -117,6 +122,7 @@ public class StoreOrgStatisticsService {
         }
     }
 
+    /** 查找所选组织在完整组织路径中的位置。 */
     private int indexOf(List<StoreOrgPathNodeDTO> path, Long orgId) {
         for (int i = 0; i < path.size(); i++) {
             if (Objects.equals(path.get(i).getId(), orgId)) {
@@ -126,6 +132,7 @@ public class StoreOrgStatisticsService {
         return -1;
     }
 
+    /** 按组织排序值、层级和 ID 稳定排序。 */
     private Comparator<NodeAccumulator> nodeComparator() {
         return Comparator
                 .comparing((NodeAccumulator accumulator) -> accumulator.node.getSort(),
@@ -135,6 +142,7 @@ public class StoreOrgStatisticsService {
                 .thenComparing(accumulator -> accumulator.node.getId(), Comparator.nullsLast(Long::compareTo));
     }
 
+    /** 将内部累计节点递归转换为接口响应节点。 */
     private StoreOrgStatisticsNodeRespVO toNode(NodeAccumulator accumulator) {
         StoreOrgStatisticsNodeRespVO node = new StoreOrgStatisticsNodeRespVO();
         node.setOrgId(accumulator.node.getId().toString());
