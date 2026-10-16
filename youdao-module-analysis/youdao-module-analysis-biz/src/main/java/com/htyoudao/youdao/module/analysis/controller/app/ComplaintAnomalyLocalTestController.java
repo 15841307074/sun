@@ -31,7 +31,7 @@ public class ComplaintAnomalyLocalTestController {
     /**
      * 手动执行指定项目、指定自然周的投诉异常指标计算。
      *
-     * @return 写入 ClickHouse 的版本行数
+     * @return 写入或更新 MySQL 周异常表的行数
      */
     @PostMapping("/complaint-anomaly-week")
     @Operation(summary = "本地执行周度投诉异常指标任务")

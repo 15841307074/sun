@@ -56,10 +56,10 @@ public class ComplaintAnomalyWeekJob {
         try {
             BusinessContextHolder.setBusinessId(businessId);
             int count = clickHouseService.calculateAndSaveWeek(businessId, periodStart);
-            log.info("[calculateWeek] businessId={}, periodStart={}, versionRows={}",
+            log.info("[calculateWeek] businessId={}, periodStart={}, affectedRows={}",
                     businessId, periodStart, count);
             XxlJobHelper.log("周度投诉异常指标计算完成: businessId=" + businessId
-                    + ", periodStart=" + periodStart + ", versionRows=" + count);
+                    + ", periodStart=" + periodStart + ", affectedRows=" + count);
             return count;
         } finally {
             BusinessContextHolder.clear();

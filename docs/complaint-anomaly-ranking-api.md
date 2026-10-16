@@ -188,13 +188,13 @@ GET /analysis/app/anomaly-report/food-hygiene-complaint-ranking?startDate=2026-1
 | `1008000024` | 开始日期和结束日期不能为空 | 任一日期未传 |
 | `1008000025` | 开始日期不能晚于结束日期，且日期范围不能超过 90 天 | 日期顺序错误或超过 90 天 |
 | `1008000026` | 排行类型仅支持 TOP 或 BOTTOM | `rankType` 不合法 |
-| `1008000011` | 查询超时，请缩短查询范围后重试 | ClickHouse 查询失败 |
+| `1008000011` | 查询超时，请缩短查询范围后重试 | 经营异常数据查询失败 |
 
 日期格式不是 `yyyy-MM-dd` 时，由接口参数解析校验统一返回参数格式错误。
 
 ## 6. 周度投诉指标任务
 
-接口读取 `analytics.store_anomaly_metrics_weekly` 周度指标表。该表由以下 XXL-Job 定期计算：
+接口读取 MySQL 的 `store_anomaly_metrics_weekly` 周度指标表。该表由以下 XXL-Job 定期计算：
 
 ```text
 Handler: analysisComplaintAnomalyWeekJobHandler
@@ -224,14 +224,14 @@ Handler: analysisComplaintAnomalyWeekJobHandler
 
 - 投诉明细：`analytics.system_complaint_ch`。
 - 有效订单：`analytics.bz_order_ch`。
-- 周度指标：`analytics.store_anomaly_metrics_weekly`。
+- 周度指标结果：MySQL `store_anomaly_metrics_weekly`。
 
 任务按项目和自然周覆盖投诉相关指标，不覆盖营业额、客单价、销量等其他异常指标。任务失败时不会写入不完整结果，并且会清理当前任务线程中的项目上下文。
 
 ## 7. 部署前置条件
 
-1. 执行 `sql/经营异常提醒_261014/clickhouse_store_anomaly_metrics_weekly.sql` 创建周度指标表。
-2. 确认 ClickHouse 已存在并持续同步 `analytics.system_complaint_ch`。
+1. 确认 MySQL `store_anomaly_metrics_weekly` 已包含四个投诉指标字段。
+2. 确认 ClickHouse 已存在并持续同步 `analytics.system_complaint_ch` 和 `analytics.bz_order_ch`。
 3. 先部署包含 `StoreApi.listUserStoreRelations` 的 system 服务，再部署 analysis 服务。
 4. 在 XXL-Job 中按照项目分别配置周度投诉指标任务。
 5. 周度投诉指标任务建议安排在 06:30，现有周度报告任务安排在 07:00。
