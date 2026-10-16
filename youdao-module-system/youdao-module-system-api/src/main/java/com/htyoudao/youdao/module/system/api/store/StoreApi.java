@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -134,4 +135,13 @@ public interface StoreApi {
      * @return 命中任意一个标签返回 true
      */
     Boolean matchStoreTagCache(Long businessId, Long storeId, List<Long> tagIds);
+
+    /**
+     * 批量查询用户负责的组织门店和额外绑定门店。
+     *
+     * @param userIds 用户ID集合
+     * @param storeIds 可选的门店范围，为空时查询全部负责门店
+     * @return 用户与门店关系列表
+     */
+    List<UserStoreRelationDTO> listUserStoreRelations(Collection<Long> userIds, Collection<Long> storeIds);
 }

@@ -5,6 +5,8 @@ import com.htyoudao.youdao.framework.common.pojo.PageParam;
 import com.htyoudao.youdao.framework.common.pojo.PageResult;
 import com.htyoudao.youdao.framework.security.core.util.SecurityFrameworkUtils;
 import com.htyoudao.youdao.module.analysis.controller.app.vo.anomaly.AnomalyReportRespVO;
+import com.htyoudao.youdao.module.analysis.controller.app.vo.anomaly.ComplaintRatioRankingRespVO;
+import com.htyoudao.youdao.module.analysis.controller.app.vo.anomaly.FoodHygieneComplaintRankingRespVO;
 import com.htyoudao.youdao.module.analysis.controller.app.vo.anomaly.PlatformMessageRespVO;
 import com.htyoudao.youdao.module.analysis.controller.app.vo.anomaly.StoreOrgStatisticsRespVO;
 import com.htyoudao.youdao.module.analysis.dal.dataobject.anomaly.AnomalyUserReportDO;
@@ -12,13 +14,16 @@ import com.htyoudao.youdao.module.analysis.dal.dataobject.anomaly.PlatformMessag
 import com.htyoudao.youdao.module.analysis.enums.AnomalyTypeEnum;
 import com.htyoudao.youdao.module.analysis.framework.config.anomaly.AnomalyProperties;
 import com.htyoudao.youdao.module.analysis.service.anomaly.PlatformMessageService;
+import com.htyoudao.youdao.module.analysis.service.anomaly.ComplaintRankingService;
 import com.htyoudao.youdao.module.analysis.service.anomaly.StoreOrgStatisticsService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 import static com.htyoudao.youdao.framework.common.pojo.CommonResult.success;
@@ -46,6 +51,8 @@ public class AnomalyAppController {
     private AnomalyProperties properties;
     @Resource
     private StoreOrgStatisticsService storeOrgStatisticsService;
+    @Resource
+    private ComplaintRankingService complaintRankingService;
 
     // ==================== 接口 1：平台消息分页 ====================
 
@@ -105,6 +112,34 @@ public class AnomalyAppController {
             @RequestParam("month") String month) {
         Long userId = SecurityFrameworkUtils.getLoginUserId();
         return success(storeOrgStatisticsService.getStatistics(userId, orgId, month));
+    }
+
+    // ==================== 接口 5：投诉异常排行 ====================
+
+    @GetMapping("/anomaly-report/complaint-ratio-ranking")
+    @Operation(summary = "查询投诉订单占比排行")
+    public CommonResult<List<ComplaintRatioRankingRespVO>> getComplaintRatioRanking(
+            @Parameter(description = "开始日期，格式 yyyy-MM-dd", required = true)
+            @RequestParam("startDate") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate startDate,
+            @Parameter(description = "结束日期，格式 yyyy-MM-dd", required = true)
+            @RequestParam("endDate") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate endDate,
+            @Parameter(description = "排行类型：TOP 或 BOTTOM", required = true)
+            @RequestParam("rankType") String rankType) {
+        return success(complaintRankingService.getComplaintRatioRanking(
+                SecurityFrameworkUtils.getLoginUserId(), startDate, endDate, rankType));
+    }
+
+    @GetMapping("/anomaly-report/food-hygiene-complaint-ranking")
+    @Operation(summary = "查询食品卫生投诉排行")
+    public CommonResult<List<FoodHygieneComplaintRankingRespVO>> getFoodHygieneComplaintRanking(
+            @Parameter(description = "开始日期，格式 yyyy-MM-dd", required = true)
+            @RequestParam("startDate") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate startDate,
+            @Parameter(description = "结束日期，格式 yyyy-MM-dd", required = true)
+            @RequestParam("endDate") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate endDate,
+            @Parameter(description = "排行类型：TOP 或 BOTTOM", required = true)
+            @RequestParam("rankType") String rankType) {
+        return success(complaintRankingService.getFoodHygieneComplaintRanking(
+                SecurityFrameworkUtils.getLoginUserId(), startDate, endDate, rankType));
     }
 
     // ==================== VO 转换 ====================

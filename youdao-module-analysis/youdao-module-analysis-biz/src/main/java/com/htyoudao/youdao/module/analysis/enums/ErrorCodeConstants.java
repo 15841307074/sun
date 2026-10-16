@@ -38,4 +38,9 @@ public interface ErrorCodeConstants {
     ErrorCode STORE_ORG_SNAPSHOT_NOT_FOUND = new ErrorCode(1_008_000_022, "指定月份的门店组织快照尚未生成");
     ErrorCode STORE_ORG_SNAPSHOT_DATA_INVALID = new ErrorCode(1_008_000_023, "门店组织快照数据异常");
 
+    // ========== 投诉异常排行 ==========
+    ErrorCode COMPLAINT_RANKING_DATE_REQUIRED = new ErrorCode(1_008_000_024, "开始日期和结束日期不能为空");
+    ErrorCode COMPLAINT_RANKING_DATE_INVALID = new ErrorCode(1_008_000_025, "开始日期不能晚于结束日期，且日期范围不能超过 90 天");
+    ErrorCode COMPLAINT_RANKING_TYPE_INVALID = new ErrorCode(1_008_000_026, "排行类型仅支持 TOP 或 BOTTOM");
+
 }

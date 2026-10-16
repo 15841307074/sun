@@ -17,6 +17,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -193,5 +194,42 @@ public class StoreApiImpl implements StoreApi{
     @Override
     public Boolean matchStoreTagCache(Long businessId, Long storeId, List<Long> tagIds) {
         return systemStoreInfoService.matchStoreTagCache(businessId, storeId, tagIds);
+    }
+
+    @Override
+    public List<UserStoreRelationDTO> listUserStoreRelations(Collection<Long> userIds, Collection<Long> storeIds) {
+        if (CollectionUtil.isEmpty(userIds)) {
+            return java.util.Collections.emptyList();
+        }
+        java.util.Map<Long, Set<Long>> userStoreMap = new java.util.HashMap<>();
+        Set<Long> allStoreIds = new HashSet<>();
+        Set<Long> storeIdFilter = storeIds == null ? null : new HashSet<>(storeIds);
+        for (Long userId : userIds) {
+            Set<Long> userStores = getAllStoreIdByUser(userId).getCheckedData();
+            if (userStores == null) {
+                userStores = new HashSet<>();
+            }
+            if (storeIdFilter != null && !storeIdFilter.isEmpty()) {
+                userStores.retainAll(storeIdFilter);
+            }
+            userStoreMap.put(userId, userStores);
+            allStoreIds.addAll(userStores);
+        }
+        java.util.Map<Long, String> storeNameMap = new java.util.HashMap<>();
+        if (!allStoreIds.isEmpty()) {
+            List<StoreInfoDTO> stores = listStoresByIds(new java.util.ArrayList<>(allStoreIds));
+            if (stores != null) {
+                stores.forEach(store -> storeNameMap.put(store.getStoreId(), store.getStoreName()));
+            }
+        }
+        java.util.List<UserStoreRelationDTO> result = new java.util.ArrayList<>();
+        userStoreMap.forEach((userId, userStores) -> userStores.forEach(storeId -> {
+            UserStoreRelationDTO relation = new UserStoreRelationDTO();
+            relation.setUserId(userId);
+            relation.setStoreId(storeId);
+            relation.setStoreName(storeNameMap.get(storeId));
+            result.add(relation);
+        }));
+        return result;
     }
 }
