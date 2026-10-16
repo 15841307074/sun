@@ -16,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.when;
 
 class ComplaintAnomalyWeekJobTest {
 
@@ -69,6 +70,15 @@ class ComplaintAnomalyWeekJobTest {
 
         assertThrows(IllegalStateException.class, () -> job.execute(
                 "{\"businessId\":10,\"periodStart\":\"2026-10-05\"}", LocalDate.now()));
+        assertNull(BusinessContextHolder.getBusinessId());
+    }
+
+    @Test
+    void shouldReturnWrittenRowsForLocalTestEndpoint() {
+        LocalDate periodStart = LocalDate.of(2026, 10, 5);
+        when(clickHouseService.calculateAndSaveWeek(10L, periodStart)).thenReturn(12);
+
+        assertEquals(12, job.execute(10L, periodStart));
         assertNull(BusinessContextHolder.getBusinessId());
     }
 }

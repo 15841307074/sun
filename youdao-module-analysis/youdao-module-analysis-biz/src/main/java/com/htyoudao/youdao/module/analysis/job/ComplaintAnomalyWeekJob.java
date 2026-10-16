@@ -31,15 +31,36 @@ public class ComplaintAnomalyWeekJob {
         execute(XxlJobHelper.getJobParam(), LocalDate.now());
     }
 
-    void execute(String rawParam, LocalDate today) {
+    int execute(String rawParam, LocalDate today) {
+        JobParam param = parseParam(rawParam, today);
+        return execute(param.businessId(), param.periodStart());
+    }
+
+    /**
+     * 执行指定项目、指定自然周的投诉异常指标计算。
+     *
+     * <p>供 XXL-Job 和本地测试接口共同复用，执行结束后始终清理项目上下文。</p>
+     *
+     * @return 本次写入 ClickHouse 的版本行数
+     */
+    public int execute(Long businessId, LocalDate periodStart) {
+        if (businessId == null || businessId <= 0) {
+            throw new IllegalArgumentException("businessId 必须大于 0");
+        }
+        if (periodStart == null) {
+            throw new IllegalArgumentException("periodStart 不能为空");
+        }
+        if (periodStart.getDayOfWeek() != DayOfWeek.MONDAY) {
+            throw new IllegalArgumentException("periodStart 必须是周一");
+        }
         try {
-            JobParam param = parseParam(rawParam, today);
-            BusinessContextHolder.setBusinessId(param.businessId());
-            int count = clickHouseService.calculateAndSaveWeek(param.businessId(), param.periodStart());
+            BusinessContextHolder.setBusinessId(businessId);
+            int count = clickHouseService.calculateAndSaveWeek(businessId, periodStart);
             log.info("[calculateWeek] businessId={}, periodStart={}, versionRows={}",
-                    param.businessId(), param.periodStart(), count);
-            XxlJobHelper.log("周度投诉异常指标计算完成: businessId=" + param.businessId()
-                    + ", periodStart=" + param.periodStart() + ", versionRows=" + count);
+                    businessId, periodStart, count);
+            XxlJobHelper.log("周度投诉异常指标计算完成: businessId=" + businessId
+                    + ", periodStart=" + periodStart + ", versionRows=" + count);
+            return count;
         } finally {
             BusinessContextHolder.clear();
         }
