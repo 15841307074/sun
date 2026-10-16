@@ -1,19 +1,24 @@
 package com.htyoudao.youdao.module.analysis.service.anomaly;
 
 import com.baomidou.dynamic.datasource.annotation.DS;
+import com.htyoudao.youdao.module.analysis.AnalysisServerApplication;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -55,6 +60,15 @@ class ComplaintAnomalyDataSourceServiceTest {
         verify(weeklyMysqlService).mergeWeek(10L, 2026, 41, metrics);
         assertEquals("clickhouse", ComplaintMetricClickHouseQueryService.class.getAnnotation(DS.class).value());
         assertEquals("master", ComplaintAnomalyWeeklyMysqlService.class.getAnnotation(DS.class).value());
+    }
+
+    @Test
+    void shouldEnableJdbcTransactionManagerAutoConfiguration() {
+        SpringBootApplication application = AnalysisServerApplication.class
+                .getAnnotation(SpringBootApplication.class);
+
+        assertFalse(Arrays.asList(application.exclude())
+                .contains(DataSourceTransactionManagerAutoConfiguration.class));
     }
 
     @Test
