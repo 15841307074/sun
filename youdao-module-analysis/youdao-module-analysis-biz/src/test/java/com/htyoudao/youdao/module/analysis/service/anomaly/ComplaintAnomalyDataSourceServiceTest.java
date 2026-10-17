@@ -6,6 +6,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.MockitoAnnotations;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration;
@@ -19,6 +20,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -83,5 +85,20 @@ class ComplaintAnomalyDataSourceServiceTest {
         assertEquals(1, service.mergeWeek(10L, 2026, 41, List.of(metric)));
         verify(jdbcTemplate).batchUpdate(
                 org.mockito.ArgumentMatchers.startsWith("INSERT INTO store_anomaly_metrics_weekly"), any(List.class));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void shouldCountOnlyCompletedOrdersAsValidOrders() {
+        ComplaintMetricClickHouseQueryService service = new ComplaintMetricClickHouseQueryService();
+        ReflectionTestUtils.setField(service, "jdbcTemplate", jdbcTemplate);
+        when(jdbcTemplate.query(anyString(), any(RowMapper.class), any(Object[].class))).thenReturn(List.of());
+
+        service.queryWeek(10L, LocalDate.of(2026, 10, 5), LocalDate.of(2026, 10, 12));
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(jdbcTemplate).query(sql.capture(), any(RowMapper.class), any(Object[].class));
+        assertTrue(sql.getValue().contains("order_state = '60'"));
+        assertFalse(sql.getValue().contains("order_state IN ('20'"));
     }
 }

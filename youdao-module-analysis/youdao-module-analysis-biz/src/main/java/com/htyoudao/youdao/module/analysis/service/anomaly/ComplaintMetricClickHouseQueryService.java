@@ -7,9 +7,6 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.stream.Collectors;
-
-import static com.htyoudao.youdao.module.analysis.enums.OrderStatusConstants.VALID_ORDER_STATES;
 
 /** 只负责从 ClickHouse 读取投诉和订单明细并计算周投诉指标。 */
 @Service
@@ -18,9 +15,8 @@ public class ComplaintMetricClickHouseQueryService {
 
     private static final String COMPLAINT_TABLE = "analytics.system_complaint_ch";
     private static final String ORDER_TABLE = "analytics.bz_order_ch";
-    private static final String VALID_ORDER_STATES_SQL = VALID_ORDER_STATES.stream()
-            .map(value -> "'" + value + "'")
-            .collect(Collectors.joining(","));
+    /** 投诉占比的有效订单口径：仅统计已完成订单。 */
+    private static final String COMPLETED_ORDER_STATE = "'60'";
 
     @Resource
     private JdbcTemplate jdbcTemplate;
@@ -36,7 +32,8 @@ public class ComplaintMetricClickHouseQueryService {
                 + " AND create_time >= toDateTime(?) AND create_time < toDateTime(?) GROUP BY store_id"
                 + "), orders AS ("
                 + " SELECT toUInt64OrZero(store_id) store_id, anyLast(ifNull(store_name, '')) store_name, "
-                + " uniqExactIf(order_sn, order_state IN (" + VALID_ORDER_STATES_SQL + ")) valid_count"
+                + " uniqExactIf(order_sn, order_state = " + COMPLETED_ORDER_STATE
+                + " AND notEmpty(ifNull(order_sn, ''))) valid_count"
                 + " FROM " + ORDER_TABLE + " FINAL"
                 + " WHERE business_id = ? AND deleted = '0'"
                 + " AND create_time >= toDateTime(?) AND create_time < toDateTime(?) GROUP BY store_id"

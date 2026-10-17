@@ -2,6 +2,8 @@ package com.htyoudao.youdao.module.analysis.job;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.htyoudao.youdao.framework.context.BusinessContextHolder;
+import com.htyoudao.youdao.module.analysis.enums.AnomalyJobTypeEnum;
+import com.htyoudao.youdao.module.analysis.service.anomaly.AnomalyJobRecordService;
 import com.htyoudao.youdao.module.analysis.service.anomaly.ComplaintAnomalyClickHouseService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
@@ -16,6 +18,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class ComplaintAnomalyWeekJobTest {
@@ -23,6 +28,8 @@ class ComplaintAnomalyWeekJobTest {
     private ComplaintAnomalyWeekJob job;
     @Mock
     private ComplaintAnomalyClickHouseService clickHouseService;
+    @Mock
+    private AnomalyJobRecordService jobRecordService;
     private AutoCloseable mocks;
 
     @BeforeEach
@@ -31,6 +38,7 @@ class ComplaintAnomalyWeekJobTest {
         job = new ComplaintAnomalyWeekJob();
         ReflectionTestUtils.setField(job, "objectMapper", new ObjectMapper());
         ReflectionTestUtils.setField(job, "clickHouseService", clickHouseService);
+        ReflectionTestUtils.setField(job, "jobRecordService", jobRecordService);
     }
 
     @AfterEach
@@ -70,6 +78,10 @@ class ComplaintAnomalyWeekJobTest {
 
         assertThrows(IllegalStateException.class, () -> job.execute(
                 "{\"businessId\":10,\"periodStart\":\"2026-10-12\"}", LocalDate.now()));
+        verify(jobRecordService).recordRunning(eq(AnomalyJobTypeEnum.SOURCE_WEEK_ANOMALY),
+                eq(LocalDate.of(2026, 10, 5)), any());
+        verify(jobRecordService).recordFailure(eq(AnomalyJobTypeEnum.SOURCE_WEEK_ANOMALY),
+                eq(LocalDate.of(2026, 10, 5)), eq("clickhouse error"), any());
         assertNull(BusinessContextHolder.getBusinessId());
     }
 
@@ -79,6 +91,10 @@ class ComplaintAnomalyWeekJobTest {
         when(clickHouseService.calculateAndSaveWeek(10L, periodStart)).thenReturn(12);
 
         assertEquals(12, job.execute(10L, periodStart));
+        verify(jobRecordService).recordRunning(
+                eq(AnomalyJobTypeEnum.SOURCE_WEEK_ANOMALY), eq(periodStart), any());
+        verify(jobRecordService).recordSuccess(
+                eq(AnomalyJobTypeEnum.SOURCE_WEEK_ANOMALY), eq(periodStart), eq(12), any());
         assertNull(BusinessContextHolder.getBusinessId());
     }
 

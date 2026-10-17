@@ -3,6 +3,8 @@ package com.htyoudao.youdao.module.analysis.job;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.htyoudao.youdao.framework.context.BusinessContextHolder;
+import com.htyoudao.youdao.module.analysis.enums.AnomalyJobTypeEnum;
+import com.htyoudao.youdao.module.analysis.service.anomaly.AnomalyJobRecordService;
 import com.htyoudao.youdao.module.analysis.service.anomaly.ComplaintAnomalyClickHouseService;
 import com.xxl.job.core.context.XxlJobHelper;
 import com.xxl.job.core.handler.annotation.XxlJob;
@@ -12,6 +14,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.TemporalAdjusters;
 
@@ -24,6 +27,8 @@ public class ComplaintAnomalyWeekJob {
     private ObjectMapper objectMapper;
     @Resource
     private ComplaintAnomalyClickHouseService clickHouseService;
+    @Resource
+    private AnomalyJobRecordService jobRecordService;
 
     /**
      * 参数示例：{"businessId":10}。
@@ -56,14 +61,29 @@ public class ComplaintAnomalyWeekJob {
         if (periodStart.getDayOfWeek() != DayOfWeek.MONDAY) {
             throw new IllegalArgumentException("periodStart 必须是周一");
         }
+        LocalDateTime startTime = LocalDateTime.now();
         try {
             BusinessContextHolder.setBusinessId(businessId);
-            int count = clickHouseService.calculateAndSaveWeek(businessId, periodStart);
-            log.info("[calculateWeek] businessId={}, periodStart={}, affectedRows={}",
-                    businessId, periodStart, count);
-            XxlJobHelper.log("周度投诉异常指标计算完成: businessId=" + businessId
-                    + ", periodStart=" + periodStart + ", affectedRows=" + count);
-            return count;
+            // 撤销同周期旧成功状态，避免下游周报在本次重算期间读取未完成数据。
+            jobRecordService.recordRunning(AnomalyJobTypeEnum.SOURCE_WEEK_ANOMALY, periodStart, startTime);
+            try {
+                int count = clickHouseService.calculateAndSaveWeek(businessId, periodStart);
+                jobRecordService.recordSuccess(
+                        AnomalyJobTypeEnum.SOURCE_WEEK_ANOMALY, periodStart, count, startTime);
+                log.info("[calculateWeek] businessId={}, periodStart={}, affectedRows={}",
+                        businessId, periodStart, count);
+                XxlJobHelper.log("周度投诉异常指标计算完成: businessId=" + businessId
+                        + ", periodStart=" + periodStart + ", affectedRows=" + count);
+                return count;
+            } catch (RuntimeException e) {
+                try {
+                    jobRecordService.recordFailure(
+                            AnomalyJobTypeEnum.SOURCE_WEEK_ANOMALY, periodStart, e.getMessage(), startTime);
+                } catch (RuntimeException recordError) {
+                    e.addSuppressed(recordError);
+                }
+                throw e;
+            }
         } finally {
             BusinessContextHolder.clear();
         }
