@@ -49,7 +49,7 @@ class StoreOrgStatisticsServiceTest {
     }
 
     @Test
-    void shouldUseUserOrganizationWhenOrgIdIsOmitted() throws Exception {
+    void shouldUseCurrentUserOrganization() throws Exception {
         when(storeOrgSnapshotApi.getUserDefaultOrgId(7L)).thenReturn(CommonResult.success(200L));
         when(storeOrgSnapshotApi.listManageableOrgIds(7L))
                 .thenReturn(CommonResult.success(Set.of(200L, 300L)));
@@ -57,7 +57,7 @@ class StoreOrgStatisticsServiceTest {
                 snapshot(1L, "辽宁省", List.of(node(100L, "总部", 0L, 1, 1),
                         node(200L, "小组", 100L, 2, 1), node(300L, "省区", 200L, 3, 1)))));
 
-        StoreOrgStatisticsRespVO result = service.getStatistics(7L, null, "2026-08");
+        StoreOrgStatisticsRespVO result = service.getStatistics(7L, "2026-08");
 
         assertEquals("200", result.getOrgId());
         assertEquals("小组", result.getOrgName());
@@ -71,12 +71,15 @@ class StoreOrgStatisticsServiceTest {
         when(storeOrgSnapshotApi.listManageableOrgIds(7L)).thenReturn(CommonResult.success(Set.of()));
 
         assertThrows(com.htyoudao.youdao.framework.common.exception.ServiceException.class,
-                () -> service.getStatistics(7L, null, "2026-08"));
+                () -> service.getStatistics(7L, "2026-08"));
         verifyNoInteractions(snapshotMapper);
     }
 
     @Test
-    void shouldReturnDynamicOrganizationTreeFromSelectedOrganization() throws Exception {
+    void shouldReturnDynamicOrganizationTreeFromUserOrganization() throws Exception {
+        when(storeOrgSnapshotApi.getUserDefaultOrgId(7L))
+                .thenReturn(CommonResult.success(100L), CommonResult.success(200L),
+                        CommonResult.success(300L), CommonResult.success(400L));
         when(storeOrgSnapshotApi.listManageableOrgIds(7L))
                 .thenReturn(CommonResult.success(Set.of(100L, 200L, 300L, 400L)));
         when(snapshotMapper.selectListByMonth(10L, LocalDate.of(2026, 8, 1))).thenReturn(List.of(
@@ -90,7 +93,7 @@ class StoreOrgStatisticsServiceTest {
                         node(200L, "王子彬组", 100L, 2, 2), node(300L, "辽宁省组织", 200L, 3, 1),
                         node(400L, "沈阳市", 300L, 4, 1)))));
 
-        StoreOrgStatisticsRespVO result = service.getStatistics(7L, 100L, "2026-08");
+        StoreOrgStatisticsRespVO result = service.getStatistics(7L, "2026-08");
 
         assertEquals("东北区域", result.getOrgName());
         assertEquals(4L, result.getTotalStoreCount());
@@ -110,50 +113,52 @@ class StoreOrgStatisticsServiceTest {
         assertEquals(2L, city.getDirectStoreCount());
         assertTrue(city.getChildren().isEmpty());
 
-        StoreOrgStatisticsRespVO groupResult = service.getStatistics(7L, 200L, "2026-08");
+        StoreOrgStatisticsRespVO groupResult = service.getStatistics(7L, "2026-08");
         assertEquals("王子彬组", groupResult.getOrgName());
         assertEquals(3L, groupResult.getTotalStoreCount());
         assertEquals(1L, groupResult.getDirectStoreCount());
         assertEquals("300", groupResult.getItems().get(0).getOrgId());
 
-        StoreOrgStatisticsRespVO provinceResult = service.getStatistics(7L, 300L, "2026-08");
+        StoreOrgStatisticsRespVO provinceResult = service.getStatistics(7L, "2026-08");
         assertEquals("辽宁省组织", provinceResult.getOrgName());
         assertEquals(2L, provinceResult.getTotalStoreCount());
         assertEquals(0L, provinceResult.getDirectStoreCount());
         assertEquals("400", provinceResult.getItems().get(0).getOrgId());
 
-        StoreOrgStatisticsRespVO cityResult = service.getStatistics(7L, 400L, "2026-08");
+        StoreOrgStatisticsRespVO cityResult = service.getStatistics(7L, "2026-08");
         assertEquals("沈阳市", cityResult.getOrgName());
         assertEquals(2L, cityResult.getTotalStoreCount());
         assertEquals(2L, cityResult.getDirectStoreCount());
         assertTrue(cityResult.getItems().isEmpty());
-        verify(storeOrgSnapshotApi, never()).getUserDefaultOrgId(any());
+        verify(storeOrgSnapshotApi, times(4)).getUserDefaultOrgId(7L);
     }
 
     @Test
     void shouldRejectOrganizationOutsideUserScope() {
+        when(storeOrgSnapshotApi.getUserDefaultOrgId(7L)).thenReturn(CommonResult.success(100L));
         when(storeOrgSnapshotApi.listManageableOrgIds(7L))
                 .thenReturn(CommonResult.success(Set.of(200L)));
 
         assertThrows(RuntimeException.class,
-                () -> service.getStatistics(7L, 100L, "2026-08"));
+                () -> service.getStatistics(7L, "2026-08"));
         verifyNoInteractions(snapshotMapper);
     }
 
     @Test
     void shouldRejectMissingMonthSnapshot() {
+        when(storeOrgSnapshotApi.getUserDefaultOrgId(7L)).thenReturn(CommonResult.success(100L));
         when(storeOrgSnapshotApi.listManageableOrgIds(7L))
                 .thenReturn(CommonResult.success(Set.of(100L)));
         when(snapshotMapper.selectListByMonth(10L, LocalDate.of(2026, 8, 1))).thenReturn(List.of());
 
         assertThrows(RuntimeException.class,
-                () -> service.getStatistics(7L, 100L, "2026-08"));
+                () -> service.getStatistics(7L, "2026-08"));
     }
 
     @Test
     void shouldRejectInvalidMonthBeforeRemoteCall() {
         assertThrows(RuntimeException.class,
-                () -> service.getStatistics(7L, 100L, "2026-8"));
+                () -> service.getStatistics(7L, "2026-8"));
         verifyNoInteractions(storeOrgSnapshotApi, snapshotMapper);
     }
 
