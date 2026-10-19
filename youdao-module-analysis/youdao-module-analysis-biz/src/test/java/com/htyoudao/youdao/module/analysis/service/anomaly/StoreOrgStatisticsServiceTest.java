@@ -49,6 +49,33 @@ class StoreOrgStatisticsServiceTest {
     }
 
     @Test
+    void shouldUseUserOrganizationWhenOrgIdIsOmitted() throws Exception {
+        when(storeOrgSnapshotApi.getUserDefaultOrgId(7L)).thenReturn(CommonResult.success(200L));
+        when(storeOrgSnapshotApi.listManageableOrgIds(7L))
+                .thenReturn(CommonResult.success(Set.of(200L, 300L)));
+        when(snapshotMapper.selectListByMonth(10L, LocalDate.of(2026, 8, 1))).thenReturn(List.of(
+                snapshot(1L, "辽宁省", List.of(node(100L, "总部", 0L, 1, 1),
+                        node(200L, "小组", 100L, 2, 1), node(300L, "省区", 200L, 3, 1)))));
+
+        StoreOrgStatisticsRespVO result = service.getStatistics(7L, null, "2026-08");
+
+        assertEquals("200", result.getOrgId());
+        assertEquals("小组", result.getOrgName());
+        assertEquals(1L, result.getTotalStoreCount());
+        assertEquals("300", result.getItems().get(0).getOrgId());
+    }
+
+    @Test
+    void shouldRejectUserWithoutDefaultOrganization() {
+        when(storeOrgSnapshotApi.getUserDefaultOrgId(7L)).thenReturn(CommonResult.success(null));
+        when(storeOrgSnapshotApi.listManageableOrgIds(7L)).thenReturn(CommonResult.success(Set.of()));
+
+        assertThrows(com.htyoudao.youdao.framework.common.exception.ServiceException.class,
+                () -> service.getStatistics(7L, null, "2026-08"));
+        verifyNoInteractions(snapshotMapper);
+    }
+
+    @Test
     void shouldReturnDynamicOrganizationTreeFromSelectedOrganization() throws Exception {
         when(storeOrgSnapshotApi.listManageableOrgIds(7L))
                 .thenReturn(CommonResult.success(Set.of(100L, 200L, 300L, 400L)));
@@ -100,6 +127,7 @@ class StoreOrgStatisticsServiceTest {
         assertEquals(2L, cityResult.getTotalStoreCount());
         assertEquals(2L, cityResult.getDirectStoreCount());
         assertTrue(cityResult.getItems().isEmpty());
+        verify(storeOrgSnapshotApi, never()).getUserDefaultOrgId(any());
     }
 
     @Test

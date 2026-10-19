@@ -22,4 +22,10 @@ public interface StoreOrgSnapshotApi {
      * 查询用户在当前项目内可管理的组织（用户直属组织及其全部下级）。
      */
     CommonResult<Set<Long>> listManageableOrgIds(Long userId);
+
+    /**
+     * 查询用户在当前项目所属的默认组织，无有效所属组织时返回 null。
+     * 多个所属组织按层级、排序值、ID 升序取第一个，不包含仅有管理权限的下级组织。
+     */
+    CommonResult<Long> getUserDefaultOrgId(Long userId);
 }

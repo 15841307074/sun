@@ -2,6 +2,7 @@ package com.htyoudao.youdao.module.analysis.service.anomaly;
 
 import com.baomidou.dynamic.datasource.annotation.DS;
 import com.htyoudao.youdao.module.analysis.AnalysisServerApplication;
+import com.htyoudao.youdao.module.analysis.dal.dataobject.anomaly.StoreAnomalyWeeklyDO;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,6 +16,7 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
 
@@ -26,6 +28,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.times;
 
 class ComplaintAnomalyDataSourceServiceTest {
 
@@ -85,6 +88,50 @@ class ComplaintAnomalyDataSourceServiceTest {
         assertEquals(1, service.mergeWeek(10L, 2026, 41, List.of(metric)));
         verify(jdbcTemplate).batchUpdate(
                 org.mockito.ArgumentMatchers.startsWith("INSERT INTO store_anomaly_metrics_weekly"), any(List.class));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void shouldUpdateExistingEmptyMetricRowAndInsertOnlyMissingStore() {
+        ComplaintAnomalyWeeklyMysqlService service = new ComplaintAnomalyWeeklyMysqlService();
+        ReflectionTestUtils.setField(service, "jdbcTemplate", jdbcTemplate);
+        StoreAnomalyWeeklyDO existing = new StoreAnomalyWeeklyDO();
+        existing.setId(101L);
+        existing.setStoreId(1L);
+        existing.setDeleted(true);
+        StoreAnomalyWeeklyDO otherMetrics = new StoreAnomalyWeeklyDO();
+        otherMetrics.setId(103L);
+        otherMetrics.setStoreId(3L);
+        otherMetrics.setWeeklyTurnover(new BigDecimal("500.00"));
+        when(jdbcTemplate.query(anyString(), any(RowMapper.class), eq(10L), eq(2026), eq(41)))
+                .thenReturn(List.of(existing, otherMetrics));
+        var existingMetric = new ComplaintMetricClickHouseQueryService.ComplaintMetric(1L, "已有门店", 2, 10, 1);
+        var missingMetric = new ComplaintMetricClickHouseQueryService.ComplaintMetric(2L, "补全门店", 1, 20, 0);
+
+        var otherMetric = new ComplaintMetricClickHouseQueryService.ComplaintMetric(3L, "已有营业额门店", 1, 10, 0);
+        assertEquals(3, service.mergeWeek(10L, 2026, 41, List.of(existingMetric, missingMetric, otherMetric)));
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<List<Object[]>> batches = ArgumentCaptor.forClass(List.class);
+        verify(jdbcTemplate, times(2)).batchUpdate(sql.capture(), batches.capture());
+        assertTrue(sql.getAllValues().get(0).startsWith("UPDATE store_anomaly_metrics_weekly"));
+        assertFalse(sql.getAllValues().get(0).contains("weekly_turnover="));
+        Object[] update = batches.getAllValues().get(0).get(0);
+        assertEquals(new BigDecimal("20.00"), update[1]);
+        assertEquals(2L, update[2]);
+        assertEquals(10L, update[3]);
+        assertEquals(0, update[7]);
+        assertEquals(101L, update[8]);
+        assertEquals(10L, update[9]);
+        assertEquals(2, batches.getAllValues().get(0).size());
+        assertTrue(sql.getAllValues().get(1).startsWith("INSERT INTO store_anomaly_metrics_weekly"));
+        assertEquals(1, batches.getAllValues().get(1).size());
+        Object[] insert = batches.getAllValues().get(1).get(0);
+        assertEquals(10L, insert[0]);
+        assertEquals(2L, insert[1]);
+        assertEquals(new BigDecimal("5.00"), insert[5]);
+        assertEquals(20L, insert[7]);
+        assertEquals(new BigDecimal("500.00"), otherMetrics.getWeeklyTurnover());
     }
 
     @Test

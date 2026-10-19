@@ -70,6 +70,27 @@ public class StoreOrgSnapshotQueryServiceImpl implements StoreOrgSnapshotQuerySe
         return result;
     }
 
+    @Override
+    public Long getUserDefaultOrgId(Long userId) {
+        if (userId == null) {
+            throw new IllegalArgumentException("用户ID不能为空");
+        }
+        Long businessId = BusinessContextHolder.getRequiredBusinessId();
+        Set<Long> directOrgIds = new HashSet<>(
+                orgUserMapper.selectUserOrgIdsByBusinessId(userId, businessId));
+        if (directOrgIds.isEmpty()) {
+            return null;
+        }
+        // 默认组织只从当前项目的有效所属组织中选取，多个组织时保持稳定顺序。
+        return loadOrgMap(businessId).values().stream()
+                .filter(org -> directOrgIds.contains(org.getId()))
+                .sorted(Comparator.comparing(OrgDO::getLevel, Comparator.nullsLast(Integer::compareTo))
+                        .thenComparing(OrgDO::getSort, Comparator.nullsLast(Integer::compareTo))
+                        .thenComparing(OrgDO::getId))
+                .map(OrgDO::getId)
+                .findFirst().orElse(null);
+    }
+
     private Map<Long, OrgDO> loadOrgMap(Long businessId) {
         return orgMapper.selectList(new LambdaQueryWrapperX<OrgDO>()
                         .eq(OrgDO::getBusinessId, businessId)

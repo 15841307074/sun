@@ -29,4 +29,9 @@ public class StoreOrgSnapshotApiImpl implements StoreOrgSnapshotApi {
     public CommonResult<Set<Long>> listManageableOrgIds(Long userId) {
         return success(queryService.listManageableOrgIds(userId));
     }
+
+    @Override
+    public CommonResult<Long> getUserDefaultOrgId(Long userId) {
+        return success(queryService.getUserDefaultOrgId(userId));
+    }
 }

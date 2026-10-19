@@ -25,6 +25,7 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class StoreOrgSnapshotQueryServiceImplTest {
@@ -84,8 +85,41 @@ class StoreOrgSnapshotQueryServiceImplTest {
     }
 
     @Test
+    void shouldDefaultToOwnOrganizationWithStableOrder() {
+        BusinessContextHolder.setBusinessId(20L);
+        when(orgUserMapper.selectUserOrgIdsByBusinessId(7L, 20L)).thenReturn(List.of(400L, 300L, 200L, 999L));
+        when(orgMapper.selectList(orgWrapper())).thenReturn(List.of(
+                org(100L, "总部", 0L, 1, 1),
+                org(400L, "小组二", 100L, 2, 2),
+                org(300L, "省区", 200L, 3, 1),
+                org(200L, "小组一", 100L, 2, 1)));
+
+        assertEquals(200L, service.getUserDefaultOrgId(7L));
+    }
+
+    @Test
+    void shouldReturnNullWithoutOrganizationMembership() {
+        BusinessContextHolder.setBusinessId(10L);
+        when(orgUserMapper.selectUserOrgIdsByBusinessId(7L, 10L)).thenReturn(List.of());
+
+        assertNull(service.getUserDefaultOrgId(7L));
+        verifyNoInteractions(orgMapper, storeMapper);
+    }
+
+    @Test
+    void shouldIgnoreMembershipOfUnavailableOrganization() {
+        BusinessContextHolder.setBusinessId(10L);
+        when(orgUserMapper.selectUserOrgIdsByBusinessId(7L, 10L)).thenReturn(List.of(999L));
+        when(orgMapper.selectList(orgWrapper())).thenReturn(List.of(org(100L, "总部", 0L, 1, 1)));
+
+        assertNull(service.getUserDefaultOrgId(7L));
+    }
+
+    @Test
     void shouldFailWithoutBusinessContext() {
         assertThrows(NullPointerException.class, service::listNormalStoreOrgData);
+        assertThrows(NullPointerException.class, () -> service.getUserDefaultOrgId(7L));
+        verifyNoInteractions(orgUserMapper, orgMapper, storeMapper);
     }
 
     private SystemStoreInfoDO store(Long storeId, Long orgId) {

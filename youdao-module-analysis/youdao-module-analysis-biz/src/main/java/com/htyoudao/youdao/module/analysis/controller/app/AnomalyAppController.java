@@ -106,8 +106,8 @@ public class AnomalyAppController {
     @GetMapping("/anomaly-report/org-store-statistics")
     @Operation(summary = "查询月度门店组织统计")
     public CommonResult<StoreOrgStatisticsRespVO> getOrgStoreStatistics(
-            @Parameter(description = "组织ID", required = true)
-            @RequestParam("orgId") Long orgId,
+            @Parameter(description = "组织ID，不传时使用当前登录人在当前项目所属的默认组织")
+            @RequestParam(value = "orgId", required = false) Long orgId,
             @Parameter(description = "月份，格式 yyyy-MM", required = true, example = "2026-08")
             @RequestParam("month") String month) {
         Long userId = SecurityFrameworkUtils.getLoginUserId();

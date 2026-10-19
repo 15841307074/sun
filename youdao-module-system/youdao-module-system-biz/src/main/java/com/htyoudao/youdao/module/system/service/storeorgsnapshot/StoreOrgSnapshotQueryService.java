@@ -11,4 +11,6 @@ public interface StoreOrgSnapshotQueryService {
     List<StoreOrgSnapshotDTO> listNormalStoreOrgData();
 
     Set<Long> listManageableOrgIds(Long userId);
+
+    Long getUserDefaultOrgId(Long userId);
 }

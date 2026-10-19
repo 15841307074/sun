@@ -38,12 +38,15 @@ public class StoreOrgStatisticsService {
     @DubboReference
     private StoreOrgSnapshotApi storeOrgSnapshotApi;
 
-    /** 查询指定月份、指定组织及其全部下级的门店统计。 */
+    /** 查询指定月份的组织门店统计，未选组织时默认使用登录人所属组织。 */
     public StoreOrgStatisticsRespVO getStatistics(Long userId, Long orgId, String month) {
         Long businessId = BusinessContextHolder.getRequiredBusinessId();
         LocalDate snapshotMonth = parseMonth(month);
+        if (orgId == null) {
+            orgId = storeOrgSnapshotApi.getUserDefaultOrgId(userId).getCheckedData();
+        }
         Set<Long> manageableOrgIds = storeOrgSnapshotApi.listManageableOrgIds(userId).getCheckedData();
-        if (manageableOrgIds == null || !manageableOrgIds.contains(orgId)) {
+        if (orgId == null || manageableOrgIds == null || !manageableOrgIds.contains(orgId)) {
             throw exception(STORE_ORG_PERMISSION_DENIED);
         }
 

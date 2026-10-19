@@ -40,7 +40,8 @@ public class ComplaintAnomalyWeeklyMysqlService {
     /**
      * 合并指定项目、指定周的投诉指标。
      *
-     * <p>已有记录只更新投诉字段，其他经营异常指标保持不变；同周重跑不会新增重复记录。</p>
+     * <p>按项目、年、周和门店匹配，已有行即使投诉指标为空也做更新，缺少门店行才插入补全。
+     * 只更新投诉相关字段，保留其他经营异常指标；同周重跑不会新增重复记录。</p>
      */
     @Transactional(rollbackFor = Exception.class)
     public int mergeWeek(Long businessId, int statYear, int statWeek,
