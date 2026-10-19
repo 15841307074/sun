@@ -35,6 +35,7 @@ import com.htyoudao.youdao.module.member.enums.EventType;
 import com.htyoudao.youdao.module.member.service.crowd.CustomCrowdService;
 import com.htyoudao.youdao.module.member.service.crowd.WxMemberCrowdRefService;
 import com.htyoudao.youdao.module.member.service.pointsLog.IPointsLogService;
+import com.htyoudao.youdao.module.member.service.pointsLog.FrozenPointsReleaseService;
 import com.htyoudao.youdao.module.member.service.wxmember.IEventService;
 import com.htyoudao.youdao.module.member.service.wxmember.WxMemberService;
 import com.htyoudao.youdao.module.member.util.DateUtils;
@@ -49,6 +50,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.dubbo.config.annotation.DubboReference;
 import org.elasticsearch.client.ResponseException;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.TransientDataAccessException;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.dao.InvalidDataAccessResourceUsageException;
+import org.springframework.dao.PermissionDeniedDataAccessException;
+import org.redisson.api.RedissonClient;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -103,6 +110,15 @@ public class JobServiceImpl implements JobService{
     private IPointsLogService pointsLogService;
 
     @Resource
+    private FrozenPointsReleaseService frozenPointsReleaseService;
+
+    @Resource
+    private RedissonClient redissonClient;
+
+    @Value("${member.points.unfreeze.batch-size:200}")
+    private int unfreezeBatchSize = 200;
+
+    @Resource
     private WxMemberService wxMemberService;
 
     @Resource
@@ -131,149 +147,93 @@ public class JobServiceImpl implements JobService{
 
     @Override
     @DS(DsNameConstants.SHARDING)
-    @DSTransactional
     @DataPermission(enable = false)
     public void updateMemberPointTask(int start, int end, long memberId, long businessId) {
-        String busId = null;
-        if(businessId != 0){
-            busId = String.valueOf(businessId);
-        }else{
-            busId = XxlJobHelper.getJobParam();
-        }
-
-        if(StringUtils.isBlank(busId)){
-            log.error("释放冻结积分定时任务，获取项目失败");
+        String value = businessId == 0 ? XxlJobHelper.getJobParam() : String.valueOf(businessId);
+        if (StringUtils.isBlank(value)) throw new IllegalArgumentException("释放冻结积分任务缺少项目编号");
+        long projectId = Long.parseLong(value.trim());
+        if (projectId <= 0) throw new IllegalArgumentException("释放冻结积分任务项目编号无效");
+        int days = Math.max(start, 2);
+        if (end > 0 && end <= days) throw new IllegalArgumentException("解冻结束天数必须大于开始天数");
+        LocalDateTime now = LocalDateTime.now(BUSINESS_ZONE);
+        LocalDateTime frozenBefore = now.minusDays(days);
+        // 默认任务补偿所有达到解冻期限的冻结记录；人工指定 end 时仍按指定范围处理。
+        LocalDateTime notBefore = end > 0 ? now.minusDays(end) : null;
+        // 非阻塞分布式锁：同项目不叠加执行，使用已有 Redisson watchdog 续期。
+        var lock = redissonClient.getLock("member:points:unfreeze:" + projectId);
+        if (!lock.tryLock()) {
+            log.info("冻结积分任务已有实例执行，businessId={}", projectId);
             return;
         }
-
-        int unit = 24;
-        start = Math.max(start, 2);
-        int minusHours1 = unit * start;
-        int minusHours2 = unit * end;
-        // 使用分页查询，每次处理一部分数据
-        int pageSize = 10000;
-        int pageNum = 1;
-        boolean hasMore = true;
-        // 查询用户冻结积分
-        QueryWrapperX<PointsLogDO> baseLqw = new QueryWrapperX<>();
-        LambdaQueryWrapper<PointsLogDO> baseExpiredPointsQuery = new LambdaQueryWrapper<>();
-        baseLqw.select("member_id", "SUM(points_change) as points_change");
-        if(memberId != 0){
-            baseLqw.eq("member_id", memberId);
-            baseExpiredPointsQuery.eq(PointsLogDO::getMemberId, memberId);
-        }
-        baseLqw.eq("points_type", 4)
-                .le("create_time", LocalDateTime.now().minusHours(minusHours1 == 0 ? 48 : minusHours1))
-                .ge("create_time", LocalDateTime.now().minusHours(minusHours2 == 0 ? 72 : minusHours2))
-                .eq("business_id", busId)
-                .groupBy("member_id");
-        baseExpiredPointsQuery.eq(PointsLogDO::getPointsType, 4)
-                .le(PointsLogDO::getCreateTime, LocalDateTime.now().minusHours(minusHours1 == 0 ? 48 : minusHours1))
-                .ge(PointsLogDO::getCreateTime, LocalDateTime.now().minusHours(minusHours2 == 0 ? 72 : minusHours2))
-                .eq(PointsLogDO::getBusinessId, busId);
-        while(hasMore){
-            QueryWrapper<PointsLogDO> lqw = baseLqw.clone();
-            lqw.last("limit " + (pageNum - 1) * pageSize + "," + pageSize);
-            log.info("lqw where条件语句：{}", lqw.getSqlSegment());
-            List<PointsLogDO> pointsLogDOS = pointsLogMapper.selectList(lqw);
-            Map<Long, Long> memberPointsMap = pointsLogDOS.stream()
-                    .collect(Collectors.toMap(PointsLogDO::getMemberId, PointsLogDO::getPointsChange));
-            //  需清理的积分
-            if (memberPointsMap.isEmpty()) {
-                hasMore = false;
-                continue;
-            }
-            List<WxMemberDO> memberList = memberPointsMap.entrySet().stream()
-                    .filter(entry -> memberPointsMap.containsKey(entry.getKey()))
-                    .map(entry -> {
-                        WxMemberDO member = new WxMemberDO();
-                        member.setMemberId(entry.getKey());
-                        member.setMemberIntegral(entry.getValue().intValue());
-                        return member;
-                    })
-                    .filter(Objects::nonNull)
-                    .collect(Collectors.toList());
-            log.info(">>> 开始解冻积分，解冻积分={}", memberList);
-            updateWxMemberPointsBatch(memberList, busId);
-            // 页码增加
-            pageNum++;
-        }
-        // 批量更新积分记录
-        // 查询过期积分记录
-        pageNum = 1;
-        hasMore = true;
-        while(hasMore){
-            LambdaQueryWrapper<PointsLogDO> expiredPointsQuery = baseExpiredPointsQuery.clone();
-            expiredPointsQuery.last("limit " + (pageNum - 1) * pageSize + "," + pageSize);
-            log.info("expiredPointsQuery where条件语句：{}", expiredPointsQuery.getSqlSegment());
-            List<PointsLogDO> pointsLogs = pointsLogMapper.selectList(expiredPointsQuery);
-            pointsLogs.forEach(pointsLog -> pointsLog.setPointsType(1));
-            log.info(">>> 开始更新积分记录，解冻积分={}", pointsLogs);
-            if (pointsLogs.isEmpty()) {
-                hasMore = false;
-                continue;
-            }
-            // 更新积分记录
-            for (PointsLogDO pointsLog : pointsLogs) {
-                LambdaQueryWrapper<PointsLogDO> qw = new LambdaQueryWrapper<>();
-                qw.eq(PointsLogDO::getPointsLogId, pointsLog.getPointsLogId());
-                qw.eq(PointsLogDO::getShardingValue, pointsLog.getMemberId() % 10);
-                pointsLogMapper.update(pointsLog, qw);
-            }
-            pageNum ++;
-        }
-
-
-
-    }
-
-    public void updateWxMemberPointsBatch(List<WxMemberDO> batch, String businessId) {
-        // 缓存会员卡等级信息
-        Map<Long, WxMemberCardDO> memberCardCache = new HashMap<>();
-        for (WxMemberDO wxMember : batch) {
-            Long memberIntegral = wxMember.getMemberIntegral().longValue();
-            if (!memberCardCache.containsKey(memberIntegral)) {
-                LambdaQueryWrapper<WxMemberCardDO> qw = new LambdaQueryWrapper<>();
-                qw.gt(WxMemberCardDO::getMaxPointsThreshold, memberIntegral);
-                qw.lt(WxMemberCardDO::getMinPointsThreshold, memberIntegral);
-                qw.eq(WxMemberCardDO::getCardStatus, 1);
-                qw.eq(WxMemberCardDO::getBusinessId, businessId);
-                WxMemberCardDO wxMemberCard = wxMemberCardMapper.selectOne(qw);
-                memberCardCache.put(memberIntegral, wxMemberCard);
-            }
-        }
-
-        // 处理每个会员
-        for (WxMemberDO wxMember : batch) {
-//            LambdaQueryWrapper<WxMemberDO> wxQw = new LambdaQueryWrapper<>();
-//            wxQw.eq(WxMemberDO::getMemberId, wxMember.getMemberId());
-//            wxQw.eq(WxMemberDO::getShardingValue, wxMember.getMemberId() % 10);
-//            WxMemberDO existingMember = wxMemberMapper.selectById(wxMember.getMemberId());
-            WxMemberDO existingMember =wxMemberService.selectByIdAndBusinessId(wxMember.getMemberId(), businessId);
-            if (existingMember != null && existingMember.getFreezePoints() > 0 && existingMember.getFreezePoints() - wxMember.getMemberIntegral() >= 0&&existingMember.getMemberIntegral() + wxMember.getMemberIntegral()>0) {
-                // 用户对象的可用积分
-                existingMember.setMemberIntegral(existingMember.getMemberIntegral() + wxMember.getMemberIntegral());
-                // 用户对象的总积分
-                existingMember.setIntegralFrozen(existingMember.getIntegralFrozen() + wxMember.getMemberIntegral());
-                // 冻结积分更新
-                existingMember.setFreezePoints(existingMember.getFreezePoints() - wxMember.getMemberIntegral());
-
-                // 更新会员卡等级
-                WxMemberCardDO wxMemberCard = memberCardCache.get(wxMember.getMemberIntegral());
-                if (wxMemberCard != null) {
-                    existingMember.setMemberLevel(wxMemberCard.getMemberLevel());
+        int failed = 0;
+        int released = 0;
+        int limit = Math.max(1, Math.min(unfreezeBatchSize, 500));
+        Set<Long> blockedMembers = new HashSet<>();
+        Map<Long, Integer> levels = new HashMap<>();
+        try {
+            int firstShard = memberId == 0 ? 0 : (int) (memberId % 10);
+            int lastShard = memberId == 0 ? 9 : firstShard;
+            // 不创建线程池；一次只扫描一个分片，查询连接在进入解冻事务前释放。
+            for (int shard = firstShard; shard <= lastShard; shard++) {
+                LocalDateTime cursorTime = null;
+                Long cursorId = null;
+                while (true) {
+                    var rows = frozenPointsReleaseService.pending(projectId, shard, memberId, frozenBefore, notBefore,
+                            cursorTime, cursorId, limit);
+                    if (rows.isEmpty()) break;
+                    var tail = rows.get(rows.size() - 1);
+                    cursorTime = tail.getCreateTime();
+                    cursorId = tail.getPointsLogId();
+                    Map<Long, List<Long>> groups = new LinkedHashMap<>();
+                    for (var row : rows) groups.computeIfAbsent(row.getMemberId(), ignored -> new ArrayList<>()).add(row.getPointsLogId());
+                    for (var group : groups.entrySet()) {
+                        long currentMember = group.getKey();
+                        if (blockedMembers.contains(currentMember)) continue;
+                        if (!levels.containsKey(currentMember)) {
+                            Integer level = null;
+                            try { level = frozenPointsReleaseService.memberLevel(currentMember, projectId, frozenBefore, notBefore); }
+                            catch (DataAccessResourceFailureException unavailable) { throw unavailable; }
+                            catch (RuntimeException error) {
+                                log.warn("会员卡等级匹配失败，保留原等级并继续解冻，businessId={}, memberId={}", projectId, currentMember, error);
+                            }
+                            levels.put(currentMember, level);
+                        }
+                        try {
+                            released += frozenPointsReleaseService.release(currentMember, projectId, group.getValue(), frozenBefore, notBefore, levels.get(currentMember));
+                        } catch (DataAccessResourceFailureException unavailable) {
+                            throw unavailable; // 数据库不可用时快速停止，避免反复抢连接。
+                        } catch (InvalidDataAccessResourceUsageException | PermissionDeniedDataAccessException configurationError) {
+                            throw configurationError; // SQL/权限错误不是单条脏数据，不能逐条反复尝试。
+                        } catch (FrozenPointsReleaseService.AccountUnavailable | TransientDataAccessException blocked) {
+                            failed += group.getValue().size();
+                            blockedMembers.add(currentMember);
+                            log.info("会员解冻暂不可执行，跳过本次其他同会员记录，下次继续重试，businessId={}, memberId={}, reason={}", projectId, currentMember, blocked.getMessage());
+                        } catch (RuntimeException batchError) {
+                            // 整批已回滚。仅对数据/明细异常降级为单条事务，一条失败不毒化整个批次。
+                            for (long id : group.getValue()) {
+                                try {
+                                    released += frozenPointsReleaseService.release(currentMember, projectId, List.of(id), frozenBefore, notBefore, levels.get(currentMember));
+                                } catch (DataAccessResourceFailureException unavailable) { throw unavailable; }
+                                catch (InvalidDataAccessResourceUsageException | PermissionDeniedDataAccessException configurationError) { throw configurationError; }
+                                catch (FrozenPointsReleaseService.AccountUnavailable | TransientDataAccessException blocked) {
+                                    failed++;
+                                    blockedMembers.add(currentMember);
+                                    log.info("会员解冻暂不可执行，businessId={}, memberId={}, pointsLogId={}, reason={}", projectId, currentMember, id, blocked.getMessage());
+                                    break;
+                                } catch (RuntimeException recordError) {
+                                    failed++;
+                                    log.info("单条冻结积分暂未解冻，保留记录重试，businessId={}, memberId={}, pointsLogId={}, reason={}", projectId, currentMember, id, recordError.getMessage());
+                                }
+                            }
+                        }
+                    }
                 }
-
-                // 更新用户积分
-//                wxMemberMapper.update(existingMember, wxQw);
-                wxMemberService.updateMemberByJustIdAndBusinessId(existingMember.getMemberId(), businessId, existingMember);
-//                wxMemberMapper.updateById(existingMember);
-            } else {
-                log.warn(">>> 未找到memberId={}的用户", wxMember.getMemberId());
             }
+            // 单条/会员账户异常已经回滚并记录；保留冻结状态供下次检查，不将整次任务标记为失败。
+            log.info("冻结积分任务结束，businessId={}，已解冻明细={}，暂未解冻明细={}，跳过会员数={}", projectId, released, failed, blockedMembers.size());
+        } finally {
+            if (lock.isHeldByCurrentThread()) lock.unlock();
         }
-
-
     }
 
     @Override
