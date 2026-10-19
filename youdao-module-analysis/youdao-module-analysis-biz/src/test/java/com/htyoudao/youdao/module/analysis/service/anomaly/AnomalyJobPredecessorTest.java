@@ -25,11 +25,11 @@ class AnomalyJobPredecessorTest {
     }
     @AfterEach void cleanup() { BusinessContextHolder.clear(); }
 
-    @Test void eachAggregationRequiresSnapshotAndMatchingSource() {
+    @Test void eachAggregationRequiresItsActualPredecessors() {
         Map<AnomalyJobTypeEnum, List<AnomalyJobTypeEnum>> expected = Map.of(
                 AnomalyJobTypeEnum.REPORT_WEEK, List.of(AnomalyJobTypeEnum.SNAPSHOT_WEEK, AnomalyJobTypeEnum.SOURCE_WEEK_ANOMALY),
-                AnomalyJobTypeEnum.REPORT_MONTH_SALES, List.of(AnomalyJobTypeEnum.SNAPSHOT_MONTH, AnomalyJobTypeEnum.SOURCE_MONTH_PRODUCT_SALES),
-                AnomalyJobTypeEnum.REPORT_MONTH_ZERO, List.of(AnomalyJobTypeEnum.SNAPSHOT_MONTH, AnomalyJobTypeEnum.SOURCE_MONTH_ZERO_ORDER));
+                AnomalyJobTypeEnum.REPORT_MONTH_SALES, List.of(AnomalyJobTypeEnum.SNAPSHOT_MONTH),
+                AnomalyJobTypeEnum.REPORT_MONTH_ZERO, List.of(AnomalyJobTypeEnum.SNAPSHOT_MONTH));
         for (var entry : expected.entrySet()) {
             assertEquals(entry.getValue(), entry.getKey().getPredecessors());
             for (var dependency : entry.getValue()) {
@@ -53,8 +53,7 @@ class AnomalyJobPredecessorTest {
     }
     @Test void upstreamAndSnapshotsHaveNoPredecessorsWhilePushKeepsItsReportDependency() {
         for (var type : List.of(AnomalyJobTypeEnum.SNAPSHOT_WEEK, AnomalyJobTypeEnum.SNAPSHOT_MONTH,
-                AnomalyJobTypeEnum.SOURCE_WEEK_ANOMALY, AnomalyJobTypeEnum.SOURCE_MONTH_PRODUCT_SALES,
-                AnomalyJobTypeEnum.SOURCE_MONTH_ZERO_ORDER)) {
+                AnomalyJobTypeEnum.SOURCE_WEEK_ANOMALY)) {
             assertTrue(type.getPredecessors().isEmpty());
             assertTrue(service.isPredecessorSuccess(type, period));
         }
@@ -67,25 +66,23 @@ class AnomalyJobPredecessorTest {
         List<AnomalyJobTypeEnum> ordered = List.of(AnomalyJobTypeEnum.SNAPSHOT_WEEK, AnomalyJobTypeEnum.SNAPSHOT_MONTH,
                 AnomalyJobTypeEnum.REPORT_WEEK, AnomalyJobTypeEnum.REPORT_MONTH_SALES, AnomalyJobTypeEnum.REPORT_MONTH_ZERO,
                 AnomalyJobTypeEnum.PUSH_WEEK, AnomalyJobTypeEnum.PUSH_MONTH_SALES, AnomalyJobTypeEnum.PUSH_MONTH_ZERO,
-                AnomalyJobTypeEnum.SOURCE_WEEK_ANOMALY, AnomalyJobTypeEnum.SOURCE_MONTH_PRODUCT_SALES,
-                AnomalyJobTypeEnum.SOURCE_MONTH_ZERO_ORDER);
+                AnomalyJobTypeEnum.SOURCE_WEEK_ANOMALY);
         List<String> handlers = List.of("analysisUserStoreSnapshotWeekJobHandler", "analysisUserStoreSnapshotMonthJobHandler",
                 "analysisWeekAnomalyJobHandler", "analysisMonthProductSalesJobHandler", "analysisMonthZeroOrderJobHandler",
                 "analysisWeekAnomalyPushJobHandler", "analysisMonthProductSalesPushJobHandler", "analysisMonthZeroOrderPushJobHandler",
-                "analysisComplaintAnomalyWeekJobHandler", "analysisSourceMonthProductSalesJobHandler", "analysisSourceMonthZeroOrderJobHandler");
+                "analysisComplaintAnomalyWeekJobHandler");
         for (int i = 0; i < ordered.size(); i++) {
             assertEquals(i + 1, ordered.get(i).getType());
             assertEquals(handlers.get(i), ordered.get(i).getHandler());
             assertSame(ordered.get(i), AnomalyJobTypeEnum.valueOfType(i + 1));
         }
-        assertEquals(11, Arrays.stream(AnomalyJobTypeEnum.values()).map(AnomalyJobTypeEnum::getHandler).distinct().count());
+        assertEquals(9, Arrays.stream(AnomalyJobTypeEnum.values()).map(AnomalyJobTypeEnum::getHandler).distinct().count());
         assertNull(AnomalyJobTypeEnum.valueOfType(null));
-        assertNull(AnomalyJobTypeEnum.valueOfType(12));
+        assertNull(AnomalyJobTypeEnum.valueOfType(10));
         assertThrows(UnsupportedOperationException.class, () -> AnomalyJobTypeEnum.REPORT_WEEK.getPredecessors().clear());
     }
     @Test void upstreamSuccessRecordsCorrectProjectHandlerAndPeriodTypeEvenWithZeroRows() {
-        for (var type : List.of(AnomalyJobTypeEnum.SOURCE_WEEK_ANOMALY,
-                AnomalyJobTypeEnum.SOURCE_MONTH_PRODUCT_SALES, AnomalyJobTypeEnum.SOURCE_MONTH_ZERO_ORDER)) {
+        for (var type : List.of(AnomalyJobTypeEnum.SOURCE_WEEK_ANOMALY)) {
             reset(mapper);
             LocalDate start = type.isMonthly() ? period : LocalDate.of(2026, 10, 12);
             service.recordSuccess(type, start, 0, LocalDateTime.now());
@@ -94,7 +91,7 @@ class AnomalyJobPredecessorTest {
             var row = captor.getValue();
             assertEquals(10L, row.getBusinessId()); assertEquals(type.getType(), row.getJobType());
             assertEquals(type.getHandler(), row.getJobHandler()); assertEquals(start, row.getPeriodStart());
-            assertEquals(type == AnomalyJobTypeEnum.SOURCE_WEEK_ANOMALY ? 1 : 2, row.getPeriodType());
+            assertEquals(1, row.getPeriodType());
             assertEquals(1, row.getJobStatus()); assertEquals(0, row.getRecordCount());
         }
     }

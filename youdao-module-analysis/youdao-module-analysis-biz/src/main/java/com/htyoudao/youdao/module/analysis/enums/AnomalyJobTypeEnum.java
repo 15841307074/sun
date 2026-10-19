@@ -11,8 +11,8 @@ import java.util.List;
  * <p>依赖关系（箭头从前置任务指向后续任务）：
  * <pre>
  * 周快照(1) + 上游周异常(9) → 周聚合(3) → 周推送(6)
- * 月快照(2) + 上游月销量(10) → 月销量聚合(4) → 月销量推送(7)
- * 月快照(2) + 上游月零订单(11) → 月0订单聚合(5) → 月0订单推送(8)
+ * 月快照(2) → 月销量聚合(4) → 月销量推送(7)
+ * 月快照(2) → 月0订单聚合(5) → 月0订单推送(8)
  * </pre>
  */
 public enum AnomalyJobTypeEnum {
@@ -26,13 +26,9 @@ public enum AnomalyJobTypeEnum {
     SNAPSHOT_MONTH(2, "月快照", "analysisUserStoreSnapshotMonthJobHandler"),
 
     // ==================== 上游数据任务 ====================
-    // 常量需先声明供聚合引用；编号仍接续原有1~8，严禁用ordinal代替type。
+    // 常量需先声明供聚合引用；编号接续原有1~8，严禁用ordinal代替type。
     /** 周度投诉异常指标计算完成标记，无本模块前置依赖。 */
     SOURCE_WEEK_ANOMALY(9, "周度投诉异常指标计算", "analysisComplaintAnomalyWeekJobHandler"),
-    /** 上游生成月度货品销量异常数据。 */
-    SOURCE_MONTH_PRODUCT_SALES(10, "月度货品销量异常数据生成", "analysisSourceMonthProductSalesJobHandler"),
-    /** 上游生成月度货品零订单异常数据。 */
-    SOURCE_MONTH_ZERO_ORDER(11, "月度货品零订单异常数据生成", "analysisSourceMonthZeroOrderJobHandler"),
 
     // ==================== 报告聚合 ====================
 
@@ -40,10 +36,10 @@ public enum AnomalyJobTypeEnum {
     REPORT_WEEK(3, "周聚合", "analysisWeekAnomalyJobHandler", SNAPSHOT_WEEK, SOURCE_WEEK_ANOMALY),
 
     /** 月销量聚合：每月 1 号 07:00，从销量异常月表取异常门店按人聚合 */
-    REPORT_MONTH_SALES(4, "月销量聚合", "analysisMonthProductSalesJobHandler", SNAPSHOT_MONTH, SOURCE_MONTH_PRODUCT_SALES),
+    REPORT_MONTH_SALES(4, "月销量聚合", "analysisMonthProductSalesJobHandler", SNAPSHOT_MONTH),
 
     /** 月0订单聚合：每月 1 号 07:00，从0订单异常月表取异常门店按人聚合 */
-    REPORT_MONTH_ZERO(5, "月0订单聚合", "analysisMonthZeroOrderJobHandler", SNAPSHOT_MONTH, SOURCE_MONTH_ZERO_ORDER),
+    REPORT_MONTH_ZERO(5, "月0订单聚合", "analysisMonthZeroOrderJobHandler", SNAPSHOT_MONTH),
 
     // ==================== 推送 ====================
 
@@ -128,11 +124,10 @@ public enum AnomalyJobTypeEnum {
     }
 
     /**
-     * 是否月度任务（包含上游月度数据任务），用于执行记录的周期类型
+     * 是否月度任务，用于执行记录的周期类型
      */
     public boolean isMonthly() {
         return this == SNAPSHOT_MONTH || this == REPORT_MONTH_SALES || this == REPORT_MONTH_ZERO
-                || this == PUSH_MONTH_SALES || this == PUSH_MONTH_ZERO
-                || this == SOURCE_MONTH_PRODUCT_SALES || this == SOURCE_MONTH_ZERO_ORDER;
+                || this == PUSH_MONTH_SALES || this == PUSH_MONTH_ZERO;
     }
 }
