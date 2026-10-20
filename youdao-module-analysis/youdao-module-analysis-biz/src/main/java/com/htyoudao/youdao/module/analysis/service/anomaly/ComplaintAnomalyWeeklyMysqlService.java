@@ -87,6 +87,7 @@ public class ComplaintAnomalyWeeklyMysqlService {
         return loadCurrentRows(businessId, statYear, statWeek, false).stream()
                 .filter(row -> !Boolean.TRUE.equals(row.getDeleted()))
                 .filter(row -> !isEmptyMetricRow(row))
+                .filter(row -> !row.hasOnlyNormalComplaintStatistics())
                 .toList();
     }
 
@@ -190,23 +191,18 @@ public class ComplaintAnomalyWeeklyMysqlService {
 
     private void applyComplaintMetric(StoreAnomalyWeeklyDO row,
                                       ComplaintMetricClickHouseQueryService.ComplaintMetric metric) {
-        if (metric == null) {
-            row.setComplaintOrderRatio(null);
-            row.setComplaintOrderCount(null);
-            row.setValidOrderCount(null);
-            row.setFoodHygieneComplaintOrderCount(null);
-            return;
-        }
-        if ((row.getStoreName() == null || row.getStoreName().isBlank()) && metric.storeName() != null) {
+        if (metric != null && (row.getStoreName() == null || row.getStoreName().isBlank()) && metric.storeName() != null) {
             row.setStoreName(metric.storeName());
         }
-        row.setComplaintOrderCount(metric.complaintCount());
-        row.setValidOrderCount(metric.validOrderCount());
-        row.setComplaintOrderRatio(metric.validOrderCount() == 0 ? null
-                : BigDecimal.valueOf(metric.complaintCount())
+        long complaintCount = metric == null ? 0L : metric.complaintCount();
+        long validCount = metric == null ? 0L : metric.validOrderCount();
+        row.setComplaintOrderCount(complaintCount);
+        row.setValidOrderCount(validCount);
+        row.setComplaintOrderRatio(validCount == 0 ? BigDecimal.ZERO
+                : BigDecimal.valueOf(complaintCount)
                 .multiply(BigDecimal.valueOf(100))
-                .divide(BigDecimal.valueOf(metric.validOrderCount()), 2, RoundingMode.HALF_UP));
-        row.setFoodHygieneComplaintOrderCount(metric.foodHygieneCount() == 0 ? null : metric.foodHygieneCount());
+                .divide(BigDecimal.valueOf(validCount), 2, RoundingMode.HALF_UP));
+        row.setFoodHygieneComplaintOrderCount(metric == null ? 0L : metric.foodHygieneCount());
     }
 
     private boolean isEmptyMetricRow(StoreAnomalyWeeklyDO row) {

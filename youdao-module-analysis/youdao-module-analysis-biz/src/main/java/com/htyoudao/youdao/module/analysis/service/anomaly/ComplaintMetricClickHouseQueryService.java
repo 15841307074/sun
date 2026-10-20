@@ -21,7 +21,7 @@ public class ComplaintMetricClickHouseQueryService {
     @Resource
     private JdbcTemplate jdbcTemplate;
 
-    /** 查询指定项目和时间范围内有投诉的门店周指标。 */
+    /** 汇总指定项目各门店的投诉及有效订单，无投诉的门店也统计订单数。 */
     public List<ComplaintMetric> queryWeek(Long businessId, LocalDate start, LocalDate end) {
         String sql = "WITH complaints AS ("
                 + " SELECT toUInt64OrZero(toString(store_id)) store_id, "
@@ -37,9 +37,13 @@ public class ComplaintMetricClickHouseQueryService {
                 + " FROM " + ORDER_TABLE + " FINAL"
                 + " WHERE business_id = ? AND deleted = '0'"
                 + " AND create_time >= toDateTime(?) AND create_time < toDateTime(?) GROUP BY store_id"
-                + ") SELECT c.store_id, ifNull(o.store_name, '') store_name, c.complaint_count, "
-                + "ifNull(o.valid_count, 0) valid_count, c.food_count FROM complaints c"
-                + " LEFT JOIN orders o ON o.store_id = c.store_id WHERE c.complaint_count > 0";
+                + "), store_metrics AS ("
+                + " SELECT store_id, '' store_name, complaint_count, toUInt64(0) valid_count, food_count FROM complaints"
+                + " UNION ALL SELECT store_id, store_name, toUInt64(0) complaint_count, valid_count, "
+                + "toUInt64(0) food_count FROM orders)"
+                + " SELECT store_id, max(store_name) store_name, sum(complaint_count) complaint_count, "
+                + "sum(valid_count) valid_count, sum(food_count) food_count"
+                + " FROM store_metrics GROUP BY store_id";
         Object[] params = {String.valueOf(businessId), start.toString(), end.toString(),
                 String.valueOf(businessId), start.toString(), end.toString()};
         return jdbcTemplate.query(sql, (rs, rowNum) -> new ComplaintMetric(

@@ -254,10 +254,13 @@ public class AnomalyReportService {
             if (w.getWeeklyOrderCustomerCount() != null) metricUnion.add("weekly_order_customer_count");
             if (w.getWeeklyMealSalesQuantity() != null) metricUnion.add("weekly_meal_sales_quantity");
             if (w.getPrevWeekMealSalesQuantity() != null) metricUnion.add("prev_week_meal_sales_quantity");
-            if (w.getComplaintOrderRatio() != null) metricUnion.add("complaint_order_ratio");
-            if (w.getComplaintOrderCount() != null) metricUnion.add("complaint_order_count");
-            if (w.getValidOrderCount() != null) metricUnion.add("valid_order_count");
-            if (w.getFoodHygieneComplaintOrderCount() != null) metricUnion.add("food_hygiene_complaint_order_count");
+            boolean hasComplaint = w.getComplaintOrderCount() != null && w.getComplaintOrderCount() > 0;
+            if (w.getComplaintOrderRatio() != null && w.getComplaintOrderRatio().signum() > 0)
+                metricUnion.add("complaint_order_ratio");
+            if (hasComplaint) metricUnion.add("complaint_order_count");
+            if (hasComplaint && w.getValidOrderCount() != null) metricUnion.add("valid_order_count");
+            if (w.getFoodHygieneComplaintOrderCount() != null && w.getFoodHygieneComplaintOrderCount() > 0)
+                metricUnion.add("food_hygiene_complaint_order_count");
         }
         // union 大小即异常指标种类数
         return metricUnion.size();

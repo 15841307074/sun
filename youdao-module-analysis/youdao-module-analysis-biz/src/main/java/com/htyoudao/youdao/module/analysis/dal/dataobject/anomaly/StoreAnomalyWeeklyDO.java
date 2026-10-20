@@ -13,10 +13,9 @@ import java.math.BigDecimal;
  * 门店异常指标周表 DO（只读，上游产出）
  *
  * <p>对应上游表 {@code store_anomaly_metrics_weekly}。
- * <b>出现即异常</b>：门店在该表有一行记录 = 该门店本周有异常。
+ * 同时保存投诉及有效订单统计，仅有正常订单、投诉为零的行不属于异常。
  *
- * <p>非空的指标列 = 该门店涉及的异常指标，
- * 用于计算 anomaly_metric_count。
+ * <p>其他经营指标仍按非空判断异常；投诉统计为零时不计入 anomaly_metric_count。
  */
 @TableName("store_anomaly_metrics_weekly")
 @Data
@@ -49,7 +48,7 @@ public class StoreAnomalyWeeklyDO extends BusinessBaseDO {
      */
     private Integer statWeek;
 
-    // ==================== 指标列（非空 = 该门店涉及这个异常指标） ====================
+    // ==================== 经营异常指标和投诉统计 ====================
 
     /**
      * 周营业额
@@ -120,4 +119,19 @@ public class StoreAnomalyWeeklyDO extends BusinessBaseDO {
      * 食卫投诉订单数
      */
     private Long foodHygieneComplaintOrderCount;
+
+    /** 仅有正常投诉统计的行不进入异常报告；其他任务的异常指标判断保持原口径。 */
+    public boolean hasOnlyNormalComplaintStatistics() {
+        boolean hasStatistics = complaintOrderRatio != null || complaintOrderCount != null
+                || validOrderCount != null || foodHygieneComplaintOrderCount != null;
+        return hasStatistics
+                && (complaintOrderRatio == null || complaintOrderRatio.signum() <= 0)
+                && (complaintOrderCount == null || complaintOrderCount <= 0)
+                && (foodHygieneComplaintOrderCount == null || foodHygieneComplaintOrderCount <= 0)
+                && weeklyTurnover == null && prevWeekTurnover == null
+                && weeklyAvgOrderAmountChangeRate == null && weeklyAvgOrderAmount == null
+                && prevWeekAvgOrderAmount == null && avgOrderAmountChange == null
+                && weeklyRepeatCustomerCount == null && weeklyOrderCustomerCount == null
+                && weeklyMealSalesQuantity == null && prevWeekMealSalesQuantity == null;
+    }
 }
