@@ -51,6 +51,27 @@ class StoreOrgSnapshotQueryServiceImplTest {
     }
 
     @Test
+    void shouldFilterOrganizationAndDirectRelationsToNormalStores() {
+        BusinessContextHolder.setBusinessId(10L);
+        var api = org.mockito.Mockito.spy(new com.htyoudao.youdao.module.system.api.store.StoreApiImpl());
+        var queryService = org.mockito.Mockito.mock(StoreOrgSnapshotQueryService.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(api, "storeOrgSnapshotQueryService", queryService);
+        StoreOrgSnapshotDTO normal = new StoreOrgSnapshotDTO();
+        normal.setStoreId(900L);
+        when(queryService.listNormalStoreOrgData()).thenReturn(List.of(normal));
+        org.mockito.Mockito.doReturn(com.htyoudao.youdao.framework.common.pojo.CommonResult.success(
+                Set.of(900L, 901L, 902L, 903L))).when(api).getAllStoreIdByUser(1L);
+        var info = new com.htyoudao.youdao.module.system.api.store.dto.StoreInfoDTO();
+        info.setStoreId(900L);
+        info.setStoreName("正常营业门店");
+        org.mockito.Mockito.doReturn(List.of(info)).when(api).listStoresByIds(List.of(900L));
+        var relations = api.listUserStoreRelations(List.of(1L), null);
+        assertEquals(1, relations.size());
+        assertEquals(900L, relations.get(0).getStoreId());
+        assertEquals("正常营业门店", relations.get(0).getStoreName());
+    }
+
+    @Test
     void shouldBuildCompletePathAndParent() {
         BusinessContextHolder.setBusinessId(10L);
         when(storeMapper.selectList(any())).thenReturn(List.of(store(900L, 300L)));

@@ -10,6 +10,9 @@ import com.htyoudao.youdao.module.system.controller.admin.store.vo.StoreChannelR
 import com.htyoudao.youdao.module.system.controller.admin.store.vo.StoreSimpleResVO;
 import com.htyoudao.youdao.module.system.service.store.SystemStoreInfoService;
 import com.htyoudao.youdao.module.system.service.storeuser.StoreUserService;
+import com.htyoudao.youdao.framework.context.BusinessContextHolder;
+import com.htyoudao.youdao.module.system.api.storeorgsnapshot.dto.StoreOrgSnapshotDTO;
+import com.htyoudao.youdao.module.system.service.storeorgsnapshot.StoreOrgSnapshotQueryService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.dubbo.config.annotation.DubboService;
@@ -38,6 +41,9 @@ public class StoreApiImpl implements StoreApi{
 
     @Resource
     private StoreUserService storeUserService;
+
+    @Resource
+    private StoreOrgSnapshotQueryService storeOrgSnapshotQueryService;
 
 
     @Override
@@ -201,17 +207,21 @@ public class StoreApiImpl implements StoreApi{
         if (CollectionUtil.isEmpty(userIds)) {
             return java.util.Collections.emptyList();
         }
+        BusinessContextHolder.getRequiredBusinessId();
+        // 组织门店和额外绑定门店统一与当前项目的正常营业门店取交集。
+        Set<Long> normalStoreIds = storeOrgSnapshotQueryService.listNormalStoreOrgData().stream()
+                .map(StoreOrgSnapshotDTO::getStoreId)
+                .collect(java.util.stream.Collectors.toSet());
         java.util.Map<Long, Set<Long>> userStoreMap = new java.util.HashMap<>();
         Set<Long> allStoreIds = new HashSet<>();
         Set<Long> storeIdFilter = storeIds == null ? null : new HashSet<>(storeIds);
         for (Long userId : userIds) {
-            Set<Long> userStores = getAllStoreIdByUser(userId).getCheckedData();
-            if (userStores == null) {
-                userStores = new HashSet<>();
-            }
+            Set<Long> sourceStores = getAllStoreIdByUser(userId).getCheckedData();
+            Set<Long> userStores = sourceStores == null ? new HashSet<>() : new HashSet<>(sourceStores);
             if (storeIdFilter != null && !storeIdFilter.isEmpty()) {
                 userStores.retainAll(storeIdFilter);
             }
+            userStores.retainAll(normalStoreIds);
             userStoreMap.put(userId, userStores);
             allStoreIds.addAll(userStores);
         }

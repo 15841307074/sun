@@ -20,6 +20,7 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /** 负责 MySQL 周异常结果表的合并写入和排行查询。 */
@@ -46,11 +47,15 @@ public class ComplaintAnomalyWeeklyMysqlService {
      */
     @Transactional(rollbackFor = Exception.class)
     public int mergeWeek(Long businessId, int statYear, int statWeek,
-                         Collection<ComplaintMetricClickHouseQueryService.ComplaintMetric> sourceMetrics) {
+                         Collection<ComplaintMetricClickHouseQueryService.ComplaintMetric> sourceMetrics,
+                         Set<Long> normalStoreIds) {
         Map<Long, StoreAnomalyWeeklyDO> rows = loadCurrentRows(businessId, statYear, statWeek, true).stream()
+                // 已闭店或删除的历史行不参与本次更新，也不删除其他任务生成的数据。
+                .filter(row -> normalStoreIds.contains(row.getStoreId()))
                 .collect(Collectors.toMap(StoreAnomalyWeeklyDO::getStoreId, row -> row,
                         (first, ignored) -> first, LinkedHashMap::new));
         Map<Long, ComplaintMetricClickHouseQueryService.ComplaintMetric> metrics = sourceMetrics.stream()
+                .filter(metric -> normalStoreIds.contains(metric.storeId()))
                 .collect(Collectors.toMap(ComplaintMetricClickHouseQueryService.ComplaintMetric::storeId,
                         metric -> metric, (first, ignored) -> first, LinkedHashMap::new));
 

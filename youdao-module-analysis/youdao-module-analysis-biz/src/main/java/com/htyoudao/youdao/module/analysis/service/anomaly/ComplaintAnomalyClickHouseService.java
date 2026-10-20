@@ -3,6 +3,10 @@ package com.htyoudao.youdao.module.analysis.service.anomaly;
 import com.htyoudao.youdao.module.analysis.controller.app.vo.anomaly.ComplaintRatioRankingRespVO;
 import com.htyoudao.youdao.module.analysis.controller.app.vo.anomaly.FoodHygieneComplaintRankingRespVO;
 import com.htyoudao.youdao.module.analysis.dal.dataobject.anomaly.StoreAnomalyWeeklyDO;
+import com.htyoudao.youdao.framework.context.BusinessContextHolder;
+import com.htyoudao.youdao.module.system.api.storeorgsnapshot.StoreOrgSnapshotApi;
+import com.htyoudao.youdao.module.system.api.storeorgsnapshot.dto.StoreOrgSnapshotDTO;
+import org.apache.dubbo.config.annotation.DubboReference;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
@@ -13,6 +17,9 @@ import java.time.temporal.WeekFields;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static com.htyoudao.youdao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static com.htyoudao.youdao.module.analysis.enums.ErrorCodeConstants.CH_QUERY_ERROR;
@@ -31,8 +38,23 @@ public class ComplaintAnomalyClickHouseService {
     @Resource
     private ComplaintAnomalyWeeklyMysqlService weeklyMysqlService;
 
+    @DubboReference
+    private StoreOrgSnapshotApi storeOrgSnapshotApi;
+
     /** 计算指定自然周的投诉指标，并合并写入 MySQL 周异常表。 */
     public int calculateAndSaveWeek(Long businessId, LocalDate periodStart) {
+        if (!Objects.equals(businessId, BusinessContextHolder.getRequiredBusinessId())) {
+            throw new IllegalArgumentException("任务项目与当前项目上下文不一致");
+        }
+        // 先取得当前项目的正常营业门店；远程失败时不进入合并写入，保留原数据。
+        List<StoreOrgSnapshotDTO> stores = Objects.requireNonNull(
+                storeOrgSnapshotApi.listNormalStoreOrgData().getCheckedData(), "正常营业门店查询返回null");
+        Set<Long> normalStoreIds = stores.stream()
+                .map(store -> Objects.requireNonNull(store.getStoreId(), "门店ID不能为空"))
+                .collect(Collectors.toSet());
+        if (normalStoreIds.isEmpty()) {
+            return 0;
+        }
         WeekFields iso = WeekFields.ISO;
         int statYear = periodStart.get(iso.weekBasedYear());
         int statWeek = periodStart.get(iso.weekOfWeekBasedYear());
@@ -40,7 +62,7 @@ public class ComplaintAnomalyClickHouseService {
         try {
             List<ComplaintMetricClickHouseQueryService.ComplaintMetric> metrics =
                     clickHouseQueryService.queryWeek(businessId, periodStart, periodEnd);
-            return weeklyMysqlService.mergeWeek(businessId, statYear, statWeek, metrics);
+            return weeklyMysqlService.mergeWeek(businessId, statYear, statWeek, metrics, normalStoreIds);
         } catch (DataAccessException e) {
             log.error("[calculateAndSaveWeek] 周投诉指标计算失败, businessId={}, periodStart={}",
                     businessId, periodStart, e);

@@ -1,6 +1,10 @@
 package com.htyoudao.youdao.module.analysis.service.anomaly;
 
 import com.baomidou.dynamic.datasource.annotation.DS;
+import com.htyoudao.youdao.framework.context.BusinessContextHolder;
+import com.htyoudao.youdao.framework.common.pojo.CommonResult;
+import com.htyoudao.youdao.module.system.api.storeorgsnapshot.StoreOrgSnapshotApi;
+import com.htyoudao.youdao.module.system.api.storeorgsnapshot.dto.StoreOrgSnapshotDTO;
 import com.htyoudao.youdao.module.analysis.AnalysisServerApplication;
 import com.htyoudao.youdao.module.analysis.dal.dataobject.anomaly.StoreAnomalyWeeklyDO;
 import org.junit.jupiter.api.AfterEach;
@@ -43,6 +47,8 @@ class ComplaintAnomalyDataSourceServiceTest {
     private ComplaintAnomalyWeeklyMysqlService weeklyMysqlService;
     @Mock
     private JdbcTemplate jdbcTemplate;
+    @Mock
+    private StoreOrgSnapshotApi storeOrgSnapshotApi;
 
     @BeforeEach
     void setUp() {
@@ -51,6 +57,7 @@ class ComplaintAnomalyDataSourceServiceTest {
 
     @AfterEach
     void tearDown() throws Exception {
+        BusinessContextHolder.clear();
         mocks.close();
     }
 
@@ -59,14 +66,19 @@ class ComplaintAnomalyDataSourceServiceTest {
         ComplaintAnomalyClickHouseService service = new ComplaintAnomalyClickHouseService();
         ReflectionTestUtils.setField(service, "clickHouseQueryService", clickHouseQueryService);
         ReflectionTestUtils.setField(service, "weeklyMysqlService", weeklyMysqlService);
+        ReflectionTestUtils.setField(service, "storeOrgSnapshotApi", storeOrgSnapshotApi);
+        BusinessContextHolder.setBusinessId(10L);
+        StoreOrgSnapshotDTO store = new StoreOrgSnapshotDTO();
+        store.setStoreId(1L);
+        when(storeOrgSnapshotApi.listNormalStoreOrgData()).thenReturn(CommonResult.success(List.of(store)));
         LocalDate start = LocalDate.of(2025, 12, 1);
         var metrics = List.of(new ComplaintMetricClickHouseQueryService.ComplaintMetric(1L, "测试门店", 2, 10, 1));
         when(clickHouseQueryService.queryWeek(10L, start, start.plusWeeks(1))).thenReturn(metrics);
-        when(weeklyMysqlService.mergeWeek(10L, 2025, 49, metrics)).thenReturn(1);
+        when(weeklyMysqlService.mergeWeek(10L, 2025, 49, metrics, Set.of(1L))).thenReturn(1);
 
         assertEquals(1, service.calculateAndSaveWeek(10L, start));
         verify(clickHouseQueryService).queryWeek(10L, start, start.plusWeeks(1));
-        verify(weeklyMysqlService).mergeWeek(10L, 2025, 49, metrics);
+        verify(weeklyMysqlService).mergeWeek(10L, 2025, 49, metrics, Set.of(1L));
         assertEquals("clickhouse", ComplaintMetricClickHouseQueryService.class.getAnnotation(DS.class).value());
         assertEquals("master", ComplaintAnomalyWeeklyMysqlService.class.getAnnotation(DS.class).value());
     }
@@ -89,7 +101,7 @@ class ComplaintAnomalyDataSourceServiceTest {
                 eq(10L), eq(2026), eq(41))).thenReturn(List.of());
         var metric = new ComplaintMetricClickHouseQueryService.ComplaintMetric(1L, "测试门店", 2, 10, 1);
 
-        assertEquals(1, service.mergeWeek(10L, 2026, 41, List.of(metric)));
+        assertEquals(1, service.mergeWeek(10L, 2026, 41, List.of(metric), Set.of(1L)));
         verify(jdbcTemplate).batchUpdate(
                 org.mockito.ArgumentMatchers.startsWith("INSERT INTO store_anomaly_metrics_weekly"), any(List.class));
     }
@@ -113,7 +125,7 @@ class ComplaintAnomalyDataSourceServiceTest {
         var missingMetric = new ComplaintMetricClickHouseQueryService.ComplaintMetric(2L, "补全门店", 1, 20, 0);
 
         var otherMetric = new ComplaintMetricClickHouseQueryService.ComplaintMetric(3L, "已有营业额门店", 1, 10, 0);
-        assertEquals(3, service.mergeWeek(10L, 2026, 41, List.of(existingMetric, missingMetric, otherMetric)));
+        assertEquals(3, service.mergeWeek(10L, 2026, 41, List.of(existingMetric, missingMetric, otherMetric), Set.of(1L, 2L, 3L)));
 
         ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<List<Object[]>> batches = ArgumentCaptor.forClass(List.class);
@@ -151,8 +163,8 @@ class ComplaintAnomalyDataSourceServiceTest {
                 new ComplaintMetricClickHouseQueryService.ComplaintMetric(1L, "已有门店", 2, 10, 1),
                 new ComplaintMetricClickHouseQueryService.ComplaintMetric(2L, "补全门店", 1, 20, 0));
 
-        assertEquals(2, service.mergeWeek(10L, 2025, 49, metrics));
-        assertEquals(2, service.mergeWeek(10L, 2025, 49, metrics));
+        assertEquals(2, service.mergeWeek(10L, 2025, 49, metrics, Set.of(1L, 2L)));
+        assertEquals(2, service.mergeWeek(10L, 2025, 49, metrics, Set.of(1L, 2L)));
         assertEquals(2, database.queryForObject("SELECT COUNT(*) FROM store_anomaly_metrics_weekly", Integer.class));
         assertEquals(101L, database.queryForObject(
                 "SELECT id FROM store_anomaly_metrics_weekly WHERE store_id=1", Long.class));
@@ -164,6 +176,43 @@ class ComplaintAnomalyDataSourceServiceTest {
                 "SELECT id FROM store_anomaly_metrics_weekly WHERE store_id=2", Long.class) > 0);
         assertEquals(20L, database.queryForObject(
                 "SELECT valid_order_count FROM store_anomaly_metrics_weekly WHERE store_id=2", Long.class));
+    }
+
+    @Test
+    void shouldSkipNonNormalStoresWithoutTouchingTheirHistory() {
+        JdbcTemplate database = newWeeklyDatabase();
+        database.update("INSERT INTO store_anomaly_metrics_weekly "
+                + "(id,business_id,store_id,stat_year,stat_week,complaint_order_count,valid_order_count,deleted) "
+                + "VALUES (101,10,1,2025,49,2,20,0),(102,10,2,2025,49,9,90,0)");
+        ComplaintAnomalyWeeklyMysqlService service = new ComplaintAnomalyWeeklyMysqlService();
+        ReflectionTestUtils.setField(service, "jdbcTemplate", database);
+        var metrics = List.of(
+                new ComplaintMetricClickHouseQueryService.ComplaintMetric(1L, "营业门店", 3, 30, 0),
+                new ComplaintMetricClickHouseQueryService.ComplaintMetric(2L, "闭店历史门店", 8, 80, 1),
+                new ComplaintMetricClickHouseQueryService.ComplaintMetric(3L, "临时闭店或删除门店", 7, 70, 1));
+        assertEquals(1, service.mergeWeek(10L, 2025, 49, metrics, Set.of(1L)));
+        assertEquals(3L, database.queryForObject(
+                "SELECT complaint_order_count FROM store_anomaly_metrics_weekly WHERE store_id=1", Long.class));
+        assertEquals(9L, database.queryForObject(
+                "SELECT complaint_order_count FROM store_anomaly_metrics_weekly WHERE store_id=2", Long.class));
+        assertEquals(2, database.queryForObject("SELECT COUNT(*) FROM store_anomaly_metrics_weekly", Integer.class));
+    }
+
+    @Test
+    void shouldPreserveDataWhenStoreApiFailsAndRejectMismatchedProject() {
+        ComplaintAnomalyClickHouseService service = new ComplaintAnomalyClickHouseService();
+        ReflectionTestUtils.setField(service, "clickHouseQueryService", clickHouseQueryService);
+        ReflectionTestUtils.setField(service, "weeklyMysqlService", weeklyMysqlService);
+        ReflectionTestUtils.setField(service, "storeOrgSnapshotApi", storeOrgSnapshotApi);
+        BusinessContextHolder.setBusinessId(11L);
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+                () -> service.calculateAndSaveWeek(10L, LocalDate.of(2025, 12, 1)));
+        org.mockito.Mockito.verifyNoInteractions(storeOrgSnapshotApi, clickHouseQueryService, weeklyMysqlService);
+        BusinessContextHolder.setBusinessId(10L);
+        when(storeOrgSnapshotApi.listNormalStoreOrgData()).thenThrow(new IllegalStateException("远程查询失败"));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+                () -> service.calculateAndSaveWeek(10L, LocalDate.of(2025, 12, 1)));
+        org.mockito.Mockito.verifyNoInteractions(clickHouseQueryService, weeklyMysqlService);
     }
 
     private JdbcTemplate newWeeklyDatabase() {
@@ -198,8 +247,8 @@ class ComplaintAnomalyDataSourceServiceTest {
                 new ComplaintMetricClickHouseQueryService.ComplaintMetric(5L, "仅有正常订单", 0, 200, 0),
                 new ComplaintMetricClickHouseQueryService.ComplaintMetric(6L, "无有效订单的投诉门店", 2, 0, 1));
 
-        assertEquals(5, service.mergeWeek(10L, 2025, 49, metrics));
-        assertEquals(5, service.mergeWeek(10L, 2025, 49, metrics));
+        assertEquals(5, service.mergeWeek(10L, 2025, 49, metrics, Set.of(1L, 2L, 3L, 5L, 6L)));
+        assertEquals(5, service.mergeWeek(10L, 2025, 49, metrics, Set.of(1L, 2L, 3L, 5L, 6L)));
         assertEquals(5, database.queryForObject(
                 "SELECT COUNT(*) FROM store_anomaly_metrics_weekly WHERE business_id=10", Integer.class));
         assertEquals(101L, database.queryForObject(

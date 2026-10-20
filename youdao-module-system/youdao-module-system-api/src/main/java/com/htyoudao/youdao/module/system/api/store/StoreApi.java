@@ -143,5 +143,6 @@ public interface StoreApi {
      * @param storeIds 可选的门店范围，为空时查询全部负责门店
      * @return 用户与门店关系列表
      */
+    // 仅返回当前项目中未删除且正常营业的门店，排除闭店、临时闭店。
     List<UserStoreRelationDTO> listUserStoreRelations(Collection<Long> userIds, Collection<Long> storeIds);
 }
