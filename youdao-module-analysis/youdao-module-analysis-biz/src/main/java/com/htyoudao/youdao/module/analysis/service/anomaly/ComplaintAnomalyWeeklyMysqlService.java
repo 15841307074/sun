@@ -1,6 +1,7 @@
 package com.htyoudao.youdao.module.analysis.service.anomaly;
 
 import com.baomidou.dynamic.datasource.annotation.DS;
+import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.htyoudao.youdao.module.analysis.controller.app.vo.anomaly.ComplaintRatioRankingRespVO;
 import com.htyoudao.youdao.module.analysis.controller.app.vo.anomaly.FoodHygieneComplaintRankingRespVO;
 import com.htyoudao.youdao.module.analysis.dal.dataobject.anomaly.StoreAnomalyWeeklyDO;
@@ -164,9 +165,9 @@ public class ComplaintAnomalyWeeklyMysqlService {
                 .map(this::insertParameters).toList();
         if (!inserts.isEmpty()) {
             jdbcTemplate.batchUpdate("INSERT INTO " + WEEKLY_TABLE
-                    + " (business_id, store_id, store_name, stat_year, stat_week, complaint_order_ratio, "
+                    + " (id, business_id, store_id, store_name, stat_year, stat_week, complaint_order_ratio, "
                     + "complaint_order_count, valid_order_count, food_hygiene_complaint_order_count, "
-                    + "creator, create_time, updater, update_time, deleted) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    + "creator, create_time, updater, update_time, deleted) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                     inserts);
         }
     }
@@ -179,7 +180,8 @@ public class ComplaintAnomalyWeeklyMysqlService {
     }
 
     private Object[] insertParameters(StoreAnomalyWeeklyDO row) {
-        return new Object[]{row.getBusinessId(), row.getStoreId(), blankToEmpty(row.getStoreName()),
+        // 与其他周表任务一致，由代码生成主键，不依赖数据库自增。
+        return new Object[]{IdWorker.getId(), row.getBusinessId(), row.getStoreId(), blankToEmpty(row.getStoreName()),
                 row.getStatYear(), row.getStatWeek(), row.getComplaintOrderRatio(), row.getComplaintOrderCount(),
                 row.getValidOrderCount(), row.getFoodHygieneComplaintOrderCount(), blankToEmpty(row.getCreator()),
                 row.getCreateTime(), blankToEmpty(row.getUpdater()), row.getUpdateTime(),

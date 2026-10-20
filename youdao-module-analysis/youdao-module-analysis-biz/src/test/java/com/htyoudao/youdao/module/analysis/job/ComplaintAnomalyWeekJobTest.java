@@ -59,10 +59,10 @@ class ComplaintAnomalyWeekJobTest {
     @Test
     void shouldUsePreviousWeekOfSpecifiedExecutionMonday() {
         ComplaintAnomalyWeekJob.JobParam param = job.parseParam(
-                "{\"businessId\":99,\"periodStart\":\"2026-10-12\"}", LocalDate.now());
+                "{\"businessId\":99,\"periodStart\":\"2025-12-08\"}", LocalDate.now());
 
         assertEquals(99L, param.businessId());
-        assertEquals(LocalDate.of(2026, 10, 5), param.periodStart());
+        assertEquals(LocalDate.of(2025, 12, 1), param.periodStart());
     }
 
     @Test
