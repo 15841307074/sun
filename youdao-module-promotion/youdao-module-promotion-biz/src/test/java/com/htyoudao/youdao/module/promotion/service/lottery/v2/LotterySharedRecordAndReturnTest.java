@@ -91,4 +91,33 @@ class LotterySharedRecordAndReturnTest {
         assertFalse(identity.matchesMobile("13800000000","13900000000"));
     }
 
+    @Test void bothCounterCachesUseBusinessErrorsForAllThreeRecoveryContentionCases() {
+        for (Object cache : List.of(new com.htyoudao.youdao.module.promotion.service.lottery.v2.impl.LotteryCounterCacheImpl(),
+                new com.htyoudao.youdao.module.promotion.service.lottery.v2.impl.LotteryMobileCounterCache())) {
+            for (int scenario = 0; scenario < 3; scenario++) {
+                var redis = mock(org.springframework.data.redis.core.StringRedisTemplate.class);
+                org.springframework.data.redis.core.ValueOperations<String, String> values = mock(org.springframework.data.redis.core.ValueOperations.class);
+                var jdbc = mock(JdbcTemplate.class);
+                when(redis.opsForValue()).thenReturn(values);
+                when(values.get(anyString())).thenReturn(null);
+                when(values.setIfAbsent(anyString(), anyString(), any(java.time.Duration.class))).thenReturn(scenario == 2);
+                when(jdbc.queryForList(anyString(), any(Object[].class))).thenReturn(List.of());
+                when(redis.execute(any(org.springframework.data.redis.core.script.RedisScript.class), anyList(), any(Object[].class))).thenReturn(0L);
+                ReflectionTestUtils.setField(cache, "redis", redis);ReflectionTestUtils.setField(cache, "jdbc", jdbc);
+                ReflectionTestUtils.setField(cache, "json", new com.fasterxml.jackson.databind.ObjectMapper());
+                var refills = (java.util.concurrent.atomic.AtomicInteger) ReflectionTestUtils.getField(cache, "refills");
+                refills.set(scenario == 0 ? 4 : 0);
+                Runnable read = cache instanceof com.htyoudao.youdao.module.promotion.service.lottery.v2.impl.LotteryCounterCacheImpl legacy
+                        ? () -> legacy.read(10L, 20L, 30L, "20261021")
+                        : () -> ((com.htyoudao.youdao.module.promotion.service.lottery.v2.impl.LotteryMobileCounterCache) cache).read(10L, 20L, "13800000000", "20261021");
+                var failure = assertThrows(com.htyoudao.youdao.framework.common.exception.ServiceException.class, read::run);
+                var expected = com.htyoudao.youdao.module.promotion.api.enums.ErrorCodeConstants.LOTTERY_SYSTEM_AGAIN;
+                assertEquals(expected.getCode(), failure.getCode());assertEquals(expected.getMsg(), failure.getMessage());
+                assertEquals(scenario == 0 ? 4 : 0, refills.get());
+                if (scenario < 2) verifyNoInteractions(jdbc);
+            }
+        }
+    }
+
+
 }
