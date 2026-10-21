@@ -37,12 +37,12 @@ public class LotteryLogExportRespVO {
 
 //    /** 奖品类型 1 优惠卷 2 积分 3 实物 4 无奖品 */
 //    @ExcelProperty("奖品类型")
-//    @Schema(name = "prizeType", description = "奖品类型 1 优惠卷 2 积分 3 实物 4 无奖品")
+//    @Schema(name = "prizeType", description = "奖品类型 1 优惠卷 2 积分 3 实物 4 无奖品 5 现金红包 6 优惠券包")
 //    private Integer prizeType;
 
 
     @ExcelProperty("奖品类型")
-    @Schema(name = "prizeTypeName", description = "奖品类型 1 优惠卷 2 积分 3 实物 4 无奖品")
+    @Schema(name = "prizeTypeName", description = "奖品类型 1 优惠卷 2 积分 3 实物 4 无奖品 5 现金红包 6 优惠券包")
     private String prizeTypeName;
 
     /** 奖品名称 */

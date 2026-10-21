@@ -29,6 +29,7 @@ import java.util.stream.Collectors;
 
 @Service("lotteryScopeService")
 public class LotteryScopeServiceImpl implements LotteryScopeService {
+    @Resource private LotteryCouponPackageService couponPackages;
     @Resource
     private ActivityStoreService stores;
     @Resource
@@ -161,6 +162,8 @@ public class LotteryScopeServiceImpl implements LotteryScopeService {
             throw new IllegalArgumentException("必须配置唯一保底奖品");
         Set<String> codes = new HashSet<>();
         for (LotteryPrizeReqVO prize : template) {
+            if(Objects.equals(prize.getIsGuarantees(),1)&&Objects.equals(prize.getPrizeType(),5))throw com.htyoudao.youdao.module.promotion.service.lottery.v2.LotteryErrors.invalid("红包不能作为抽奖兜底奖品");
+            if(Objects.equals(prize.getPrizeType(),6))couponPackages.snapshot(prize.getAwardId());
             if (prize.getIsGuarantees() == null) prize.setIsGuarantees(0);
             if (!Objects.equals(prize.getIsGuarantees(),0) && !Objects.equals(prize.getIsGuarantees(),1))
                 throw new IllegalArgumentException("isGuarantees 只能为 0 或 1");

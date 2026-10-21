@@ -38,9 +38,14 @@ public class LotteryGrantStorageImpl implements LotteryGrantStorage {
         if(row==null)return false;
         if(Objects.equals(row.getPrizeState(),9))return true;
         if(!Objects.equals(row.getPrizeType(),3)||!Objects.equals(row.getPrizeState(),1)
-                ||row.getCreateTime().isAfter(LocalDate.now().minusDays(2).atStartOfDay()))return false;
+                ||row.getCreateTime()==null||row.getCreateTime().isAfter(LocalDateTime.now(ZoneId.of("Asia/Shanghai")).minusHours(48))
+                ||row.getReceiveAddress()!=null&&!row.getReceiveAddress().isBlank()
+                ||row.getTrackingNumber()!=null&&!row.getTrackingNumber().isBlank())return false;
         LotteryLogDO update=new LotteryLogDO();update.setPrizeState(9);
-        return logs.update(update,key.eq(LotteryLogDO::getPrizeState,1))==1;
+        return logs.update(update,key.eq(LotteryLogDO::getPrizeState,1).eq(LotteryLogDO::getPrizeType,3)
+                .le(LotteryLogDO::getCreateTime,LocalDateTime.now(ZoneId.of("Asia/Shanghai")).minusHours(48))
+                .and(address -> address.isNull(LotteryLogDO::getReceiveAddress).or().eq(LotteryLogDO::getReceiveAddress,""))
+                .and(tracking -> tracking.isNull(LotteryLogDO::getTrackingNumber).or().eq(LotteryLogDO::getTrackingNumber,"")))==1;
     }
     @Override
     @Transactional(rollbackFor=Exception.class,timeout=5)
@@ -70,7 +75,7 @@ public class LotteryGrantStorageImpl implements LotteryGrantStorage {
         var s=draw.getSnapshot();var prize=s.getPrize();var cfg=s.getSettings();
         LotteryLogDO row=new LotteryLogDO();row.setId(draw.getId());row.setBusinessId(draw.getBusinessId());
         row.setLotteryPrizeId(prize.getId());row.setLotteryId(cfg.getId());row.setMemberId(draw.getMemberId());row.setStoreId(draw.getStoreId());
-        row.setMemberMobile(s.getMember().getMemberMobile());row.setMemberName(s.getMember().getMemberNickName());
+        row.setMemberMobile(s.getMemberMobile()==null?s.getMember().getMemberMobile():s.getMemberMobile());row.setMemberName(s.getMember().getMemberNickName());
         row.setPrizeName(prize.getPrizeName());row.setPrizeType(prize.getPrizeType());row.setPrizeImgUrl(prize.getPrizeImgUrl());row.setPrizeValue(prize.getPrizeValue());
         row.setIsGuarantees(prize.getIsGuarantees());
         row.setPrice(draw.getPointsCost());row.setLotteryType(cfg.getLotteryType());row.setLotteryStartTime(cfg.getLotteryStartTime());row.setLotteryEndTime(cfg.getLotteryEndTime());

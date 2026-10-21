@@ -56,6 +56,7 @@ class LotteryGrantWakeupTest {
         context.getBeanFactory().registerSingleton("ledger",ledger);
         context.getBeanFactory().registerSingleton("storage",storage);
         context.getBeanFactory().registerSingleton("cash",mock(LotteryCashGateway.class));
+        context.getBeanFactory().registerSingleton("couponPackages",mock(LotteryCouponPackageService.class));
         context.getBeanFactory().registerSingleton("stockCache",mock(LotteryStockCache.class));
         context.getBeanFactory().registerSingleton("service",mock(LotteryV2Service.class));
         context.getBeanFactory().registerSingleton("properties",new LotteryProperties());

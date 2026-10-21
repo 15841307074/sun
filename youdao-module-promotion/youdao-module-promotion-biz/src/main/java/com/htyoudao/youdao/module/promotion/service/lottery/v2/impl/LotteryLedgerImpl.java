@@ -136,24 +136,52 @@ public class LotteryLedgerImpl implements LotteryLedger {
             throw exception(LOTTERY_TOT_LIMIT_REACHED_AGAIN);
     }
 
-    @Transactional(rollbackFor=Exception.class)
+    private void ensureMobileCounter(long b,long a,String m,String scope,int source) {
+        jdbc.update("INSERT IGNORE INTO lottery_mobile_counter(business_id,activity_id,member_mobile,scope_key,source) VALUES(?,?,?,?,?)",b,a,m,scope,source);
+    }
+    @Override
+    public long consumed(long b,long a,String m,String scope,int source) {
+        List<Long> values=jobs().queryForList("SELECT consumed FROM lottery_mobile_counter WHERE business_id=? AND activity_id=? AND member_mobile=? AND scope_key=? AND source=?",Long.class,b,a,m,scope,source);
+        return values.isEmpty()?0:values.get(0);
+    }
+    @Override
+    public long[] counter(long b,long a,String m,String scope,int source) {
+        List<Map<String,Object>> values=jobs().queryForList("SELECT gained,consumed,finished FROM lottery_mobile_counter WHERE business_id=? AND activity_id=? AND member_mobile=? AND scope_key=? AND source=?",b,a,m,scope,source);
+        if(values.isEmpty())return new long[]{0,0,0};
+        Map<String,Object> r=values.get(0);return new long[]{n(r,"gained"),n(r,"consumed"),n(r,"finished")};
+    }
+    @Override
+    public Map<String,long[]> counters(long b,long a,String m,String period) {
+        Map<String,long[]> result=new HashMap<>();
+        for(var row:jobs().queryForList("SELECT scope_key,source,gained,consumed,finished FROM lottery_mobile_counter WHERE business_id=? AND activity_id=? AND member_mobile=? AND scope_key IN ('TOTAL',?)",b,a,m,period))
+            result.put(row.get("scope_key")+":"+n(row,"source"),new long[]{n(row,"gained"),n(row,"consumed"),n(row,"finished")});
+        return result;
+    }
+    private void consumeMobileBound(long b,long a,String m,String scope,int source,long limit) {
+        ensureMobileCounter(b,a,m,scope,source);
+        if(jdbc.update("UPDATE lottery_mobile_counter SET consumed=consumed+1,revision=revision+1 WHERE business_id=? AND activity_id=? AND member_mobile=? AND scope_key=? AND source=? AND (?<=0 OR consumed<?)",b,a,m,scope,source,limit,limit)!=1)
+            throw exception(LOTTERY_TOT_LIMIT_REACHED_AGAIN);
+    }
+
+    @Transactional(rollbackFor=Exception.class,timeout=5)
     @Override
     public Draw accept(long b,LotteryDrawSnapshot snapshot) {
         var req=snapshot.getRequest();var cfg=snapshot.getSettings();
         long a=cfg.getActivityId(),m=req.getMemberId(),pool=Objects.equals(cfg.getPrizePoolRules(),2)?req.getStoreId():0;
+        String mobile=Objects.requireNonNull(snapshot.getMemberMobile(),"抽奖手机号不能为空");
         // 共享读锁允许并发抽奖，同时阻止配置版本切换。
         List<Map<String,Object>> configs=jdbc.queryForList("SELECT config_version,stock_epoch,runtime_version,state FROM lottery_settings WHERE id=? AND business_id=? AND deleted=0 LOCK IN SHARE MODE",cfg.getId(),b);
         if(configs.isEmpty()||n(configs.get(0),"config_version")!=cfg.getConfigVersion()||n(configs.get(0),"stock_epoch")!=cfg.getStockEpoch()
                 ||n(configs.get(0),"runtime_version")!=2||!enabledState(configs.get(0).get("state")))throw exception(LOTTERY_SYSTEM_AGAIN);
         Draw previous=find(b,a,m,req.getRequestId());if(previous!=null)return previous;
-        consumeBound(b,a,m,"TOTAL",0,Optional.ofNullable(cfg.getLotteryTotalNumber()).orElse(0));
-        consumeBound(b,a,m,snapshot.getScopeKey(),0,Optional.ofNullable(cfg.getLotteryLimit()).orElse(0));
+        consumeMobileBound(b,a,mobile,"TOTAL",0,Optional.ofNullable(cfg.getLotteryTotalNumber()).orElse(0));
+        consumeMobileBound(b,a,mobile,snapshot.getScopeKey(),0,Optional.ofNullable(cfg.getLotteryLimit()).orElse(0));
         LotteryDrawSnapshot.Chance chosen=null;
         for(var chance:snapshot.getChances()) {
-            ensureCounter(b,a,m,chance.getScope(),chance.getSource());
-            int count=jdbc.update("UPDATE lottery_v2_counter SET consumed=consumed+1 WHERE business_id=? AND activity_id=? AND member_id=? AND scope_key=? AND source=? " +
+            ensureMobileCounter(b,a,mobile,chance.getScope(),chance.getSource());
+            int count=jdbc.update("UPDATE lottery_mobile_counter SET consumed=consumed+1 WHERE business_id=? AND activity_id=? AND member_mobile=? AND scope_key=? AND source=? " +
                     (chance.isEarned()?"AND consumed<gained":"AND (?<0 OR consumed<?)"),
-                    chance.isEarned()?new Object[]{b,a,m,chance.getScope(),chance.getSource()}:new Object[]{b,a,m,chance.getScope(),chance.getSource(),chance.getLimit(),chance.getLimit()});
+                    chance.isEarned()?new Object[]{b,a,mobile,chance.getScope(),chance.getSource()}:new Object[]{b,a,mobile,chance.getScope(),chance.getSource(),chance.getLimit(),chance.getLimit()});
             if(count==1){chosen=chance;break;}
         }
         if(chosen==null)throw exception(LOTTERY_TOT_LIMIT_REACHED_AGAIN);
@@ -170,7 +198,7 @@ public class LotteryLedgerImpl implements LotteryLedger {
                 id,b,a,cfg.getId(),m,req.getStoreId(),req.getRequestId(),cfg.getConfigVersion(),cfg.getStockEpoch(),pool,prize.getCode(),prize.getId(),stocked?"RESERVED":"NONE",chosen.getSource(),chosen.getScope(),chosen.getPointsCost(),"L"+id,encode(snapshot));
         jdbc.update("INSERT INTO lottery_v2_job(request_pk) VALUES(?)",id);
         jdbc.update("INSERT INTO lottery_v2_counter(business_id,activity_id,member_id,scope_key,source,gained) VALUES(?,?,0,'ACTIVITY_TOTAL',0,1) ON DUPLICATE KEY UPDATE gained=gained+1",b,a);
-        quotaCache.changed(b,a,m);
+        quotaCache.changed(b,a,mobile);
         // 插入所需字段均已确定，无需立即重读并反序列化。
         Draw accepted=new Draw(); accepted.setId(id); accepted.setBusinessId(b); accepted.setActivityId(a);
         accepted.setMemberId(m); accepted.setStoreId(req.getStoreId()); accepted.setEpoch(cfg.getStockEpoch()); accepted.setPool(pool);
@@ -222,16 +250,21 @@ public class LotteryLedgerImpl implements LotteryLedger {
         Draw draw=get(id);
         if(draw==null||!"ACCEPTED".equals(draw.getDrawStatus()))return;
         if(draw.getSnapshot().isManualReissue())return;
+        boolean mobileIdentity=draw.getSnapshot().getMemberMobile()!=null;
+        String counterTable=mobileIdentity?"lottery_mobile_counter":"lottery_v2_counter";
+        String ownerColumn=mobileIdentity?"member_mobile":"member_id";
+        Object owner=mobileIdentity?draw.getSnapshot().getMemberMobile():draw.getMemberId();
         // 退款与受理使用相同的会员、周期、来源、库存加锁顺序。
         for(Object[] counter:new Object[][]{{"TOTAL",0},{draw.getSnapshot().getScopeKey(),0},{draw.getScopeKey(),draw.getSource()}})
-            jdbc.queryForObject("SELECT consumed FROM lottery_v2_counter WHERE business_id=? AND activity_id=? AND member_id=? AND scope_key=? AND source=? FOR UPDATE",Long.class,draw.getBusinessId(),draw.getActivityId(),draw.getMemberId(),counter[0],counter[1]);
+            jdbc.queryForObject("SELECT consumed FROM "+counterTable+" WHERE business_id=? AND activity_id=? AND "+ownerColumn+"=? AND scope_key=? AND source=? FOR UPDATE",Long.class,draw.getBusinessId(),draw.getActivityId(),owner,counter[0],counter[1]);
         List<Map<String,Object>> rows=jdbc.queryForList("SELECT * FROM lottery_v2_request WHERE id=? FOR UPDATE",id);
         if(!"ACCEPTED".equals(rows.get(0).get("draw_status")))return;
         grantState(id,"FAILED",null,true,false);
         for(Object[] counter:new Object[][]{{"TOTAL",0},{draw.getSnapshot().getScopeKey(),0},{draw.getScopeKey(),draw.getSource()}})
-            jdbc.update("UPDATE lottery_v2_counter SET consumed=consumed-1,revision=revision+1 WHERE business_id=? AND activity_id=? AND member_id=? AND scope_key=? AND source=? AND consumed>0",draw.getBusinessId(),draw.getActivityId(),draw.getMemberId(),counter[0],counter[1]);
+            jdbc.update("UPDATE "+counterTable+" SET consumed=consumed-1,revision=revision+1 WHERE business_id=? AND activity_id=? AND "+ownerColumn+"=? AND scope_key=? AND source=? AND consumed>0",draw.getBusinessId(),draw.getActivityId(),owner,counter[0],counter[1]);
         jdbc.update("UPDATE lottery_v2_counter SET gained=gained-1 WHERE business_id=? AND activity_id=? AND member_id=0 AND scope_key='ACTIVITY_TOTAL' AND source=0 AND gained>0",draw.getBusinessId(),draw.getActivityId());
-        quotaCache.changed(draw.getBusinessId(),draw.getActivityId(),draw.getMemberId());
+        if(mobileIdentity)quotaCache.changed(draw.getBusinessId(),draw.getActivityId(),draw.getSnapshot().getMemberMobile());
+        else quotaCache.changed(draw.getBusinessId(),draw.getActivityId(),draw.getMemberId());
     }
 
     @Transactional(rollbackFor=Exception.class,timeout=5)
@@ -248,6 +281,7 @@ public class LotteryLedgerImpl implements LotteryLedger {
         }
         draw.getSnapshot().setPrize(draw.getSnapshot().getGuarantee());
         draw.getSnapshot().setCoupon(draw.getSnapshot().getGuaranteeCoupon());
+        draw.getSnapshot().setCouponPackage(draw.getSnapshot().getGuaranteePackage());
         draw.getSnapshot().setFallbackApplied(true);
         jdbc.update("UPDATE lottery_v2_request SET stock_state='RELEASED',grant_status='PENDING',snapshot_json=?,result_json=NULL WHERE id=?",encode(draw.getSnapshot()),id);
     }
@@ -270,7 +304,7 @@ public class LotteryLedgerImpl implements LotteryLedger {
     }
 
     /** 锁定原请求和任务，只补发原快照；不触碰次数计数和扣积分业务号。 */
-    @Transactional(rollbackFor=Exception.class)
+    @Transactional(rollbackFor=Exception.class,timeout=5)
     @Override
     public Reissue reissue(long b,long id,long member,long store,String requestId,String expectedBill,
                            long expectedSequence,boolean cashDefinitelyFailed) {
@@ -311,13 +345,24 @@ public class LotteryLedgerImpl implements LotteryLedger {
         return new Reissue(draw,true,"已安排人工补发，不扣抽奖次数或消耗积分");
     }
     @Override
+    @Transactional(rollbackFor=Exception.class,timeout=5)
     public boolean queuePhysicalReturn(LotteryLogDO log) {
         Draw draw=get(log.getId());
         if(draw==null)return false;
         if(draw.getBusinessId()!=log.getBusinessId()||draw.getMemberId()!=log.getMemberId())throw new IllegalArgumentException("退奖记录与流水不一致");
-        if(jdbc.update("UPDATE lottery_v2_job SET attempts=0,action='RETURN',state='READY',next_at=NOW(3) WHERE request_pk=? AND state='DONE'",draw.getId())>0)
-            events.publishEvent(new JobReady(draw.getId()));
+        if(!Objects.equals(draw.getSnapshot().getPrize().getPrizeType(),3)
+                ||!("COMPLETED".equals(draw.getDrawStatus())||"RETURNED".equals(draw.getDrawStatus())))return true;
+        // 任务丢失时补建；正在正常执行的发奖任务不抢占，等待下次扫描。
+        int created=jdbc.update("INSERT IGNORE INTO lottery_v2_job(request_pk,action,state,next_at) VALUES(?,'RETURN','READY',NOW(3))",draw.getId());
+        int changed=jdbc.update("UPDATE lottery_v2_job SET attempts=0,action='RETURN',state='READY',lease_token=NULL,lease_until=NULL,next_at=NOW(3) WHERE request_pk=? AND (state IN ('DONE','STOPPED') OR (action='RETURN' AND state='RUNNING' AND lease_until<NOW(3)))",draw.getId());
+        if(created>0||changed>0)events.publishEvent(new JobReady(draw.getId()));
         return true;
+    }
+    @Override
+    public void wakePhysicalReturns() {
+        for(Long id:jobs().queryForList("SELECT j.request_pk FROM lottery_v2_job j JOIN lottery_v2_request r ON r.id=j.request_pk WHERE j.action='RETURN' AND j.state='STOPPED' AND r.draw_status IN ('COMPLETED','RETURNED') ORDER BY j.request_pk LIMIT 64",Long.class)) {
+            if(jobs().update("UPDATE lottery_v2_job SET attempts=0,state='READY',next_at=NOW(3) WHERE request_pk=? AND action='RETURN' AND state='STOPPED'",id)==1)events.publishEvent(new JobReady(id));
+        }
     }
     @Override
     public boolean isReturnJob(long id){return "RETURN".equals(jdbc.queryForObject("SELECT action FROM lottery_v2_job WHERE request_pk=?",String.class,id));}
@@ -394,6 +439,37 @@ public class LotteryLedgerImpl implements LotteryLedger {
         if(jdbc.update("UPDATE lottery_v2_counter SET gained=gained+?,finished=finished+1 WHERE business_id=? AND activity_id=? AND member_id=? AND scope_key=? AND source=? AND (?=1 OR finished<?)",reward,b,a,m,scope,source,unlimited?1:0,limit)!=1)
             throw exception(LOTTERY_TASK_LIMIT_REACHED);
         jdbc.update("UPDATE lottery_v2_counter SET revision=revision+1 WHERE business_id=? AND activity_id=? AND member_id=? AND scope_key='TOTAL' AND source=0",b,a,m);
+        quotaCache.changed(b,a,m);
+    }
+    @Transactional(rollbackFor=Exception.class,timeout=5)
+    @Override
+    public void earn(long b,LotterySettingsCacheDataVO cfg,String m,String period,String scope,int source,int limit,boolean unlimited,int reward,int balance) {
+        earn(b,cfg,m,period,scope,source,limit,unlimited,reward,balance,null);
+    }
+
+    @Transactional(rollbackFor=Exception.class,timeout=5)
+    @Override
+    public void earnOrder(long b,LotterySettingsCacheDataVO cfg,String m,String period,String scope,int limit,boolean unlimited,String orderSn) {
+        if(orderSn!=null&&!orderSn.isBlank()&&orderSn.length()>120)throw new IllegalArgumentException("订单号过长");
+        earn(b,cfg,m,period,scope,3,limit,unlimited,1,0,orderSn);
+    }
+
+    private void earn(long b,LotterySettingsCacheDataVO cfg,String m,String period,String scope,int source,int limit,boolean unlimited,int reward,int balance,String orderSn) {
+        long a=cfg.getActivityId();
+        var versions=jdbc.queryForList("SELECT config_version FROM lottery_settings WHERE id=? AND business_id=? AND state=1 AND deleted=0 LOCK IN SHARE MODE",cfg.getId(),b);
+        if(versions.isEmpty()||n(versions.get(0),"config_version")!=cfg.getConfigVersion())throw exception(LOTTERY_SYSTEM_AGAIN);
+        ensureMobileCounter(b,a,m,"TOTAL",0); // 与受理时保持相同的会员计数锁顺序。
+        Long totalConsumed=jdbc.queryForObject("SELECT consumed FROM lottery_mobile_counter WHERE business_id=? AND activity_id=? AND member_mobile=? AND scope_key='TOTAL' AND source=0 FOR UPDATE",Long.class,b,a,m);
+        // 复用计数表唯一键，订单回执与奖励在同一事务提交；不增加业务表。
+        // 回执不属于 TOTAL/日期计数，不参与次数展示及场次重置。
+        if(orderSn!=null&&!orderSn.isBlank()&&jdbc.update("INSERT IGNORE INTO lottery_mobile_counter(business_id,activity_id,member_mobile,scope_key,source) VALUES(?,?,?,?,3)",b,a,m,"ORDER:"+orderSn)!=1)return;
+        // 尚未消耗的免费/积分机会不占任务奖励额度，尤其不能用无限积分阻止任务奖励。
+        if(cfg.getLotteryTotalNumber()!=null&&cfg.getLotteryTotalNumber()>0&&totalConsumed>=cfg.getLotteryTotalNumber())
+            throw exception(LOTTERY_TOT_LIMIT_REACHED_AGAIN);
+        ensureMobileCounter(b,a,m,scope,source);
+        if(jdbc.update("UPDATE lottery_mobile_counter SET gained=gained+?,finished=finished+1 WHERE business_id=? AND activity_id=? AND member_mobile=? AND scope_key=? AND source=? AND (?=1 OR finished<?)",reward,b,a,m,scope,source,unlimited?1:0,limit)!=1)
+            throw exception(LOTTERY_TASK_LIMIT_REACHED);
+        jdbc.update("UPDATE lottery_mobile_counter SET revision=revision+1 WHERE business_id=? AND activity_id=? AND member_mobile=? AND scope_key='TOTAL' AND source=0",b,a,m);
         quotaCache.changed(b,a,m);
     }
 }

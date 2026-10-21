@@ -32,7 +32,10 @@ class LotteryServiceWiringTest {
                 for (var field : implementation.getDeclaredFields()) {
                     if (field.isAnnotationPresent(Resource.class) && !contracts.contains(field.getType())
                             && dependencies.add(field.getType())) {
-                        context.getBeanFactory().registerSingleton("test" + field.getType().getSimpleName(), mock(field.getType()));
+                        Object dependency=mock(field.getType());
+                        if(dependency instanceof org.springframework.jdbc.core.JdbcTemplate jdbc)
+                            org.mockito.Mockito.when(jdbc.getDataSource()).thenReturn(mock(javax.sql.DataSource.class));
+                        context.getBeanFactory().registerSingleton("test" + field.getType().getSimpleName(), dependency);
                     }
                 }
             }

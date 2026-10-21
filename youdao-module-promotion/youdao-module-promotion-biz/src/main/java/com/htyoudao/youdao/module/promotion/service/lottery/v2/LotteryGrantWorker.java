@@ -34,6 +34,7 @@ public class LotteryGrantWorker {
     private LotteryStockCache stockCache;
     @Resource
     private LotteryV2Service service;
+    @Resource private LotteryCouponPackageService couponPackages;
     @Resource
     private LotteryProperties properties;
     @Resource
@@ -146,7 +147,7 @@ public class LotteryGrantWorker {
     }
     private LotteryLedger.Draw run(long id) {
         long started=System.nanoTime(), transferNanos=0;
-        boolean cashDraw=false, cashTransferAttempted=false;
+        boolean cashDraw=false, cashTransferAttempted=false, packageGrantAttempted=false;
         String token=UUID.randomUUID().toString();
         if(!ledger.claim(id,token))return null;
         Long previousBusiness=BusinessContextHolder.getBusinessId();
@@ -159,7 +160,6 @@ public class LotteryGrantWorker {
                 if(storage.claimPhysicalReturn(draw)) {
                     ledger.confirmPhysicalReturn(id);draw=ledger.get(id);
                     if("RETURNED".equals(draw.getDrawStatus())) {
-                        if(draw.getPointsCost()>0)members.refundLotteryPoints(draw.getMemberId(),draw.pointsBusinessNo());
                         stockCache.reconcile(draw);service.result(draw);
                     }
                 }
@@ -200,6 +200,11 @@ public class LotteryGrantWorker {
                             ledger.retryJob(id,token,"微信红包处理中");return current;
                         }
                     } else {
+                        if(type==6) {
+                            packageGrantAttempted=true;
+                            storage.log(draw);
+                            couponPackages.grant(draw);
+                        }
                         if(type==1)storage.coupon(draw);
                         if(type==2&&!members.changeLotteryPoints(draw.getMemberId(),draw.pointsBusinessNo()+":AWARD",draw.getSnapshot().getPrize().getPrizeValue().intValueExact()))
                             throw new IllegalStateException("积分发放未完成");
@@ -223,7 +228,16 @@ public class LotteryGrantWorker {
             LotteryLedger.Draw failed=null;
             try {failed=ledger.get(id);if(failed!=null&&Objects.equals(failed.getSnapshot().getPrize().getPrizeType(),5))storage.log(failed);}
             catch(Exception logging){log.warn("Lottery cash log deferred: request={}, reason={}",id,logging.getClass().getSimpleName());}
-            if(cashTransferAttempted&&(failed==null||("L"+id).equals(failed.getOutBillNo()))) {
+            if(packageGrantAttempted) {
+                // 只处理进入发券阶段后的失败；扣积分阶段仍沿用原重试逻辑。
+                try {
+                    var pending=failed==null?ledger.get(id):failed;
+                    if(pending!=null&&!"COMPLETED".equals(pending.getDrawStatus())) {
+                        ledger.grantState(id,"FAILED",service.result(pending),false,false);
+                        try{storage.log(ledger.get(id));}catch(Exception ignored){log.warn("券包中奖记录待人工补齐 request={}",id);}
+                    }
+                } finally {ledger.stopJob(id,token,"券包发放失败，待人工补发："+e.getClass().getSimpleName());}
+            } else if(cashTransferAttempted&&(failed==null||("L"+id).equals(failed.getOutBillNo()))) {
                 ledger.stopJob(id,token,"红包转账单号未落账，需人工核对");
                 log.warn("Lottery cash transfer requires reconciliation: request={}, reason={}",id,e.getClass().getSimpleName());
             } else {

@@ -12,7 +12,7 @@ public class LotteryTypeVO {
     private Long id;
 
     /** 奖品类型 1 优惠卷 2 积分 3 实物 4 无奖品 */
-    @Schema(name = "lotteryType", description = "奖品类型 1 优惠卷 2 积分 3 实物 4 无奖品")
+    @Schema(name = "lotteryType", description = "奖品类型 1 优惠卷 2 积分 3 实物 4 无奖品 5 现金红包 6 优惠券包")
     private Integer lotteryType;
 
     /** 活动名称 */

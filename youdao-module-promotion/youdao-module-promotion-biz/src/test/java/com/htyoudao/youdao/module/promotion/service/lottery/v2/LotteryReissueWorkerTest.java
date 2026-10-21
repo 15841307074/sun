@@ -77,7 +77,7 @@ class LotteryReissueWorkerTest {
         when(ledger.isReturnJob(100)).thenReturn(true);when(storage.claimPhysicalReturn(draw)).thenReturn(true);
         doAnswer(call->{draw.setDrawStatus("RETURNED");draw.setStockState("RETURNED");return null;}).when(ledger).confirmPhysicalReturn(100);
         assertSame(draw,ReflectionTestUtils.invokeMethod(worker,"run",100L));
-        verify(ledger).confirmPhysicalReturn(100);verify(members).refundLotteryPoints(40L,"L100");
+        verify(ledger).confirmPhysicalReturn(100);verify(members,never()).refundLotteryPoints(anyLong(),anyString());
         verify(ledger).finishJob(eq(100L),anyString());verifyNoInteractions(cash);verify(storage,never()).log(any());
     }
 }

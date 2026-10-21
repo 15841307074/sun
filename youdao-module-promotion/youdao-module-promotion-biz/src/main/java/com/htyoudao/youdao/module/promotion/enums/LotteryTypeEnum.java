@@ -17,7 +17,9 @@ public enum LotteryTypeEnum implements ArrayValuable<Integer> {
     COUPON(1, "优惠卷"),
     INTEGRAL(2, "积分"),
     REAL(3, "实物"),
-    NOPRIZES(4, "无奖品");
+    NOPRIZES(4, "无奖品"),
+    RED_PACKET(5, "现金红包"),
+    COUPON_PACKAGE(6, "优惠券包");
     public static final Integer[] ARRAYS = Arrays.stream(values()).map(LotteryTypeEnum::getStatus).toArray(Integer[]::new);
 
     /**

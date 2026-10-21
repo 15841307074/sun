@@ -35,7 +35,7 @@ public class LotteryReissueServiceImpl implements LotteryReissueService {
         if("COMPLETED".equals(draw.getDrawStatus())||"SUCCESS".equals(draw.getGrantStatus()))
             return new LotteryReissueRespVO(false,"奖品已发放，不重复补发",results.result(draw));
         // 原失败退款可能因服务异常尚未完成。幂等补齐原退款，而不是再扣一次。
-        if("FAILED".equals(draw.getDrawStatus())&&!draw.getSnapshot().isManualReissue()&&draw.getPointsCost()>0)
+        if(!Objects.equals(draw.getSnapshot().getPrize().getPrizeType(),6)&&"FAILED".equals(draw.getDrawStatus())&&!draw.getSnapshot().isManualReissue()&&draw.getPointsCost()>0)
             members.refundLotteryPoints(draw.getMemberId(),draw.pointsBusinessNo());
         boolean cashFailed=false;
         if(Objects.equals(draw.getSnapshot().getPrize().getPrizeType(),5)) {

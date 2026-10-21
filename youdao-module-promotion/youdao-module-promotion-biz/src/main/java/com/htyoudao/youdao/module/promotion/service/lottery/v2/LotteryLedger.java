@@ -59,6 +59,12 @@ public interface LotteryLedger {
 
     Map<String,long[]> counters(long b,long a,long m,String period);
 
+    long consumed(long b,long a,String mobile,String scope,int source);
+    long[] counter(long b,long a,String mobile,String scope,int source);
+    Map<String,long[]> counters(long b,long a,String mobile,String period);
+    void earn(long b,LotterySettingsCacheDataVO cfg,String mobile,String period,String scope,int source,int limit,boolean unlimited,int reward,int balance);
+    void earnOrder(long b,LotterySettingsCacheDataVO cfg,String mobile,String period,String scope,int limit,boolean unlimited,String orderSn);
+
     Draw accept(long b,LotteryDrawSnapshot snapshot);
 
     void grantState(long id,String grant,LotteryUserLogVO result,boolean terminal,boolean success);
@@ -77,6 +83,8 @@ public interface LotteryLedger {
                            long expectedSequence,boolean cashDefinitelyFailed);
 
     boolean queuePhysicalReturn(LotteryLogDO log);
+
+    void wakePhysicalReturns();
 
     boolean isReturnJob(long id);
 

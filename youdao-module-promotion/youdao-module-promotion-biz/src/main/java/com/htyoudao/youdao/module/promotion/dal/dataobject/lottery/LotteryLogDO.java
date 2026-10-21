@@ -38,7 +38,7 @@ public class  LotteryLogDO extends BusinessBaseDO implements Serializable {
 
     private Long lotteryPrizeId;
     /** 奖品类型 1 优惠卷 2 积分 3 实物 4 无奖品 */
-    @Schema(name = "prizeType", description = "奖品类型 1 优惠卷 2 积分 3 实物 4 无奖品 5 现金红包")
+    @Schema(name = "prizeType", description = "奖品类型 1 优惠卷 2 积分 3 实物 4 无奖品 5 现金红包 6 优惠券包")
     private Integer prizeType;
 
     @Schema(description = "抽奖时的兜底标记：0非兜底，1兜底；历史未核对数据为空")
@@ -127,4 +127,16 @@ public class  LotteryLogDO extends BusinessBaseDO implements Serializable {
     @Schema(name = "storeName", description = "门店名")
     @TableField(exist = false)
     private String storeName;
+    /** 原抽奖幂等编号，人工补发使用 */
+    @TableField(exist=false)
+    private String requestId;
+    /** 发放状态：PENDING、SUCCESS、FAILED、RETURNED */
+    @TableField(exist=false)
+    private String grantStatus;
+    /** 发放失败或停止重试原因 */
+    @TableField(exist=false)
+    private String failReason;
+    /** 是否允许后台人工补发 */
+    @TableField(exist=false)
+    private Boolean canReissue;
 }

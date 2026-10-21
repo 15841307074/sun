@@ -25,6 +25,7 @@ class LotteryRequestIdCompatibilityTest {
     private MockMvc mvc;
     @BeforeEach void setup() {
         var controller=new AppLotteryController();mobile=mock(LotteryMobileService.class);v2=mock(LotteryV2Service.class);
+        ReflectionTestUtils.setField(controller,"identities",mock(LotteryIdentityService.class));
         ReflectionTestUtils.setField(controller,"lotteryMobileservice",mobile);ReflectionTestUtils.setField(controller,"lotteryV2Service",v2);
         when(mobile.lottery(any())).thenAnswer(call->{LotteryVO req=call.getArgument(0);var result=new LotteryUserLogVO();result.setRequestId(req.getRequestId());return CommonResult.success(result);});
         mvc=MockMvcBuilders.standaloneSetup(controller).setMessageConverters(new MappingJackson2HttpMessageConverter()).build();

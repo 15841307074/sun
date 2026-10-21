@@ -110,6 +110,10 @@ public class LotteryMobileServiceImpl implements LotteryMobileService {
     private LotteryAdmission lotteryAdmission;
     @Resource
     private LotteryCounterCache lotteryCounterCache;
+    @Resource private LotteryIdentityService lotteryIdentityService;
+    @Resource private LotteryCouponPackageService lotteryCouponPackageService;
+    @Resource private LotteryRecordStateService lotteryRecordStateService;
+    @Resource private LotteryAddressStorage lotteryAddressStorage;
 
     @Resource
     private LotteryScopeService lotteryScopeService;
@@ -327,6 +331,7 @@ public class LotteryMobileServiceImpl implements LotteryMobileService {
             result = queryAllLotteryLogByMemberId(memberId);
         }
         processLotteryLogResult(result);
+        lotteryRecordStateService.enrich(result);
         return result;
     }
 
@@ -353,8 +358,11 @@ public class LotteryMobileServiceImpl implements LotteryMobileService {
      * @return 抽奖记录列表
      */
     private List<LotteryLogDO> queryLotteryLogBySettings(LotterySettingsDO lotterySettings, Long memberId) {
-        return lotteryLogMapper.selectList(new LambdaQueryWrapperX<LotteryLogDO>()
-                .eq(LotteryLogDO::getMemberId, memberId)
+        return lotteryLogMapper.selectLotteryRows(new LambdaQueryWrapperX<LotteryLogDO>()
+                .eq(LotteryLogDO::getBusinessId,BusinessContextHolder.getRequiredBusinessId()).eq(LotteryLogDO::getDeleted,false)
+                .and(owner -> owner.in(LotteryLogDO::getMemberMobile,lotteryIdentityService.recordPhones(lotteryIdentityService.mobile(memberId)))
+                        .or(blank -> blank.eq(LotteryLogDO::getMemberId,memberId)
+                                .and(missing -> missing.isNull(LotteryLogDO::getMemberMobile).or().eq(LotteryLogDO::getMemberMobile,""))))
                 .and(wrapper -> wrapper
                         .eq(LotteryLogDO::getLotteryId, lotterySettings.getId())
                         .or()
@@ -370,8 +378,12 @@ public class LotteryMobileServiceImpl implements LotteryMobileService {
      * @return 抽奖记录列表
      */
     private List<LotteryLogDO> queryAllLotteryLogByMemberId(Long memberId) {
-        return lotteryLogMapper.selectList(new LambdaQueryWrapperX<LotteryLogDO>()
-                .eq(LotteryLogDO::getMemberId, memberId)
+        String mobile=lotteryIdentityService.mobile(memberId);
+        return lotteryLogMapper.selectLotteryRows(new LambdaQueryWrapperX<LotteryLogDO>()
+                .eq(LotteryLogDO::getBusinessId,BusinessContextHolder.getRequiredBusinessId()).eq(LotteryLogDO::getDeleted,false)
+                .and(owner -> owner.in(LotteryLogDO::getMemberMobile,lotteryIdentityService.recordPhones(mobile))
+                        .or(blank -> blank.eq(LotteryLogDO::getMemberId,memberId)
+                                .and(missing -> missing.isNull(LotteryLogDO::getMemberMobile).or().eq(LotteryLogDO::getMemberMobile,""))))
                 .orderByDesc(LotteryLogDO::getCreateTime));
     }
 
@@ -414,28 +426,27 @@ public class LotteryMobileServiceImpl implements LotteryMobileService {
     }
 
     private LotteryLogDO findLotteryLogById(Long id, Long memberId) {
-        return lotteryLogMapper.selectOne(new LambdaQueryWrapperX<LotteryLogDO>().eq(LotteryLogDO::getMemberId, memberId).eq(LotteryLogDO::getId, id));
+        if(id==null)return null;
+        String mobile=lotteryIdentityService.mobile(memberId);
+        for(Long originalMember:lotteryIdentityService.relatedMembers(mobile,memberId)) {
+            LotteryLogDO row=lotteryLogMapper.selectOne(new LambdaQueryWrapperX<LotteryLogDO>()
+                    .eq(LotteryLogDO::getBusinessId,BusinessContextHolder.getRequiredBusinessId())
+                    .eq(LotteryLogDO::getMemberId,originalMember).eq(LotteryLogDO::getId,id));
+            if(row!=null&&(lotteryIdentityService.matchesMobile(mobile,row.getMemberMobile())||Objects.equals(originalMember,memberId)
+                    &&(row.getMemberMobile()==null||row.getMemberMobile().isBlank())))return row;
+        }
+        return queryAllLotteryLogByMemberId(memberId).stream().filter(row -> Objects.equals(row.getId(),id)).findFirst().orElse(null);
     }
 
-    private LotteryLogDO findLatestLotteryLogByMemberIdAndPrizeType(LotteryLogVO lotteryLogVo) {
-        List<LotteryLogDO> list = lotteryLogMapper.selectList(new LambdaQueryWrapperX<LotteryLogDO>()
-                .eq(LotteryLogDO::getMemberId, lotteryLogVo.getMemberId())
-                .eq(LotteryLogDO::getPrizeType, LotteryTypeEnum.REAL.getStatus())
-                .eq(LotteryLogDO::getLotteryPrizeId, lotteryLogVo.getId())
-                .orderByDesc(LotteryLogDO::getCreateTime));
-        return list.isEmpty() ? null : list.get(0);
+    private LotteryLogDO findLatestLotteryLogByMemberIdAndPrizeType(LotteryLogVO request) {
+        return queryAllLotteryLogByMemberId(request.getMemberId()).stream()
+                .filter(row -> Objects.equals(row.getPrizeType(),3)&&Objects.equals(row.getLotteryPrizeId(),request.getId()))
+                .findFirst().orElse(null);
     }
 
-    private int updateLotteryLogWithPrizeState(LotteryLogVO lotteryLogVo, LotteryLogDO lotteryLog) {
-        lotteryLog.setPrizeState(2);
-        lotteryLog.setReceiveAddress(lotteryLogVo.getReceiveAddress());
-        lotteryLog.setReceiveUser(lotteryLogVo.getMemberNickName());
-        lotteryLog.setReceiveMobile(lotteryLogVo.getMemberMobile());
-        return lotteryLogMapper.update(new LambdaUpdateWrapper<LotteryLogDO>().set(LotteryLogDO::getPrizeState, 2)
-                .set(LotteryLogDO::getReceiveAddress, lotteryLogVo.getReceiveAddress())
-                .set(LotteryLogDO::getReceiveUser, lotteryLogVo.getMemberNickName())
-                .set(LotteryLogDO::getReceiveMobile, lotteryLogVo.getMemberMobile()).eq(LotteryLogDO::getId, lotteryLog.getId())
-                .eq(LotteryLogDO::getMemberId, lotteryLogVo.getMemberId()).in(LotteryLogDO::getPrizeState, 1, 2));
+    private int updateLotteryLogWithPrizeState(LotteryLogVO request, LotteryLogDO original) {
+        if(request.getReceiveAddress()==null||request.getReceiveAddress().isBlank())return 0;
+        return lotteryAddressStorage.update(request,original);
     }
 
     /**
@@ -476,7 +487,7 @@ public class LotteryMobileServiceImpl implements LotteryMobileService {
                 // 发布异常只保留记录，不空闲补查；拒绝之前按账本核验，避免旧缓存误拦刚完成的任务。
                 String period=buildTaskScope(lotterySettings).scopeKey;
                 if(LotteryQuota.calculate(lotterySettings,lotteryLedger.counters(BusinessContextHolder.getRequiredBusinessId(),
-                        lotterySettings.getActivityId(),lotteryVo.getMemberId(),period),period,defaultZero(wxMember.getMemberIntegral()),true).getNum()==0)
+                        lotterySettings.getActivityId(),lotteryIdentityService.mobile(wxMember),period),period,defaultZero(wxMember.getMemberIntegral()),true).getNum()==0)
                     throw exception(LOTTERY_NO_CHANCE);
             }
             return CommonResult.success(true);
@@ -823,7 +834,7 @@ public class LotteryMobileServiceImpl implements LotteryMobileService {
 
     private int calculateTotalRemaining(LotterySettingsCacheDataVO settings, Long memberId) {
         if (lotteryV2Service.enabled(settings)) return calculateRemainingNum(defaultZero(settings.getLotteryTotalNumber()),
-                Math.toIntExact(lotteryLedger.consumed(BusinessContextHolder.getRequiredBusinessId(), settings.getActivityId(), memberId, "TOTAL", 0)));
+                Math.toIntExact(lotteryLedger.consumed(BusinessContextHolder.getRequiredBusinessId(), settings.getActivityId(), lotteryIdentityService.mobile(memberId), "TOTAL", 0)));
 
         if (settings.getLotteryTotalNumber() == null || settings.getLotteryTotalNumber() == 0) {
             return -1;
@@ -1398,9 +1409,11 @@ public class LotteryMobileServiceImpl implements LotteryMobileService {
         validateUserCrowd(cfg, member);
         if (!activityAppService.checkCanJoin(cfg.getActivityId())) throw exception(LOTTERY_WECOMGROUP_ERROR);
         LotteryPrizeDO guarantee = getGuaranteePrize(prizes, cfg.getPrizePoolRules(), req.getStoreId());
-        if (guarantee == null) throw exception(LOTTERY_GUARANTEED_PRODUCTS);
+        if (guarantee == null || Objects.equals(guarantee.getPrizeType(),5)) throw exception(LOTTERY_GUARANTEED_PRODUCTS);
         LotteryDrawSnapshot snapshot = new LotteryDrawSnapshot();
         snapshot.setRequest(req); snapshot.setSettings(cfg); snapshot.setMember(member); snapshot.setGuarantee(guarantee);
+        snapshot.setMemberMobile(lotteryIdentityService.mobile(member));
+        lotteryIdentityService.register(cfg.getActivityId(),member);
         String period = buildTaskScope(cfg).scopeKey; snapshot.setScopeKey(period);
         List<LotteryDrawSnapshot.Chance> choices = snapshot.getChances();
         if (isMultiChanceMode(cfg)) {
@@ -1428,8 +1441,12 @@ public class LotteryMobileServiceImpl implements LotteryMobileService {
                 if (random.compareTo(cumulative) <= 0) { selected = prize; break; }
             }
         }
-        if (hasCityRestriction(req, selected) || (Objects.equals(selected.getPrizeType(), 5) && Objects.equals(member.getMemberCategory(), 1))) selected = guarantee;
+        if (hasCityRestriction(req, selected)) selected = guarantee;
+        selected=LotteryPrizePolicy.forChannel(member,selected,guarantee);
         snapshot.setPrize(selected);
+        if(Objects.equals(selected.getPrizeType(),6))snapshot.setCouponPackage(lotteryCouponPackageService.snapshot(selected.getAwardId()));
+        if(Objects.equals(guarantee.getPrizeType(),6))snapshot.setGuaranteePackage(
+                Objects.equals(selected.getId(),guarantee.getId())?snapshot.getCouponPackage():lotteryCouponPackageService.snapshot(guarantee.getAwardId()));
         if (Objects.equals(selected.getPrizeType(), 1)) snapshot.setCoupon(lotteryAddLogService.getGoodCoupon(selected.getAwardId()));
         if (Objects.equals(guarantee.getPrizeType(), 1)) snapshot.setGuaranteeCoupon(
                 Objects.equals(selected.getId(), guarantee.getId()) ? snapshot.getCoupon() : lotteryAddLogService.getGoodCoupon(guarantee.getAwardId()));
@@ -2324,7 +2341,7 @@ public class LotteryMobileServiceImpl implements LotteryMobileService {
                                                boolean createIfMissing) {
         LotterySettingsCacheDataVO config = getLotterySettings(activityId);
         if (lotteryV2Service.enabled(config)) {
-            long[] values = lotteryLedger.counter(BusinessContextHolder.getRequiredBusinessId(), activityId, memberId,
+            long[] values = lotteryLedger.counter(BusinessContextHolder.getRequiredBusinessId(), activityId, lotteryIdentityService.mobile(memberId),
                     LotteryQuota.sourceScope(config,scope.scopeKey,unlimited), taskType);
             LotteryTaskDO row = new LotteryTaskDO(); row.setActivityId(activityId); row.setMemberId(memberId); row.setTaskType(taskType);
             row.setGainCount(Math.toIntExact(values[0])); row.setConsumeCount(Math.toIntExact(values[1])); row.setFinishCount(Math.toIntExact(values[2]));
@@ -2888,7 +2905,7 @@ public class LotteryMobileServiceImpl implements LotteryMobileService {
     }
     private LotterySettingsNumVo v2Quota(LotterySettingsCacheDataVO settings,Long memberId,WxMemberVO member,boolean applyLimits) {
         String period=buildTaskScope(settings).scopeKey;
-        return LotteryQuota.calculate(settings,lotteryCounterCache.read(BusinessContextHolder.getRequiredBusinessId(),settings.getActivityId(),memberId,period),
+        return LotteryQuota.calculate(settings,lotteryCounterCache.read(BusinessContextHolder.getRequiredBusinessId(),settings.getActivityId(),lotteryIdentityService.mobile(member),period),
                 period,member==null?0:defaultZero(member.getMemberIntegral()),applyLimits);
     }
 
@@ -3067,6 +3084,11 @@ public class LotteryMobileServiceImpl implements LotteryMobileService {
     public Boolean shareTask(LotteryTaskReqVO reqVO) {
         LotterySettingsCacheDataVO settings = loadTaskSettings(reqVO.getLotteryId(), reqVO.getMemberId());
         validateShareTaskEnabled(settings, reqVO);
+        if(lotteryV2Service.enabled(settings)) {
+            validateShareTaskCanComplete(settings,reqVO.getMemberId());
+            completeLotteryTask(settings,reqVO.getMemberId(),LotteryTaskTypeEnum.SHARE,buildTaskScope(settings),defaultZero(settings.getShareCount()),false,1);
+            return true;
+        }
         String lockKey = LOTTERY_SHARE_LOCK_PREFIX + resolveLotteryBizActivityId(settings) + ":" + reqVO.getMemberId();
         RLock lock = redissonClient.getLock(lockKey);
         boolean locked = false;
@@ -3163,7 +3185,7 @@ public class LotteryMobileServiceImpl implements LotteryMobileService {
             }
             if (lotteryV2Service.enabled(cacheData)) {
                 String period=buildTaskScope(cacheData).scopeKey;
-                lotteryLedger.earnOrder(BusinessContextHolder.getRequiredBusinessId(),cacheData,reqDTO.getMemberId(),period,
+                lotteryLedger.earnOrder(BusinessContextHolder.getRequiredBusinessId(),cacheData,lotteryIdentityService.mobile(wxMember),period,
                         LotteryQuota.sourceScope(cacheData,period,isUnlimitedOrderTask(cacheData)),defaultZero(settingsDO.getPlaceOrderLotteryNumber()),
                         isUnlimitedOrderTask(cacheData),reqDTO.getOrderSn());
             } else completeLotteryTask(cacheData, reqDTO.getMemberId(), LotteryTaskTypeEnum.ORDER,
@@ -3244,7 +3266,7 @@ public class LotteryMobileServiceImpl implements LotteryMobileService {
         validateLotteryTaskEnabled(settings, taskTypeEnum);
         if (lotteryV2Service.enabled(settings)) {
             WxMemberVO member = getAndValidateWxMember(memberId);
-            lotteryLedger.earn(BusinessContextHolder.getRequiredBusinessId(), settings, memberId, scope.scopeKey,
+            lotteryLedger.earn(BusinessContextHolder.getRequiredBusinessId(), settings, lotteryIdentityService.mobile(member), scope.scopeKey,
                     LotteryQuota.sourceScope(settings,scope.scopeKey,unlimited), taskTypeEnum.getCode(), taskLimit, unlimited, rewardCount, defaultZero(member.getMemberIntegral()));
             return;
         }

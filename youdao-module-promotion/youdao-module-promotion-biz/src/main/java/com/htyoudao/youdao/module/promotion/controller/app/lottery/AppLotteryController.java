@@ -32,6 +32,7 @@ public class AppLotteryController {
     private LotteryV2Service lotteryV2Service;
     @Resource
     private LotteryWinnerFeed winnerFeed;
+    @Resource private com.htyoudao.youdao.module.promotion.service.lottery.v2.LotteryIdentityService identities;
 
     @GetMapping("/recent-winners")
     @Operation(summary = "当前活动最新20条非兜底中奖记录，手机号已脱敏", description = "activityId 为活动主表ID，不接受抽奖配置ID；活动内所有门店汇总；返回不足20条时取实际条数")
@@ -42,6 +43,7 @@ public class AppLotteryController {
     @PostMapping("/result")
     @Operation(summary = "根据 requestId 查询已受理的抽奖及发奖结果")
     public CommonResult<LotteryUserLogVO> result(@Valid @RequestBody LotteryVO request) {
+        identities.authorize(request.getMemberId());
         return CommonResult.success(lotteryV2Service.query(request));
     }
 
@@ -61,24 +63,28 @@ public class AppLotteryController {
     @PostMapping("/getLotteryLogByMemberId")
     @Operation(summary = "获取活动中奖记录")
     public CommonResult<List<LotteryLogDO>> getLotteryLogByMemberId(@RequestBody LotteryLogVO lotteryLogVO) {
+        identities.authorize(lotteryLogVO.getMemberId());
         return CommonResult.success(lotteryMobileservice.getLotteryLogByMemberId(lotteryLogVO));
     }
 
     @PostMapping("/updateReceivingAddress")
     @Operation(summary = "设置收货地址")
     public CommonResult updateReceivingAddress(@RequestBody LotteryLogVO lotteryLogVO) {
+        identities.authorize(lotteryLogVO.getMemberId());
         return CommonResult.success(lotteryMobileservice.updateReceivingAddress(lotteryLogVO));
     }
 
     @PostMapping("/verifyLottery")
     @Operation(summary = "抽奖校验")
     public CommonResult verifyLottery(@RequestBody LotteryVO lotteryVO) {
+        identities.authorize(lotteryVO.getMemberId());
         return lotteryMobileservice.verifyLottery(lotteryVO);
     }
 
     @PostMapping("/lottery")
     @Operation(summary = "抽奖")
     public CommonResult<LotteryUserLogVO> lottery(@RequestBody LotteryVO lotteryVO) {
+        identities.authorize(lotteryVO.getMemberId());
         // 兼容旧版小程序；已传入的标识保留，用于同一次抽奖重试去重。
         if (lotteryVO.getRequestId() == null || lotteryVO.getRequestId().isBlank()) {
             lotteryVO.setRequestId(UUID.randomUUID().toString());
@@ -89,12 +95,14 @@ public class AppLotteryController {
     @PostMapping("/lotteryNum")
     @Operation(summary = "抽奖次数")
     public CommonResult<LotterySettingsNumVo> lotteryNum(@RequestBody LotteryVO lotteryVO) {
+        identities.authorize(lotteryVO.getMemberId());
         return CommonResult.success(lotteryMobileservice.lotteryNum(lotteryVO));
     }
 
     @PostMapping("/task/getTaskList")
     @Operation(summary = "获取抽奖任务列表")
     public CommonResult<List<LotteryTaskVO>> getTaskList(@Valid @RequestBody LotteryTaskReqVO reqVO) {
+        identities.authorize(reqVO.getMemberId());
         return CommonResult.success(lotteryMobileservice.getTaskList(reqVO));
     }
 
@@ -107,12 +115,14 @@ public class AppLotteryController {
     @PostMapping("/task/share")
     @Operation(summary = "完成分享任务", description = "memberId 为分享用户ID")
     public CommonResult<Boolean> shareTask(@Valid @RequestBody LotteryTaskReqVO reqVO) {
+        identities.authorize(reqVO.getMemberId());
         return CommonResult.success(lotteryMobileservice.shareTask(reqVO));
     }
 
     @PostMapping("/task/browse")
     @Operation(summary = "完成浏览首页任务")
     public CommonResult<Boolean> browseTask(@Valid @RequestBody LotteryTaskReqVO reqVO) {
+        identities.authorize(reqVO.getMemberId());
         return CommonResult.success(lotteryMobileservice.browseTask(reqVO));
     }
 
@@ -147,5 +157,10 @@ public class AppLotteryController {
     @Operation(summary = "获取浏览任务完成次数")
     public CommonResult<LotteryBrowseCountVO> getBrowseCount(@RequestBody LotteryVO lotteryVO) {
         return CommonResult.success(new LotteryBrowseCountVO());
+    }
+    @ExceptionHandler({org.springframework.dao.DataAccessException.class,org.springframework.transaction.TransactionException.class})
+    public CommonResult<?> dataAccessFailure(RuntimeException failure) {
+        org.slf4j.LoggerFactory.getLogger(AppLotteryController.class).warn("抽奖数据访问暂不可用：{}",failure.getClass().getSimpleName());
+        return CommonResult.error(com.htyoudao.youdao.module.promotion.api.enums.ErrorCodeConstants.LOTTERY_SYSTEM_AGAIN);
     }
 }

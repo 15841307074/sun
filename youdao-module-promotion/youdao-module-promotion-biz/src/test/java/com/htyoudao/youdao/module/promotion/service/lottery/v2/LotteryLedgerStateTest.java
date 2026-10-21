@@ -55,7 +55,7 @@ class LotteryLedgerStateTest {
         request.setStoreId(30L); request.setRequestId("request_123");
         var prize = new LotteryPrizeDO();
         prize.setId(100L); prize.setCode("guarantee"); prize.setIsGuarantees(1);
-        snapshot = new LotteryDrawSnapshot();
+        snapshot = new LotteryDrawSnapshot();snapshot.setMemberMobile("13800000000");
         snapshot.setSettings(settings); snapshot.setRequest(request); snapshot.setPrize(prize);
         snapshot.setScopeKey("TOTAL");
         snapshot.setChances(List.of(new LotteryDrawSnapshot.Chance(1, "TOTAL", 1, 0, false)));

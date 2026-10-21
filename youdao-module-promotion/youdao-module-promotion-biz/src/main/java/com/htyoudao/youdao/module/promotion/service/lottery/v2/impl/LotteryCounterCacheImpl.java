@@ -25,6 +25,7 @@ import static com.htyoudao.youdao.module.promotion.api.enums.ErrorCodeConstants.
 public class LotteryCounterCacheImpl implements LotteryCounterCache {
     @Resource
     private JdbcTemplate jdbc;
+    @Resource private LotteryMobileCounterCache mobileCache;
     @Resource
     private StringRedisTemplate redis;
     @Resource
@@ -84,6 +85,9 @@ public class LotteryCounterCacheImpl implements LotteryCounterCache {
             catch(Exception e){jdbc.update("UPDATE lottery_v2_counter SET cache_next_at=DATE_ADD(NOW(3),INTERVAL 10 SECOND) WHERE business_id=? AND activity_id=? AND member_id=? AND scope_key='TOTAL' AND source=0 AND revision=?",b,a,m,v);}
         }}catch(Exception e){log.debug("Lottery quota publisher unavailable: {}",e.getClass().getSimpleName());}
     }
+    @Override public void changed(long b,long a,String mobile){mobileCache.changed(b,a,mobile);}
+    @Override public Map<String,long[]> read(long b,long a,String mobile,String period){return mobileCache.read(b,a,mobile,period);}
+
     private long ttl(String period){
         try {
             LocalDate day=LocalDate.parse(period.substring(0,8),DateTimeFormatter.BASIC_ISO_DATE);

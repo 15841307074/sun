@@ -16,6 +16,16 @@ public class LotteryDrawSnapshot {
     private Long tenantId;
     private GoodCouponDO coupon;
     private GoodCouponDO guaranteeCoupon;
+    private PackageReward couponPackage;
+    private PackageReward guaranteePackage;
+    @Data public static class PackageReward {
+        private Long packageId;
+        private List<CouponCopy> coupons=new ArrayList<>();
+    }
+    @Data public static class CouponCopy {
+        private Long id;
+        private GoodCouponDO template;
+    }
     private boolean fallbackApplied;
     /** 人工补发沿用奖品，不再次扣次数/积分；失败不自动切换其他奖品。 */
     private boolean manualReissue;
@@ -25,6 +35,8 @@ public class LotteryDrawSnapshot {
     private LotteryVO request;
     private LotterySettingsCacheDataVO settings;
     private WxMemberVO member;
+    /** 服务端确认的抽奖手机号；空值仅用于识别旧流水。 */
+    private String memberMobile;
     private LotteryPrizeDO prize;
     private LotteryPrizeDO guarantee;
     private String scopeKey;

@@ -33,7 +33,7 @@ public class LotteryLogPageRespVO  extends BusinessBaseDO implements Serializabl
 
 
     /** 奖品类型 1 优惠卷 2 积分 3 实物 4 无奖品 */
-    @Schema(name = "prizeType", description = "奖品类型 1 优惠卷 2 积分 3 实物 4 无奖品")
+    @Schema(name = "prizeType", description = "奖品类型 1 优惠卷 2 积分 3 实物 4 无奖品 5 现金红包 6 优惠券包")
     private Integer prizeType;
 
 
@@ -116,4 +116,12 @@ public class LotteryLogPageRespVO  extends BusinessBaseDO implements Serializabl
     private String storeName;
 
 
+    /** 原抽奖幂等编号，人工补发使用 */
+    private String requestId;
+    /** 发放状态：PENDING、SUCCESS、FAILED、RETURNED */
+    private String grantStatus;
+    /** 发放失败或停止重试原因 */
+    private String failReason;
+    /** 是否允许后台人工补发 */
+    private Boolean canReissue;
 }

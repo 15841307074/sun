@@ -11,6 +11,10 @@ import java.util.Map;
 
 @Mapper
 public interface LotteryLogMapper extends BaseMapperX<LotteryLogDO> {
+    @org.apache.ibatis.annotations.Options(timeout=5)
+    @Select("SELECT * FROM lottery_log ${ew.customSqlSegment}")
+    List<LotteryLogDO> selectLotteryRows(@Param("ew") com.baomidou.mybatisplus.core.conditions.Wrapper<LotteryLogDO> wrapper);
+
 
     @Select("""
             SELECT

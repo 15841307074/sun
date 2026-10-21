@@ -402,6 +402,7 @@ public class LotterySettingServiceImpl implements LotterySettingService {
     @Transactional(rollbackFor = Exception.class)
     @LogRecord(type = SYSTEM_LOTTERY_LOG_TYPE, subType = SYSTEM_LOTTERY_LOG_UPDATE_TYPE, bizNo = "{{#lotterySettingsVO.id}}", success = SYSTEM_LOTTERY_LOG_UPDATE_TYPE_SUCCESS)
     public CommonResult<Integer> updateLottery(LotterySettingsReqVO lotterySettingsVO) {
+        validateLotteryRewardTypes(lotterySettingsVO.getPrizes());
         lotteryRuntime.rejectLegacyWrite(lotterySettingsVO.getId());
         // 判断奖品存在唯一兜底商品
         LambdaQueryWrapper<LotterySettingsDO> lotterySettingsDOLambdaQueryWrapper = new LambdaQueryWrapper<>();
@@ -613,6 +614,7 @@ public class LotterySettingServiceImpl implements LotterySettingService {
     @Transactional
     @LogRecord(type = SYSTEM_LOTTERY_SETTING_TYPE, subType = SYSTEM_LOTTERY_SETTING_ADD_TYPE, bizNo = "1", success = SYSTEM_LOTTERY_SETTING_ADD_SUCCESS)
     public CommonResult<Integer> saveLottery(LotterySettingsAddReqVO lotterySettingsAddVO) {
+        validateLotteryRewardTypes(lotterySettingsAddVO.getPrizes());
         if(ObjectUtil.isNotEmpty(lotterySettingsAddVO.getTimeRangeList())){
             boolean b = validateTimeRanges(lotterySettingsAddVO.getTimeRangeList());
             if(!b){
@@ -1160,6 +1162,7 @@ public class LotterySettingServiceImpl implements LotterySettingService {
     @Transactional(rollbackFor = Exception.class)
     @LogRecord(type = SYSTEM_LOTTERY_LOG_TYPE, subType = SYSTEM_LOTTERY_LOG_UPDATE_TYPE, bizNo = "{{#lotterySettingsVO.id}}", success = SYSTEM_LOTTERY_LOG_UPDATE_TYPE_SUCCESS)
     public CommonResult<Integer> updateLotteryData(LotterySettingsUpdateReqVO lotterySettingsUpdateReqVO) {
+        validateLotteryRewardTypes(lotterySettingsUpdateReqVO.getPrizes());
         LotterySettingsDO existingSettings = lotterySettingsMapper.selectOne(new LambdaQueryWrapper<LotterySettingsDO>()
                 .eq(LotterySettingsDO::getActivityId, lotterySettingsUpdateReqVO.getActivityId()));
         ActivityDO existingActivity = activityService.selectById(lotterySettingsUpdateReqVO.getActivityId());
@@ -2849,4 +2852,15 @@ private String buildPrizeStockKey(Long lotteryId, Long prizeId, Integer prizePoo
     return RedisKeyConstants.PRIZE_NUM + lotteryId + ":prize:" + prizeId;
 }
 
+    private void validateLotteryRewardTypes(List<LotteryPrizeReqVO> rewards) {
+        if(rewards==null)return;
+        for(var reward:rewards) {
+            if(Objects.equals(reward.getIsGuarantees(),1)&&Objects.equals(reward.getPrizeType(),5))
+                throw com.htyoudao.youdao.framework.common.exception.util.ServiceExceptionUtil.exception(
+                        new com.htyoudao.youdao.framework.common.exception.ErrorCode(1_006_005_034,"红包不能作为抽奖兜底奖品"));
+            if(Objects.equals(reward.getPrizeType(),6)&&reward.getAwardId()==null)
+                throw com.htyoudao.youdao.framework.common.exception.util.ServiceExceptionUtil.exception(
+                        new com.htyoudao.youdao.framework.common.exception.ErrorCode(1_006_005_035,"请选择优惠券包"));
+        }
+    }
 }

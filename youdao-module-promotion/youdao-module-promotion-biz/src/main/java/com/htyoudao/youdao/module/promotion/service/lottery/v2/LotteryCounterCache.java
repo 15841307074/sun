@@ -8,5 +8,8 @@ public interface LotteryCounterCache {
 
     Map<String,long[]> read(long b,long a,long m,String period);
 
+    void changed(long b,long a,String mobile);
+    Map<String,long[]> read(long b,long a,String mobile,String period);
+
     void retry();
 }

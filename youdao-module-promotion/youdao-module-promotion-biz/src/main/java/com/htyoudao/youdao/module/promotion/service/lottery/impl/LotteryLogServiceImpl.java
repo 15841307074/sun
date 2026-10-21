@@ -101,6 +101,8 @@ public class LotteryLogServiceImpl implements LotteryLogService {
     private LotteryLogMapper lotteryLogMapper;
     @Resource
     private LotteryLedger lotteryLedger;
+    @Resource private com.htyoudao.youdao.module.promotion.service.lottery.v2.LotteryRecordStateService recordStates;
+    @Resource private com.htyoudao.youdao.module.promotion.service.lottery.v2.LotteryPhysicalReturnService physicalReturns;
     @Resource
     private LotteryPrizeMapper lotteryPrizeMapper;
 
@@ -178,7 +180,9 @@ public class LotteryLogServiceImpl implements LotteryLogService {
         PageParam pageParam = new PageParam();
         pageParam.setPageNo(pageNum);
         pageParam.setPageSize(pageSize);
-        return lotteryLogMapper.selectPage(pageParam, logDOLambdaQueryWrapper);
+        var page=lotteryLogMapper.selectPage(pageParam,logDOLambdaQueryWrapper);
+        recordStates.enrich(page.getList());
+        return page;
     }
 
     @Override
@@ -200,37 +204,7 @@ public class LotteryLogServiceImpl implements LotteryLogService {
     @DS(DsNameConstants.SHARDING)
     @DataPermission(enable = false)
     public void returnReal() {
-        LocalDateTime now = LocalDateTime.now();
-        // 退回奖品
-        LocalDateTime oneDayAgo = now.minus(2, ChronoUnit.DAYS);
-        // 定义日期格式
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-        // 格式化 LocalDateTime 为字符串
-        String formattedDate = oneDayAgo.format(formatter);
-
-        List<LotteryLogDO> list = lotteryLogMapper.selectList(new LambdaQueryWrapperX<LotteryLogDO>()
-                .eq(LotteryLogDO::getPrizeState, 1)
-                .eq(LotteryLogDO::getDeleted, 0)
-                .eq(LotteryLogDO::getPrizeType, 3)
-                .lt(LotteryLogDO::getCreateTime, formattedDate));
-        if (list.isEmpty() || list.size() == 0) {
-            return;
-        }
-        Set<Long> uniqueActivityIds = new HashSet<>();
-        for (LotteryLogDO lotteryLog : list) {
-            if (lotteryLedger.queuePhysicalReturn(lotteryLog)) continue;
-            uniqueActivityIds.add(lotteryLog.getLotteryId());
-            LotteryPrizeDO lotteryPrize = lotteryPrizeMapper.selectOne(new LambdaQueryWrapperX<LotteryPrizeDO>().eq(LotteryPrizeDO::getId, lotteryLog.getLotteryPrizeId()));
-            lotteryPrize.setRemainNum(lotteryPrize.getRemainNum() - 1);
-            lotteryPrizeMapper.updateById(lotteryPrize);
-            lotteryLog.setPrizeState(9);
-            lotteryLogMapper.update(lotteryLog, new LambdaQueryWrapperX<LotteryLogDO>()
-                    .eq(LotteryLogDO::getId, lotteryLog.getId()).eq(LotteryLogDO::getMemberId, lotteryLog.getMemberId()));
-        }
-        for (Long lotteryId : uniqueActivityIds) {
-            List<LotteryPrizeDO> prizzeList = lotteryPrizeMapper.selectList(new LambdaQueryWrapperX<LotteryPrizeDO>().eq(LotteryPrizeDO::getLotteryId, lotteryId).eq(LotteryPrizeDO::getDeleted, 0));
-            redisCache.setCacheObject(RedisKeyConstants.LOTTERY_PRIZE + lotteryId, prizzeList);
-        }
+        physicalReturns.sweep();
     }
 
 
@@ -369,6 +343,7 @@ public class LotteryLogServiceImpl implements LotteryLogService {
 
         }
 
+        recordStates.enrich(lotteryLogDOPageResult.getList());
         return lotteryLogDOPageResult;
     }
 
@@ -1751,6 +1726,8 @@ public class LotteryLogServiceImpl implements LotteryLogService {
                 return "无奖品";
             case 5:
                 return "现金红包";
+            case 6:
+                return "优惠券包";
             default:
                 return "";
         }

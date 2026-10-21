@@ -57,6 +57,7 @@ public class LotteryV2ServiceImpl implements LotteryV2Service {
                     reconcile(reserved);if(reserved!=null){reserved.close();reserved=null;}
                     snapshot.setPrize(snapshot.getGuarantee());
                     snapshot.setCoupon(snapshot.getGuaranteeCoupon());
+                    snapshot.setCouponPackage(snapshot.getGuaranteePackage());
                     // 兜底受理也走下面统一的幂等/提交不确定恢复，避免并发重试时返回异常。
                     accepted=ledger.accept(b,snapshot);
                 }

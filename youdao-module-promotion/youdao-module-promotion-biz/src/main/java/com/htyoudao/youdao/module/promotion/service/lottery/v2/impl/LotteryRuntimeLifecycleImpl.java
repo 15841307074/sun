@@ -41,6 +41,10 @@ public class LotteryRuntimeLifecycleImpl implements LotteryRuntimeLifecycle {
         if (activity == null) throw new IllegalArgumentException("活动不存在");
         if (state == 1 && (!Objects.equals(cfg.getState(), 1)
                 || !Objects.equals(activity.getIsEnabled(), 1))) initializeLegacy(cfg);
+        if(state==1) {
+            Integer cashGuarantees=jdbc.queryForObject("SELECT COUNT(*) FROM lottery_prize WHERE business_id=? AND lottery_id=? AND deleted=0 AND is_guarantees=1 AND prize_type=5",Integer.class,BusinessContextHolder.getRequiredBusinessId(),cfg.getId());
+            if(cashGuarantees!=null&&cashGuarantees>0)throw com.htyoudao.youdao.module.promotion.service.lottery.v2.LotteryErrors.invalid("红包不能作为抽奖兜底奖品");
+        }
         cfg.setState(state);
         cfg.setConfigVersion(Optional.ofNullable(cfg.getConfigVersion()).orElse(0L) + 1);
         activity.setIsEnabled(state);
