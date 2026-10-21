@@ -4,10 +4,14 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.htyoudao.youdao.framework.context.BusinessContextHolder;
+import com.htyoudao.youdao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import com.htyoudao.youdao.module.analysis.controller.app.vo.anomaly.StoreOrgStatisticsNodeRespVO;
 import com.htyoudao.youdao.module.analysis.controller.app.vo.anomaly.StoreOrgStatisticsRespVO;
 import com.htyoudao.youdao.module.analysis.dal.dataobject.anomaly.StoreOrgSnapshotDO;
 import com.htyoudao.youdao.module.analysis.dal.mysql.anomaly.StoreOrgSnapshotMapper;
+import com.htyoudao.youdao.module.analysis.dal.dataobject.anomaly.UserStoreSnapshotDO;
+import com.htyoudao.youdao.module.analysis.dal.mysql.anomaly.UserStoreSnapshotMapper;
+import com.htyoudao.youdao.module.analysis.enums.PeriodTypeEnum;
 import com.htyoudao.youdao.module.system.api.storeorgsnapshot.StoreOrgSnapshotApi;
 import com.htyoudao.youdao.module.system.api.storeorgsnapshot.dto.StoreOrgPathNodeDTO;
 import jakarta.annotation.Resource;
@@ -33,6 +37,8 @@ public class StoreOrgStatisticsService {
 
     @Resource
     private StoreOrgSnapshotMapper snapshotMapper;
+    @Resource
+    private UserStoreSnapshotMapper userStoreSnapshotMapper;
     @Resource
     private ObjectMapper objectMapper;
     @DubboReference
@@ -100,6 +106,55 @@ public class StoreOrgStatisticsService {
         response.setDirectStoreCount(direct);
         response.setItems(items);
         return response;
+    }
+
+    /**
+     * 查询用户在指定月份负责、且当时归属所选组织本级或下级的门店。
+     * 仅供模块内调用；人员范围和组织层级均取当月快照，不回查实时组织和门店状态。
+     *
+     * @param userId 后台用户ID，由可信业务调用方传入
+     * @param month 快照月份，格式 yyyy-MM，例如 2026-08
+     * @param orgId 当月快照中的组织ID，包含该组织自身和全部下级
+     * @return 当月门店快照，按门店ID升序且去重；无匹配门店时返回空列表
+     */
+    public List<StoreOrgSnapshotDO> getMonthOrgStores(Long userId, String month, Long orgId) {
+        Long businessId = BusinessContextHolder.getRequiredBusinessId();
+        LocalDate snapshotMonth = parseMonth(month);
+        if (userId == null || userId <= 0 || orgId == null || orgId <= 0) {
+            throw exception(STORE_ORG_PERMISSION_DENIED);
+        }
+        List<StoreOrgSnapshotDO> snapshots = snapshotMapper.selectListByMonth(businessId, snapshotMonth);
+        if (snapshots.isEmpty()) {
+            throw exception(STORE_ORG_SNAPSHOT_NOT_FOUND);
+        }
+        // 人员权限同样取指定月份，避免人员调组织后历史查询范围发生变化。
+        Set<Long> storeIds = new HashSet<>();
+        for (UserStoreSnapshotDO row : userStoreSnapshotMapper.selectList(
+                new LambdaQueryWrapperX<UserStoreSnapshotDO>()
+                        .eq(UserStoreSnapshotDO::getBusinessId, businessId)
+                        .eq(UserStoreSnapshotDO::getPeriodType, PeriodTypeEnum.MONTH.getType())
+                        .eq(UserStoreSnapshotDO::getPeriodStart, snapshotMonth)
+                        .eq(UserStoreSnapshotDO::getUserId, userId)
+                        .eq(UserStoreSnapshotDO::getDeleted, false))) {
+            if (row.getStoreId() != null) storeIds.add(row.getStoreId());
+        }
+        if (storeIds.isEmpty()) return List.of();
+
+        Map<Long, StoreOrgSnapshotDO> matched = new TreeMap<>();
+        for (StoreOrgSnapshotDO row : snapshots) {
+            if (!storeIds.contains(row.getStoreId())) continue;
+            // 直属门店直接命中；下级门店通过完整祖先链判断，不能按实时组织递归。
+            if (Objects.equals(row.getOrgId(), orgId)) {
+                matched.putIfAbsent(row.getStoreId(), row);
+                continue;
+            }
+            List<StoreOrgPathNodeDTO> path = readPath(row.getOrgPathJson());
+            if (path == null || path.stream().anyMatch(Objects::isNull)) {
+                throw exception(STORE_ORG_SNAPSHOT_DATA_INVALID);
+            }
+            if (indexOf(path, orgId) >= 0) matched.putIfAbsent(row.getStoreId(), row);
+        }
+        return new ArrayList<>(matched.values());
     }
 
     /** 校验 yyyy-MM 月份参数，并转换为当月第一天。 */
