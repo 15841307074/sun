@@ -5,12 +5,9 @@ import lombok.Data;
 
 import java.util.List;
 
-@Schema(description = "App - 月度门店组织统计")
+@Schema(description = "App - 实时门店组织统计")
 @Data
 public class StoreOrgStatisticsRespVO {
-
-    @Schema(description = "月份", example = "2026-08")
-    private String month;
 
     @Schema(description = "所选组织ID，字符串用于避免前端精度丢失")
     private String orgId;

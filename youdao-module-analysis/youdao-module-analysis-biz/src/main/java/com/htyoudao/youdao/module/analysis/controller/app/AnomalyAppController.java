@@ -101,15 +101,13 @@ public class AnomalyAppController {
         return success(true);
     }
 
-    // ==================== 接口 4：月度门店组织统计 ====================
+    // ==================== 接口 4：实时门店组织统计 ====================
 
     @GetMapping("/anomaly-report/org-store-statistics")
-    @Operation(summary = "查询当前登录组织的月度门店统计")
-    public CommonResult<StoreOrgStatisticsRespVO> getOrgStoreStatistics(
-            @Parameter(description = "月份，格式 yyyy-MM", required = true, example = "2026-08")
-            @RequestParam("month") String month) {
+    @Operation(summary = "查询当前登录组织的实时门店统计")
+    public CommonResult<StoreOrgStatisticsRespVO> getOrgStoreStatistics() {
         Long userId = SecurityFrameworkUtils.getLoginUserId();
-        return success(storeOrgStatisticsService.getStatistics(userId, month));
+        return success(storeOrgStatisticsService.getStatistics(userId));
     }
 
     // ==================== 接口 5：投诉异常排行 ====================

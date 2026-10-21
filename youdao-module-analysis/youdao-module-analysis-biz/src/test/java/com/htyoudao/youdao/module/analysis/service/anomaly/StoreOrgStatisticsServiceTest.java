@@ -1,288 +1,165 @@
 package com.htyoudao.youdao.module.analysis.service.anomaly;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.baomidou.mybatisplus.core.conditions.AbstractWrapper;
-import com.baomidou.mybatisplus.core.conditions.Wrapper;
-import com.baomidou.mybatisplus.core.MybatisConfiguration;
-import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
-import org.apache.ibatis.builder.MapperBuilderAssistant;
-import com.htyoudao.youdao.module.analysis.dal.dataobject.anomaly.UserStoreSnapshotDO;
-import com.htyoudao.youdao.module.analysis.dal.mysql.anomaly.UserStoreSnapshotMapper;
-import org.junit.jupiter.api.BeforeAll;
-import org.mockito.ArgumentCaptor;
 import com.htyoudao.youdao.framework.common.pojo.CommonResult;
 import com.htyoudao.youdao.framework.context.BusinessContextHolder;
-import com.htyoudao.youdao.module.analysis.controller.app.vo.anomaly.StoreOrgStatisticsRespVO;
-import com.htyoudao.youdao.module.analysis.dal.dataobject.anomaly.StoreOrgSnapshotDO;
-import com.htyoudao.youdao.module.analysis.dal.mysql.anomaly.StoreOrgSnapshotMapper;
+import com.htyoudao.youdao.framework.security.core.util.SecurityFrameworkUtils;
+import com.htyoudao.youdao.module.analysis.controller.app.AnomalyAppController;
 import com.htyoudao.youdao.module.system.api.storeorgsnapshot.StoreOrgSnapshotApi;
 import com.htyoudao.youdao.module.system.api.storeorgsnapshot.dto.StoreOrgPathNodeDTO;
+import com.htyoudao.youdao.module.system.api.storeorgsnapshot.dto.StoreOrgSnapshotDTO;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
 import org.springframework.test.util.ReflectionTestUtils;
-
-import java.time.LocalDate;
-import java.util.List;
-import java.util.Set;
-
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 class StoreOrgStatisticsServiceTest {
-
-    private final ObjectMapper objectMapper = new ObjectMapper();
     private StoreOrgStatisticsService service;
-    @Mock
-    private StoreOrgSnapshotMapper snapshotMapper;
-    @Mock
-    private StoreOrgSnapshotApi storeOrgSnapshotApi;
-    @Mock
-    private UserStoreSnapshotMapper userStoreSnapshotMapper;
-    private AutoCloseable mocks;
-
-    @BeforeAll
-    static void initializeSnapshotMetadata() {
-        TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), UserStoreSnapshotDO.class);
-    }
-
-    @BeforeEach
-    void setUp() {
-        mocks = MockitoAnnotations.openMocks(this);
-        service = new StoreOrgStatisticsService();
-        ReflectionTestUtils.setField(service, "snapshotMapper", snapshotMapper);
-        ReflectionTestUtils.setField(service, "storeOrgSnapshotApi", storeOrgSnapshotApi);
-        ReflectionTestUtils.setField(service, "objectMapper", objectMapper);
-        ReflectionTestUtils.setField(service, "userStoreSnapshotMapper", userStoreSnapshotMapper);
+    private StoreOrgSnapshotApi api;
+    @BeforeEach void setUp() {
         BusinessContextHolder.setBusinessId(10L);
+        service = new StoreOrgStatisticsService();api = mock(StoreOrgSnapshotApi.class);
+        ReflectionTestUtils.setField(service, "storeOrgSnapshotApi", api);
+        when(api.getUserDefaultOrgId(7L)).thenReturn(CommonResult.success(100L));
+        when(api.listManageableOrgIds(7L)).thenReturn(CommonResult.success(Set.of(100L, 200L, 300L, 400L)));
+    }
+    @AfterEach void clear() { BusinessContextHolder.clear(); }
+
+    @Test void currentTreeWorksAtHeadquartersGroupProvinceAndCity() {
+        var root = node(100, "总部", 0, 1, 0);var group = node(200, "小组", 100, 2, 0);
+        var province = node(300, "省区", 200, 3, 0);var city = node(400, "城市", 300, 4, 0);
+        when(api.listNormalStoreOrgData()).thenReturn(CommonResult.success(List.of(
+                store(1, List.of(root)), store(2, List.of(root, group)),
+                store(3, List.of(root, group, province, city)), store(4, List.of(root, group, province, city)))));
+        when(api.getUserDefaultOrgId(7L)).thenReturn(CommonResult.success(100L), CommonResult.success(200L), CommonResult.success(300L), CommonResult.success(400L));
+        var headquarters = service.getStatistics(7L);
+        assertEquals("100", headquarters.getOrgId());assertEquals(4L, headquarters.getTotalStoreCount());assertEquals(1L, headquarters.getDirectStoreCount());
+        var groupNode = headquarters.getItems().get(0);assertEquals("200", groupNode.getOrgId());assertEquals(3L, groupNode.getStoreCount());assertEquals(1L, groupNode.getDirectStoreCount());
+        assertEquals(2L, groupNode.getChildren().get(0).getStoreCount());
+        assertEquals("400", groupNode.getChildren().get(0).getChildren().get(0).getOrgId());
+        var groupResult = service.getStatistics(7L);assertEquals(3L, groupResult.getTotalStoreCount());assertEquals(1L, groupResult.getDirectStoreCount());
+        var provinceResult = service.getStatistics(7L);assertEquals(2L, provinceResult.getTotalStoreCount());assertEquals(0L, provinceResult.getDirectStoreCount());
+        var cityResult = service.getStatistics(7L);assertEquals(2L, cityResult.getTotalStoreCount());assertEquals(2L, cityResult.getDirectStoreCount());assertTrue(cityResult.getItems().isEmpty());
     }
 
-    @AfterEach
-    void tearDown() throws Exception {
+    @Test void everyRequestUsesLatestStoresAndOrganizationPaths() {
+        var root = node(100, "总部", 0, 1, 0);var group = node(200, "原小组", 100, 2, 0);
+        var moved = node(500, "其他区域", 0, 1, 0);
+        when(api.listNormalStoreOrgData()).thenReturn(CommonResult.success(List.of(store(1, List.of(root, group)))),
+                CommonResult.success(List.of(store(1, List.of(moved)))), CommonResult.success(List.of()));
+        assertEquals(1L, service.getStatistics(7L).getTotalStoreCount());
+        assertEquals(0L, service.getStatistics(7L).getTotalStoreCount());
+        assertEquals(0L, service.getStatistics(7L).getTotalStoreCount());
+        verify(api, times(3)).listNormalStoreOrgData();
+    }
+
+    @Test void noStoresIsANormalZeroResult() {
+        when(api.listNormalStoreOrgData()).thenReturn(CommonResult.success(List.of()));
+        var result = service.getStatistics(7L);
+        assertEquals("100", result.getOrgId());assertEquals(0L, result.getTotalStoreCount());
+        assertEquals(0L, result.getDirectStoreCount());assertTrue(result.getItems().isEmpty());
+    }
+
+    @Test void recordsAreDeduplicatedSortedAndUnassignedStoresAreExcluded() {
+        var root = node(100, "总部", 0, 1, 0);var first = store(3, List.of(root));var second = store(1, List.of(root));
+        when(api.listNormalStoreOrgData()).thenReturn(CommonResult.success(Arrays.asList(first, second, first, store(4, List.of()), store(5, null))));
+        assertEquals(List.of(1L, 3L), service.getOrgStores(7L, 100L).stream().map(StoreOrgSnapshotDTO::getStoreId).toList());
+        var result = service.getStatistics(7L);assertEquals(2L, result.getTotalStoreCount());assertEquals(2L, result.getDirectStoreCount());
+    }
+
+    @Test void explicitOrganizationUsesCurrentPermissionAndWholeIdMatching() {
+        var root = node(100, "总部", 0, 1, 0);var selected = node(200, "小组", 100, 2, 0);var other = node(2000, "其他", 100, 2, 0);
+        when(api.listNormalStoreOrgData()).thenReturn(CommonResult.success(List.of(store(1, List.of(root, selected)), store(2, List.of(root, other)))));
+        assertEquals(List.of(1L), service.getOrgStores(7L, 200L).stream().map(StoreOrgSnapshotDTO::getStoreId).toList());
+        assertThrows(com.htyoudao.youdao.framework.common.exception.ServiceException.class, () -> service.getOrgStores(7L, 999L));
+        verify(api).listNormalStoreOrgData();
+    }
+
+    @Test void descendantsFollowSortLevelAndIdAndIdsAreStrings() {
+        long large = 9007199254740993L;
+        when(api.getUserDefaultOrgId(7L)).thenReturn(CommonResult.success(large));
+        when(api.listManageableOrgIds(7L)).thenReturn(CommonResult.success(Set.of(large)));
+        var root = node(large, "总部", 0, 1, 0);
+        when(api.listNormalStoreOrgData()).thenReturn(CommonResult.success(List.of(
+                store(1, List.of(root, node(201, "后", large, 2, 3))),store(2, List.of(root, node(202, "先", large, 2, 1))))));
+        var result = service.getStatistics(7L);assertEquals(Long.toString(large), result.getOrgId());
+        assertEquals(List.of("202", "201"), result.getItems().stream().map(n -> n.getOrgId()).toList());
+    }
+
+    @Test void aUserWithoutDefaultOrganizationCannotLoadStoreData() {
+        when(api.getUserDefaultOrgId(7L)).thenReturn(CommonResult.success(null));
+        assertThrows(com.htyoudao.youdao.framework.common.exception.ServiceException.class, () -> service.getStatistics(7L));
+        verify(api, never()).listNormalStoreOrgData();
+    }
+
+    @Test void permissionChangesAreCheckedOnEveryRequest() {
+        when(api.listNormalStoreOrgData()).thenReturn(CommonResult.success(List.of()));
+        service.getStatistics(7L);
+        when(api.listManageableOrgIds(7L)).thenReturn(CommonResult.success(Set.of()));
+        assertThrows(com.htyoudao.youdao.framework.common.exception.ServiceException.class, () -> service.getStatistics(7L));
+        verify(api).listNormalStoreOrgData();
+    }
+
+    @Test void currentProjectContextIsRequiredBeforeRemoteCalls() {
         BusinessContextHolder.clear();
-        mocks.close();
+        assertThrows(RuntimeException.class, () -> service.getStatistics(7L));
+        assertThrows(RuntimeException.class, () -> service.getOrgStores(7L, 100L));
+        verifyNoInteractions(api);
     }
 
-    @Test
-    void shouldUseCurrentUserOrganization() throws Exception {
-        when(storeOrgSnapshotApi.getUserDefaultOrgId(7L)).thenReturn(CommonResult.success(200L));
-        when(storeOrgSnapshotApi.listManageableOrgIds(7L))
-                .thenReturn(CommonResult.success(Set.of(200L, 300L)));
-        when(snapshotMapper.selectListByMonth(10L, LocalDate.of(2026, 8, 1))).thenReturn(List.of(
-                snapshot(1L, "辽宁省", List.of(node(100L, "总部", 0L, 1, 1),
-                        node(200L, "小组", 100L, 2, 1), node(300L, "省区", 200L, 3, 1)))));
-
-        StoreOrgStatisticsRespVO result = service.getStatistics(7L, "2026-08");
-
-        assertEquals("200", result.getOrgId());
-        assertEquals("小组", result.getOrgName());
-        assertEquals(1L, result.getTotalStoreCount());
-        assertEquals("300", result.getItems().get(0).getOrgId());
-    }
-
-    @Test
-    void shouldRejectUserWithoutDefaultOrganization() {
-        when(storeOrgSnapshotApi.getUserDefaultOrgId(7L)).thenReturn(CommonResult.success(null));
-        when(storeOrgSnapshotApi.listManageableOrgIds(7L)).thenReturn(CommonResult.success(Set.of()));
-
-        assertThrows(com.htyoudao.youdao.framework.common.exception.ServiceException.class,
-                () -> service.getStatistics(7L, "2026-08"));
-        verifyNoInteractions(snapshotMapper);
-    }
-
-    @Test
-    void shouldReturnDynamicOrganizationTreeFromUserOrganization() throws Exception {
-        when(storeOrgSnapshotApi.getUserDefaultOrgId(7L))
-                .thenReturn(CommonResult.success(100L), CommonResult.success(200L),
-                        CommonResult.success(300L), CommonResult.success(400L));
-        when(storeOrgSnapshotApi.listManageableOrgIds(7L))
-                .thenReturn(CommonResult.success(Set.of(100L, 200L, 300L, 400L)));
-        when(snapshotMapper.selectListByMonth(10L, LocalDate.of(2026, 8, 1))).thenReturn(List.of(
-                snapshot(1L, "", List.of(node(100L, "东北区域", 0L, 1, 1))),
-                snapshot(2L, "辽宁省", List.of(node(100L, "东北区域", 0L, 1, 1),
-                        node(200L, "王子彬组", 100L, 2, 2))),
-                snapshot(3L, "吉林省", List.of(node(100L, "东北区域", 0L, 1, 1),
-                        node(200L, "王子彬组", 100L, 2, 2), node(300L, "辽宁省组织", 200L, 3, 1),
-                        node(400L, "沈阳市", 300L, 4, 1))),
-                snapshot(4L, "辽宁省", List.of(node(100L, "东北区域", 0L, 1, 1),
-                        node(200L, "王子彬组", 100L, 2, 2), node(300L, "辽宁省组织", 200L, 3, 1),
-                        node(400L, "沈阳市", 300L, 4, 1)))));
-
-        StoreOrgStatisticsRespVO result = service.getStatistics(7L, "2026-08");
-
-        assertEquals("东北区域", result.getOrgName());
-        assertEquals(4L, result.getTotalStoreCount());
-        assertEquals(1L, result.getDirectStoreCount());
-        assertEquals(1, result.getItems().size());
-        var group = result.getItems().get(0);
-        assertEquals("200", group.getOrgId());
-        assertEquals(3L, group.getStoreCount());
-        assertEquals(1L, group.getDirectStoreCount());
-        var province = group.getChildren().get(0);
-        assertEquals("300", province.getOrgId());
-        assertEquals(2L, province.getStoreCount());
-        assertEquals(0L, province.getDirectStoreCount());
-        var city = province.getChildren().get(0);
-        assertEquals("400", city.getOrgId());
-        assertEquals(2L, city.getStoreCount());
-        assertEquals(2L, city.getDirectStoreCount());
-        assertTrue(city.getChildren().isEmpty());
-
-        StoreOrgStatisticsRespVO groupResult = service.getStatistics(7L, "2026-08");
-        assertEquals("王子彬组", groupResult.getOrgName());
-        assertEquals(3L, groupResult.getTotalStoreCount());
-        assertEquals(1L, groupResult.getDirectStoreCount());
-        assertEquals("300", groupResult.getItems().get(0).getOrgId());
-
-        StoreOrgStatisticsRespVO provinceResult = service.getStatistics(7L, "2026-08");
-        assertEquals("辽宁省组织", provinceResult.getOrgName());
-        assertEquals(2L, provinceResult.getTotalStoreCount());
-        assertEquals(0L, provinceResult.getDirectStoreCount());
-        assertEquals("400", provinceResult.getItems().get(0).getOrgId());
-
-        StoreOrgStatisticsRespVO cityResult = service.getStatistics(7L, "2026-08");
-        assertEquals("沈阳市", cityResult.getOrgName());
-        assertEquals(2L, cityResult.getTotalStoreCount());
-        assertEquals(2L, cityResult.getDirectStoreCount());
-        assertTrue(cityResult.getItems().isEmpty());
-        verify(storeOrgSnapshotApi, times(4)).getUserDefaultOrgId(7L);
-    }
-
-    @Test
-    void shouldRejectOrganizationOutsideUserScope() {
-        when(storeOrgSnapshotApi.getUserDefaultOrgId(7L)).thenReturn(CommonResult.success(100L));
-        when(storeOrgSnapshotApi.listManageableOrgIds(7L))
-                .thenReturn(CommonResult.success(Set.of(200L)));
-
-        assertThrows(RuntimeException.class,
-                () -> service.getStatistics(7L, "2026-08"));
-        verifyNoInteractions(snapshotMapper);
-    }
-
-    @Test
-    void shouldRejectMissingMonthSnapshot() {
-        when(storeOrgSnapshotApi.getUserDefaultOrgId(7L)).thenReturn(CommonResult.success(100L));
-        when(storeOrgSnapshotApi.listManageableOrgIds(7L))
-                .thenReturn(CommonResult.success(Set.of(100L)));
-        when(snapshotMapper.selectListByMonth(10L, LocalDate.of(2026, 8, 1))).thenReturn(List.of());
-
-        assertThrows(RuntimeException.class,
-                () -> service.getStatistics(7L, "2026-08"));
-    }
-
-    @Test
-    void shouldRejectInvalidMonthBeforeRemoteCall() {
-        assertThrows(RuntimeException.class,
-                () -> service.getStatistics(7L, "2026-8"));
-        verifyNoInteractions(storeOrgSnapshotApi, snapshotMapper);
-    }
-
-    @Test
-    void monthlyStoresIntersectHistoricalUserStoresWithTheWholeOrganizationPath() throws Exception {
-        var direct = monthlyStore(30L, 200L, List.of(node(100L, "总部", 0L, 1, 0), node(200L, "小组", 100L, 2, 0)));
-        var city = monthlyStore(10L, 400L, List.of(node(100L, "总部", 0L, 1, 0), node(200L, "小组", 100L, 2, 0),
-                node(300L, "省区", 200L, 3, 0), node(400L, "城市", 300L, 4, 0)));
-        var outside = monthlyStore(20L, 500L, List.of(node(100L, "总部", 0L, 1, 0), node(500L, "其他小组", 100L, 2, 1)));
-        var notManaged = monthlyStore(40L, 200L, List.of());notManaged.setOrgPathJson("bad unrelated data");
-        var unassigned = monthlyStore(50L, null, List.of());
-        when(snapshotMapper.selectListByMonth(10L, LocalDate.of(2026, 8, 1)))
-                .thenReturn(List.of(direct, city, outside, notManaged, unassigned, city));
-        when(userStoreSnapshotMapper.selectList(any(Wrapper.class)))
-                .thenReturn(List.of(userStore(10L), userStore(20L), userStore(30L), userStore(50L)));
-        assertEquals(List.of(10L, 30L), service.getMonthOrgStores(7L, "2026-08", 200L).stream().map(StoreOrgSnapshotDO::getStoreId).toList());
-        assertEquals(List.of(10L), service.getMonthOrgStores(7L, "2026-08", 300L).stream().map(StoreOrgSnapshotDO::getStoreId).toList());
-        assertEquals(List.of(10L), service.getMonthOrgStores(7L, "2026-08", 400L).stream().map(StoreOrgSnapshotDO::getStoreId).toList());
-        assertEquals(List.of(10L, 20L, 30L), service.getMonthOrgStores(7L, "2026-08", 100L).stream().map(StoreOrgSnapshotDO::getStoreId).toList());
-        assertTrue(service.getMonthOrgStores(7L, "2026-08", 999L).isEmpty());
-        // 只读历史快照，人员调动和门店当前状态不改变历史结果。
-        verifyNoInteractions(storeOrgSnapshotApi);
-    }
-
-    @Test
-    void monthlyStoresUseExactlyTheRequestedMonthAndExplicitProjectScope() throws Exception {
+    @Test void projectAndUserContextArePreserved() {
         BusinessContextHolder.setBusinessId(20L);
-        var row = monthlyStore(9L, 200L, List.of());row.setStoreName("当月门店名称");
-        when(snapshotMapper.selectListByMonth(20L, LocalDate.of(2025, 12, 1))).thenReturn(List.of(row));
-        when(userStoreSnapshotMapper.selectList(any(Wrapper.class))).thenReturn(List.of(userStore(9L)));
-        assertEquals("当月门店名称", service.getMonthOrgStores(7L, "2025-12", 200L).get(0).getStoreName());
-        ArgumentCaptor<Wrapper> query = ArgumentCaptor.forClass(Wrapper.class);
-        verify(userStoreSnapshotMapper).selectList(query.capture());
-        var where = (AbstractWrapper<?, ?, ?>) query.getValue();String sql = where.getSqlSegment();
-        for (String column : List.of("business_id", "period_type", "period_start", "user_id", "deleted")) assertTrue(sql.contains(column));
-        var values = where.getParamNameValuePairs().values();
-        assertTrue(values.contains(20L));assertTrue(values.contains(7L));assertTrue(values.contains(2));
-        assertTrue(values.contains(LocalDate.of(2025, 12, 1)));assertTrue(values.contains(false));
-        verifyNoInteractions(storeOrgSnapshotApi);
+        when(api.getUserDefaultOrgId(7L)).thenAnswer(call -> { assertEquals(20L, BusinessContextHolder.getRequiredBusinessId()); return CommonResult.success(100L); });
+        when(api.listNormalStoreOrgData()).thenAnswer(call -> { assertEquals(20L, BusinessContextHolder.getRequiredBusinessId()); return CommonResult.success(List.of()); });
+        service.getStatistics(7L);assertEquals(20L, BusinessContextHolder.getRequiredBusinessId());
     }
 
-    @Test
-    void monthlyStoresReturnEmptyWhenThePersonHasNoMonthlyStores() throws Exception {
-        when(snapshotMapper.selectListByMonth(10L, LocalDate.of(2026, 8, 1))).thenReturn(List.of(monthlyStore(1L, 200L, List.of())));
-        when(userStoreSnapshotMapper.selectList(any(Wrapper.class))).thenReturn(List.of());
-        assertTrue(service.getMonthOrgStores(7L, "2026-08", 200L).isEmpty());
-        verifyNoInteractions(storeOrgSnapshotApi);
+    @Test void invalidUserAndOrganizationCannotQueryAllData() {
+        assertThrows(com.htyoudao.youdao.framework.common.exception.ServiceException.class, () -> service.getStatistics(null));
+        assertThrows(com.htyoudao.youdao.framework.common.exception.ServiceException.class, () -> service.getOrgStores(7L, 0L));
+        verifyNoInteractions(api);
     }
 
-    @Test
-    void monthlyStoresRejectMissingOrganizationSnapshot() {
-        when(snapshotMapper.selectListByMonth(10L, LocalDate.of(2026, 8, 1))).thenReturn(List.of());
-        var failure = assertThrows(com.htyoudao.youdao.framework.common.exception.ServiceException.class,
-                () -> service.getMonthOrgStores(7L, "2026-08", 200L));
-        assertEquals(com.htyoudao.youdao.module.analysis.enums.ErrorCodeConstants.STORE_ORG_SNAPSHOT_NOT_FOUND.getCode(), failure.getCode());
-        verifyNoInteractions(userStoreSnapshotMapper, storeOrgSnapshotApi);
+    @Test void nullOrDamagedRemoteDataDoesNotBecomeAFalseZeroResult() {
+        when(api.listNormalStoreOrgData()).thenReturn(CommonResult.success(null));
+        assertThrows(com.htyoudao.youdao.framework.common.exception.ServiceException.class, () -> service.getStatistics(7L));
+        var invalid = new StoreOrgSnapshotDTO();
+        when(api.listNormalStoreOrgData()).thenReturn(CommonResult.success(List.of(invalid)));
+        assertThrows(com.htyoudao.youdao.framework.common.exception.ServiceException.class, () -> service.getStatistics(7L));
+        when(api.listNormalStoreOrgData()).thenReturn(CommonResult.success(List.of(store(1, Arrays.asList((StoreOrgPathNodeDTO)null)))));
+        assertThrows(com.htyoudao.youdao.framework.common.exception.ServiceException.class, () -> service.getStatistics(7L));
     }
 
-    @Test
-    void monthlyStoresRejectInvalidParametersBeforeQuerying() {
-        for (String month : new String[]{null, "2026-8", "2026-13", "2026-08-01"}) {
-            assertThrows(com.htyoudao.youdao.framework.common.exception.ServiceException.class, () -> service.getMonthOrgStores(7L, month, 200L));
+    @Test void remoteFailureIsNotReportedAsNoStores() {
+        when(api.listNormalStoreOrgData()).thenReturn(CommonResult.error(500, "system unavailable"));
+        assertThrows(com.htyoudao.youdao.framework.common.exception.ServiceException.class, () -> service.getStatistics(7L));
+    }
+
+    @Test void appEndpointWorksWithoutMonthAndDoesNotReturnMonth() throws Exception {
+        var controller = new AnomalyAppController();ReflectionTestUtils.setField(controller, "storeOrgStatisticsService", service);
+        when(api.listNormalStoreOrgData()).thenReturn(CommonResult.success(List.of()));
+        var mvc = MockMvcBuilders.standaloneSetup(controller).build();
+        try (var security = mockStatic(SecurityFrameworkUtils.class)) {
+            security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(7L);
+            mvc.perform(get("/analysis/app/anomaly-report/org-store-statistics").accept(org.springframework.http.MediaType.APPLICATION_JSON))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.code").value(0))
+                    .andExpect(jsonPath("$.data.totalStoreCount").value(0)).andExpect(jsonPath("$.data.month").doesNotExist());
+            mvc.perform(get("/analysis/app/anomaly-report/org-store-statistics").accept(org.springframework.http.MediaType.APPLICATION_JSON).param("month", "2026-08"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.data.month").doesNotExist());
         }
-        assertThrows(com.htyoudao.youdao.framework.common.exception.ServiceException.class, () -> service.getMonthOrgStores(null, "2026-08", 200L));
-        assertThrows(com.htyoudao.youdao.framework.common.exception.ServiceException.class, () -> service.getMonthOrgStores(7L, "2026-08", 0L));
-        BusinessContextHolder.clear();
-        assertThrows(RuntimeException.class, () -> service.getMonthOrgStores(7L, "2026-08", 200L));
-        verifyNoInteractions(snapshotMapper, userStoreSnapshotMapper, storeOrgSnapshotApi);
     }
 
-    @Test
-    void monthlyStoresRejectDamagedOrganizationPathInsteadOfUsingLiveOrganizations() {
-        var row = new StoreOrgSnapshotDO();row.setStoreId(1L);row.setOrgId(400L);row.setOrgPathJson("bad json");
-        when(snapshotMapper.selectListByMonth(10L, LocalDate.of(2026, 8, 1))).thenReturn(List.of(row));
-        when(userStoreSnapshotMapper.selectList(any(Wrapper.class))).thenReturn(List.of(userStore(1L)));
-        for (String broken : List.of("bad json", "null", "[null]")) {
-            row.setOrgPathJson(broken);
-            var failure = assertThrows(com.htyoudao.youdao.framework.common.exception.ServiceException.class, () -> service.getMonthOrgStores(7L, "2026-08", 200L));
-            assertEquals(com.htyoudao.youdao.module.analysis.enums.ErrorCodeConstants.STORE_ORG_SNAPSHOT_DATA_INVALID.getCode(), failure.getCode());
-        }
-        verifyNoInteractions(storeOrgSnapshotApi);
+    private StoreOrgSnapshotDTO store(long id, List<StoreOrgPathNodeDTO> path) {
+        var store = new StoreOrgSnapshotDTO();store.setStoreId(id);store.setStoreName("门店"+id);store.setOrgPath(path);
+        if (path != null && !path.isEmpty() && path.get(path.size()-1) != null) store.setOrgId(path.get(path.size()-1).getId());
+        return store;
     }
-
-    private StoreOrgSnapshotDO monthlyStore(Long storeId, Long orgId, List<StoreOrgPathNodeDTO> path) throws Exception {
-        var row = snapshot(storeId, "辽宁省", path);row.setOrgId(orgId);return row;
-    }
-
-    private UserStoreSnapshotDO userStore(Long storeId) {
-        var row = new UserStoreSnapshotDO();row.setStoreId(storeId);return row;
-    }
-
-    private StoreOrgSnapshotDO snapshot(Long storeId, String province,
-                                        List<StoreOrgPathNodeDTO> path) throws Exception {
-        StoreOrgSnapshotDO snapshot = new StoreOrgSnapshotDO();
-        snapshot.setStoreId(storeId);
-        snapshot.setStoreProvince(province);
-        snapshot.setOrgPathJson(objectMapper.writeValueAsString(path));
-        return snapshot;
-    }
-
-    private StoreOrgPathNodeDTO node(Long id, String name, Long parentId, Integer level, Integer sort) {
-        StoreOrgPathNodeDTO node = new StoreOrgPathNodeDTO();
-        node.setId(id);
-        node.setName(name);
-        node.setParentId(parentId);
-        node.setLevel(level);
-        node.setSort(sort);
-        return node;
+    private StoreOrgPathNodeDTO node(long id, String name, long parent, int level, int sort) {
+        var node = new StoreOrgPathNodeDTO();node.setId(id);node.setName(name);node.setParentId(parent);node.setLevel(level);node.setSort(sort);return node;
     }
 }

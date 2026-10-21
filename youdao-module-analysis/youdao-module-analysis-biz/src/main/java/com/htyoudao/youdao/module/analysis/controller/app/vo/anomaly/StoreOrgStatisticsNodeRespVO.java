@@ -5,7 +5,7 @@ import lombok.Data;
 
 import java.util.List;
 
-@Schema(description = "App - 月度门店组织统计节点")
+@Schema(description = "App - 实时门店组织统计节点")
 @Data
 public class StoreOrgStatisticsNodeRespVO {
 
