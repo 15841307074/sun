@@ -203,7 +203,7 @@ public class ComplaintAnomalyWeeklyMysqlService {
         long validCount = metric == null ? 0L : metric.validOrderCount();
         row.setComplaintOrderCount(complaintCount);
         row.setValidOrderCount(validCount);
-        row.setComplaintOrderRatio(validCount == 0 ? BigDecimal.ZERO
+        row.setComplaintOrderRatio(validCount == 0 ? null
                 : BigDecimal.valueOf(complaintCount)
                 .multiply(BigDecimal.valueOf(100))
                 .divide(BigDecimal.valueOf(validCount), 2, RoundingMode.HALF_UP));

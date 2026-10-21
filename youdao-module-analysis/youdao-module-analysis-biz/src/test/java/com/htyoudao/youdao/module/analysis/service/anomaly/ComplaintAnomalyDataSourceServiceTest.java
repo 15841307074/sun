@@ -30,6 +30,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -240,6 +241,7 @@ class ComplaintAnomalyDataSourceServiceTest {
                 + "complaint_order_count,valid_order_count,food_hygiene_complaint_order_count,deleted) VALUES "
                 + "(101,10,1,2025,49,500,3,30,1,0),(102,10,2,2025,49,800,NULL,NULL,NULL,0),"
                 + "(103,10,3,2025,49,NULL,5,50,1,0),(104,11,4,2025,49,NULL,9,90,1,0)");
+        database.update("UPDATE store_anomaly_metrics_weekly SET complaint_order_ratio=0 WHERE store_id IN (2,3)");
         ComplaintAnomalyWeeklyMysqlService service = new ComplaintAnomalyWeeklyMysqlService();
         ReflectionTestUtils.setField(service, "jdbcTemplate", database);
         var metrics = List.of(
@@ -264,10 +266,23 @@ class ComplaintAnomalyDataSourceServiceTest {
                     "SELECT complaint_order_count FROM store_anomaly_metrics_weekly WHERE store_id=?", Long.class, store));
             assertEquals(0L, database.queryForObject(
                     "SELECT food_hygiene_complaint_order_count FROM store_anomaly_metrics_weekly WHERE store_id=?", Long.class, store));
+        }
+        // 有订单无投诉时占比仍为0；有效订单为0时，新增和重跑更新都写入NULL。
+        for (long store : List.of(1L, 5L)) {
             assertEquals(0, database.queryForObject(
                     "SELECT complaint_order_ratio FROM store_anomaly_metrics_weekly WHERE store_id=?", BigDecimal.class, store)
                     .compareTo(BigDecimal.ZERO));
         }
+        for (long store : List.of(2L, 3L, 6L)) {
+            assertNull(database.queryForObject(
+                    "SELECT complaint_order_ratio FROM store_anomaly_metrics_weekly WHERE store_id=?", BigDecimal.class, store));
+            assertEquals(0L, database.queryForObject(
+                    "SELECT valid_order_count FROM store_anomaly_metrics_weekly WHERE store_id=?", Long.class, store));
+        }
+        assertEquals(2L, database.queryForObject(
+                "SELECT complaint_order_count FROM store_anomaly_metrics_weekly WHERE store_id=6", Long.class));
+        assertEquals(1L, database.queryForObject(
+                "SELECT food_hygiene_complaint_order_count FROM store_anomaly_metrics_weekly WHERE store_id=6", Long.class));
         assertEquals(0L, database.queryForObject(
                 "SELECT valid_order_count FROM store_anomaly_metrics_weekly WHERE store_id=2", Long.class));
         assertEquals(9L, database.queryForObject(
