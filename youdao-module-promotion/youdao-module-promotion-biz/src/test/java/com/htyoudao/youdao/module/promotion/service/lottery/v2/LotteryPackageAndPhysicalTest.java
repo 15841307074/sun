@@ -1,4 +1,24 @@
 package com.htyoudao.youdao.module.promotion.service.lottery.v2;
+import com.htyoudao.youdao.module.promotion.service.lottery.impl.LotteryLogServiceImpl;
+import com.htyoudao.youdao.module.promotion.dal.dataobject.lottery.LotterySettingsDO;
+import com.htyoudao.youdao.module.system.api.store.StoreApi;
+import com.htyoudao.youdao.framework.common.pojo.CommonResult;
+import com.htyoudao.youdao.framework.common.pojo.PageParam;
+import com.htyoudao.youdao.framework.common.pojo.PageResult;
+import com.htyoudao.youdao.module.promotion.controller.admin.lottery.LotteryController;
+import com.htyoudao.youdao.module.promotion.controller.admin.lottery.vo.LotteryLogReqVO;
+import com.htyoudao.youdao.module.promotion.controller.admin.lottery.vo.LotteryLogExportRespVO;
+import com.htyoudao.youdao.module.promotion.controller.admin.lottery.vo.LotteryLogExportVO;
+import com.htyoudao.youdao.module.promotion.service.lottery.LotteryLogQueryService;
+import com.htyoudao.youdao.framework.excel.core.service.ExcelActionService;
+import com.htyoudao.youdao.framework.context.BusinessContextHolder;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.core.conditions.AbstractWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.alibaba.excel.EasyExcel;
+import java.util.function.Function;
+import java.io.ByteArrayOutputStream;
+import java.io.ByteArrayInputStream;
 import com.htyoudao.youdao.module.promotion.service.lottery.v2.impl.LotteryGrantStorageImpl;
 import com.htyoudao.youdao.module.promotion.dal.mysql.lottery.*;
 import com.htyoudao.youdao.module.promotion.dal.mysql.usercoupon.UserCouponMapper;
@@ -93,6 +113,88 @@ class LotteryPackageAndPhysicalTest {
         assertThrows(com.htyoudao.youdao.framework.common.exception.ServiceException.class,()->identities.mobile(member));
         member.setMemberMobile("+8613800000000");assertEquals("13800000000",identities.mobile(member));
     }
+    @Test void adminQueryKeepsPackageTypePrizeNameAndGrantState() {
+        var service = new LotteryLogServiceImpl();
+        var logs = mock(LotteryLogMapper.class);
+        var settings = mock(LotterySettingsMapper.class);
+        var stores = mock(StoreApi.class);
+        ReflectionTestUtils.setField(service, "lotteryLogMapper", logs);
+        ReflectionTestUtils.setField(service, "lotterySettingsMapper", settings);
+        ReflectionTestUtils.setField(service, "storeApi", stores);
+        ReflectionTestUtils.setField(service, "recordStates", mock(LotteryRecordStateService.class));
+        var setting = new LotterySettingsDO();
+        setting.setActivityId(21L);
+        when(settings.selectOne(any(Wrapper.class))).thenReturn(setting);
+        var row = new LotteryLogDO();
+        row.setId(100L); row.setPrizeType(6); row.setPrizeName("午餐优惠券包"); row.setStoreId(30L);
+        row.setGrantStatus("FAILED"); row.setRequestId("package-request"); row.setCanReissue(true);
+        when(stores.getStoreByStoreId(30L)).thenReturn(CommonResult.success(null));
+        when(logs.selectPage(any(PageParam.class), any(Wrapper.class)))
+                .thenReturn(new PageResult<>(List.of(row), 1L));
+        var controller = new LotteryController();
+        ReflectionTestUtils.setField(controller, "lotteryLogService", service);
+        var req = new LotteryLogReqVO();
+        req.setLotteryId(21L); req.setPrizeType(6);
+        var result = controller.getByLotteryLogList(req).getCheckedData();
+        assertEquals(1L, result.getTotal());
+        var item = result.getList().get(0);
+        assertEquals(6, item.getPrizeType()); assertEquals("午餐优惠券包", item.getPrizeName());
+        assertEquals("FAILED", item.getGrantStatus()); assertEquals("package-request", item.getRequestId());
+        assertTrue(item.getCanReissue()); assertNull(item.getClaimStatus());
+        var where = org.mockito.ArgumentCaptor.forClass(Wrapper.class);
+        verify(logs).selectPage(any(PageParam.class), where.capture());
+        var query = (AbstractWrapper<?, ?, ?>) where.getValue();
+        assertTrue(query.getSqlSegment().contains("prize_type"));
+        assertTrue(query.getParamNameValuePairs().containsValue(6));
+    }
+
+    @Test void exportPackageFilterAndExcelCellsKeepPackageNameAndExistingTypes() throws Exception {
+        var service = new LotteryLogServiceImpl();
+        var settings = mock(LotterySettingsMapper.class);
+        var query = mock(LotteryLogQueryService.class);
+        var excel = mock(ExcelActionService.class);
+        ReflectionTestUtils.setField(service, "lotterySettingsMapper", settings);
+        ReflectionTestUtils.setField(service, "lotteryLogQueryService", query);
+        ReflectionTestUtils.setField(service, "lotteryLogMapper", mock(LotteryLogMapper.class));
+        ReflectionTestUtils.setField(service, "logExportRespVOExcelActionService", excel);
+        var setting = new LotterySettingsDO();
+        setting.setActivityId(21L);
+        when(settings.selectOne(any(Wrapper.class))).thenReturn(setting);
+        var row = new LotteryLogDO(); row.setMemberId(40L); row.setPrizeType(6); row.setPrizeName("午餐优惠券包");
+        when(query.selectPage(any(), any())).thenReturn(new Page<LotteryLogDO>().setRecords(List.of(row)));
+        doAnswer(call -> {
+            Function<Page<LotteryLogExportRespVO>, List<LotteryLogExportRespVO>> supplier = call.getArgument(2);
+            var rows = supplier.apply(call.getArgument(1));
+            var bytes = new ByteArrayOutputStream();
+            EasyExcel.write(bytes, LotteryLogExportRespVO.class).sheet().doWrite(rows);
+            List<Map<Integer, String>> cells = EasyExcel.read(new ByteArrayInputStream(bytes.toByteArray())).sheet().doReadSync();
+            assertEquals("优惠券包", cells.get(0).get(3));
+            assertEquals("午餐优惠券包", cells.get(0).get(4));
+            assertNull(rows.get(0).getClaimName());
+            String[] names = {"优惠券", "积分", "实物", "无奖品", "现金红包"};
+            for (int type = 1; type <= 5; type++) {
+                row.setPrizeType(type);
+                if (type == 5) row.setClaimStatus(1);
+                assertEquals(names[type - 1], supplier.apply(call.getArgument(1)).get(0).getPrizeTypeName());
+            }
+            return null;
+        }).when(excel).exportAsyncExcel(eq(LotteryLogExportRespVO.class), any(Page.class), any(Function.class), anyString(), anyList());
+        var req = new LotteryLogExportVO();
+        req.setLotteryId(21L); req.setPrizeType(6);
+        try {
+            BusinessContextHolder.setBusinessId(10L);
+            service.exportLotteryList(req, null, null);
+        } finally {
+            BusinessContextHolder.clear();
+        }
+        var where = org.mockito.ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+        verify(query, times(6)).selectPage(any(), where.capture());
+        var wrapper = where.getValue();
+        assertTrue(wrapper.getSqlSegment().contains("prize_type"));
+        assertTrue(wrapper.getParamNameValuePairs().containsValue(6));
+        assertTrue(wrapper.getParamNameValuePairs().containsValue(10L));
+    }
+
     private LotteryLedger.Draw draw(int type) {
         var draw=new LotteryLedger.Draw();draw.setId(100);draw.setBusinessId(10);draw.setMemberId(40);draw.setStoreId(30);draw.setActivityId(21);draw.setDrawStatus("ACCEPTED");draw.setGrantStatus("PENDING");draw.setStockState("RESERVED");
         var s=new LotteryDrawSnapshot();var prize=new LotteryPrizeDO();prize.setId(101L);prize.setPrizeType(type);s.setPrize(prize);s.setGuarantee(prize);var member=new WxMemberVO();member.setMemberId(40L);member.setMemberMobile("13800000000");s.setMember(member);draw.setSnapshot(s);return draw;

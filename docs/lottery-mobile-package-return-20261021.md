@@ -37,6 +37,12 @@
 
 返回表示是否安排异步任务，不代表已到账。后台中奖记录增加 `requestId`、`grantStatus`、`failReason`、`canReissue`。必须使用原账号、门店和请求编号；成功、正在执行、已安排补发、已退奖记录不会重复发放。
 
+## 后台中奖记录查询与导出
+
+- `POST /admin-api/promotion/lottery-log/getLotteryLogList`：请求体中传 `prizeType=6` 筛选优惠券包；不传时包含所有奖品类型。券包记录返回 `prizeType=6`、中奖时保存的 `prizeName`，以及原有的 `requestId`、`grantStatus`、`failReason`、`canReissue`。
+- `GET /admin-api/promotion/lottery-log/export`：查询参数传 `prizeType=6` 导出券包；不传时按原条件导出全部类型。“奖品类型”列为“优惠券包”，“奖品内容”列为中奖记录的奖品名称。
+- `claimStatus` 仍仅用于红包领取状态，查询或导出券包时不要传该参数；券包发放状态查看 `grantStatus`。其他筛选条件、分页及异步下载方式保持原样。
+
 ## 支付宝红包与实物回收
 
 服务端 `memberCategory=1` 为支付宝。支付宝命中红包时，在占库存和受理前替换为非红包兜底，正常消耗一次机会，不创建微信转账、不占红包库存。保存、上架和受理均禁止红包兜底。
