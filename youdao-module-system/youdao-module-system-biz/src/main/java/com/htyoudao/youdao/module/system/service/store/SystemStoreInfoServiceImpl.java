@@ -3519,6 +3519,14 @@ public class SystemStoreInfoServiceImpl implements SystemStoreInfoService {
             }
             fillCampusDeliveryFields(vo, sysStoreInfo, storeCampusDeliveryConfigResVO);
 
+            // 历史空金额或缺失费用配置统一回显0。
+            vo.setAdditionaaCosts(ObjectUtil.defaultIfNull(vo.getAdditionaaCosts(), BigDecimal.ZERO));
+            vo.setMinimumDeliveryFee(ObjectUtil.defaultIfNull(vo.getMinimumDeliveryFee(), BigDecimal.ZERO));
+            vo.setPackCosts(ObjectUtil.defaultIfNull(vo.getPackCosts(), BigDecimal.ZERO));
+            vo.setMinimumPackageFee(ObjectUtil.defaultIfNull(vo.getMinimumPackageFee(), BigDecimal.ZERO));
+            vo.setPackDeliveryCosts(ObjectUtil.defaultIfNull(vo.getPackDeliveryCosts(), BigDecimal.ZERO));
+            vo.setMinimumDeliveryPackFee(ObjectUtil.defaultIfNull(vo.getMinimumDeliveryPackFee(), BigDecimal.ZERO));
+
             // 设置其他属性，使用ObjectUtil避免空指针
             vo.setStoreWithoutPayment(sysStoreInfo.getStoreWithoutPayment());
             vo.setStorePayType(sysStoreInfo.getStorePayType());
@@ -4814,6 +4822,7 @@ public class SystemStoreInfoServiceImpl implements SystemStoreInfoService {
     @LogRecord(type = SYSTEM_STORE_TYPE, subType = SYSTEM_STORE_UPDATE_SUB_TYPE_BOSS, bizNo = "{{#store.storeId}}",
             success = SYSTEM_STORE_UPDATE_SUCCESS)
     public void updateStoreByBoss(StoreSaveReqVO storeUserSaveReqVO) {
+        normalizeBossStoreFees(storeUserSaveReqVO);
         SystemStoreInfoDO systemStoreInfoOldDO = systemStoreInfoMapper.selectById(storeUserSaveReqVO.getStoreId());
         if (storeUserSaveReqVO.getStoreStatus().equals(StoreStatusEnum.SHUTDOWN.getStatus()) && storeUserSaveReqVO.getOpenStatus().equals(StoreStatusEnum.OPEN.getStatus()) && systemStoreInfoOldDO.getOpenStatus().equals(StoreStatusEnum.OPEN.getStatus())) {
             throw exception(STORE_STOP_EXISTS);
@@ -4837,6 +4846,23 @@ public class SystemStoreInfoServiceImpl implements SystemStoreInfoService {
         storeCityListCacheService.refreshStoreAfterCommit(systemStoreInfoDO.getStoreId(),
                 systemStoreInfoOldDO.getStoreCity(), systemStoreInfoDO.getStoreCity(), false);
 
+    }
+
+    /** 老板助手传入的空费用按0保存，仅处理本次提交的费用项。 */
+    private void normalizeBossStoreFees(StoreSaveReqVO reqVO) {
+        reqVO.setPackingCharge(ObjectUtil.defaultIfNull(reqVO.getPackingCharge(), BigDecimal.ZERO));
+        reqVO.setDeliveryFee(ObjectUtil.defaultIfNull(reqVO.getDeliveryFee(), BigDecimal.ZERO));
+        reqVO.setCampusDeliverySubsidy(ObjectUtil.defaultIfNull(reqVO.getCampusDeliverySubsidy(), BigDecimal.ZERO));
+        if (CollectionUtil.isEmpty(reqVO.getSystemStoreExpensesList())) {
+            return;
+        }
+        for (SystemStoreExpensesVO expense : reqVO.getSystemStoreExpensesList()) {
+            if (expense == null) {
+                continue;
+            }
+            expense.setMinimumDeliveryFee(ObjectUtil.defaultIfNull(expense.getMinimumDeliveryFee(), BigDecimal.ZERO));
+            expense.setAdditionaaCosts(ObjectUtil.defaultIfNull(expense.getAdditionaaCosts(), BigDecimal.ZERO));
+        }
     }
 
     @Override
