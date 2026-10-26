@@ -61,7 +61,9 @@ public interface SystemStoreInfoMapper extends BaseMapperX<SystemStoreInfoDO> {
     List<OrgStoreNum> getNodeStoreNum(@Param("unionIds") Collection<Long> unionIds);
 
     @DataPermission(enable = false)
-    IPage<StoreResVO> selectPageList(Page<StoreResVO> page, @Param("record") StorePageReqVO reqVO,@Param("businessId") Long businessId,@Param("userId") Long userId);
+    IPage<StoreResVO> selectPageList(Page<StoreResVO> page, @Param("record") StorePageReqVO reqVO,
+                                   @Param("businessId") Long businessId, @Param("userId") Long userId,
+                                   @Param("managerOnly") boolean managerOnly);
     /**
      *
      * 根据标签查询门店

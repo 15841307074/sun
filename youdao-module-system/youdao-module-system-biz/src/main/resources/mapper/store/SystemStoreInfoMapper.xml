@@ -125,6 +125,10 @@
         <if test="businessId != null">
             AND a.business_id = #{businessId}
         </if>
+        <if test="managerOnly">
+            AND su.user_id = #{userId}
+            AND su.business_id = a.business_id
+        </if>
         AND (
         <if test="record.orgIds != null and record.orgIds.size() > 0">
             a.org_id IN

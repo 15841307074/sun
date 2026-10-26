@@ -277,10 +277,19 @@ public class SystemStoreInfoServiceImpl implements SystemStoreInfoService {
         }
         Set<Long> orgIds = new HashSet<>();
         Long userId = WebFrameworkUtils.getLoginUserId();
+        List<Long> userOrgIds = Optional.ofNullable(orgUserService.selectUserOrgIds(userId))
+                .orElseGet(Collections::emptyList).stream().filter(Objects::nonNull).toList();
+        // 无组织的店长只能查看本人担任店长的门店，不能因组织范围为空而放开查询。
+        boolean managerOnly = userId != null && userOrgIds.isEmpty()
+                && systemStoreUserMapper.selectCount(new LambdaQueryWrapperX<SystemStoreUserDO>()
+                .eq(SystemStoreUserDO::getUserId, userId)
+                .eq(SystemStoreUserDO::getBusinessId, BusinessContextHolder.getBusinessId())
+                .eq(SystemStoreUserDO::getType, StoreUserEnum.STOREMANAGER.getStatus())
+                .eq(SystemStoreUserDO::getDeleted, false)) > 0;
         //当前用户的机构ID
         if (CollectionUtil.isEmpty(pageReqVO.getOrgIds())) {
             //当前用户的机构ID
-            List<Long> orgId = orgUserService.selectUserOrgIds(userId);
+            List<Long> orgId = userOrgIds;
             orgIds.addAll(orgId);
             Set<Long> finalOrgIds = new HashSet<>();
             orgId.forEach(orgd -> {
@@ -295,7 +304,7 @@ public class SystemStoreInfoServiceImpl implements SystemStoreInfoService {
             pageReqVO.setOrgIds(orgIds);
         }
         Page<StoreResVO> page = new Page<>(pageReqVO.getPageNo(), pageReqVO.getPageSize());
-        IPage<StoreResVO> pageList = systemStoreInfoMapper.selectPageList(page, pageReqVO, businessId, userId);
+        IPage<StoreResVO> pageList = systemStoreInfoMapper.selectPageList(page, pageReqVO, businessId, userId, managerOnly);
         PageResult<StoreResVO> pageResult = new PageResult<>(pageList.getRecords(), pageList.getTotal());
         return joinData(pageResult);
     }
@@ -1918,7 +1927,7 @@ public class SystemStoreInfoServiceImpl implements SystemStoreInfoService {
     }
 
     public List<StoreResVO> selectPageList(Page<StoreResVO> page, StorePageReqVO pageReqVO, Long businessId, Long userId) {
-        IPage<StoreResVO> pageList = systemStoreInfoMapper.selectPageList(page, pageReqVO, businessId, userId);
+        IPage<StoreResVO> pageList = systemStoreInfoMapper.selectPageList(page, pageReqVO, businessId, userId, false);
         List<StoreResVO> records = pageList.getRecords();
         Set<Long> orgIds = new HashSet<>();
         Set<Long> storeIds = new HashSet<>();
