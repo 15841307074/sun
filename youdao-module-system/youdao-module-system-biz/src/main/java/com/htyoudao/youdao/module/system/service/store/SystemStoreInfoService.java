@@ -71,6 +71,9 @@ public interface SystemStoreInfoService {
      */
     PageResult<StoreResVO> getStorePage(StorePageReqVO pageReqVO);
 
+    /** 门店管理分页：无组织店长仅查看本人担任店长的门店。 */
+    PageResult<StoreResVO> getStorePageForAdmin(StorePageReqVO pageReqVO);
+
     /**
      * 添加门店
      *

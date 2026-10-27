@@ -7,6 +7,8 @@ import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.htyoudao.youdao.framework.context.BusinessContextHolder;
 import com.htyoudao.youdao.framework.web.core.util.WebFrameworkUtils;
+import com.htyoudao.youdao.module.system.controller.admin.store.SystemStoreInfoController;
+import com.htyoudao.youdao.module.system.controller.admin.sysconfig.SysConfigController;
 import com.htyoudao.youdao.module.system.controller.admin.store.vo.StorePageReqVO;
 import com.htyoudao.youdao.module.system.controller.admin.store.vo.StoreResVO;
 import com.htyoudao.youdao.module.system.dal.dataobject.store.SystemStoreUserDO;
@@ -183,10 +185,36 @@ class StorePageManagerScopeTest {
         assertEquals(List.of(103L), selectedIds);
     }
 
+    @Test
+    void cloudSpeakerEntryKeepsPreviousScopeAndSkipsManagerLookup() {
+        var controller = new SysConfigController();
+        ReflectionTestUtils.setField(controller, "systemStoreInfoService", service);
+        try (var login = mockStatic(WebFrameworkUtils.class)) {
+            login.when(WebFrameworkUtils::getLoginUserId).thenReturn(7L);
+            var result = controller.getYlbConfigPage(new StorePageReqVO()).getCheckedData();
+            assertEquals(6L, result.getTotal());
+            assertEquals(Set.of(101L, 102L, 103L, 104L, 105L, 108L), new HashSet<>(selectedIds));
+            verifyNoInteractions(managers);
+        }
+    }
+
+    @Test
+    void sharedServiceWithSuppliedOrgRangeDoesNotAddPermissionLookups() {
+        var request = new StorePageReqVO(); request.setOrgIds(Set.of(100L));
+        try (var login = mockStatic(WebFrameworkUtils.class)) {
+            login.when(WebFrameworkUtils::getLoginUserId).thenReturn(7L);
+            service.getStorePage(request);
+            assertEquals(Set.of(101L, 102L, 103L, 104L, 105L, 108L), new HashSet<>(selectedIds));
+            verifyNoInteractions(managers, orgUsers);
+        }
+    }
+
     private void query(StorePageReqVO request) {
         try (var login = mockStatic(WebFrameworkUtils.class)) {
             login.when(WebFrameworkUtils::getLoginUserId).thenReturn(7L);
-            var result = service.getStorePage(request);
+            var controller = new SystemStoreInfoController();
+            ReflectionTestUtils.setField(controller, "systemStoreInfoService", service);
+            var result = controller.getStorePage(request).getCheckedData();
             assertEquals(selectedIds.size(), result.getTotal());
         }
     }

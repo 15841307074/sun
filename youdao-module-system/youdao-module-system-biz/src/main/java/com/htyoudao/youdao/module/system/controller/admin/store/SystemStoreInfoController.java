@@ -55,7 +55,7 @@ public class SystemStoreInfoController {
     @PreAuthorize("@ss.hasPermission('system:store:query')")
     public CommonResult<PageResult<StoreResVO>> getStorePage(@Valid @RequestBody StorePageReqVO pageReqVO) {
         // 获得用户分页列表
-        PageResult<StoreResVO> pageResult = systemStoreInfoService.getStorePage(pageReqVO);
+        PageResult<StoreResVO> pageResult = systemStoreInfoService.getStorePageForAdmin(pageReqVO);
         if (CollUtil.isEmpty(pageResult.getList())) {
             return success(new PageResult<>(pageResult.getTotal()));
         }
