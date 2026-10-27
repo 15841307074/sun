@@ -186,26 +186,27 @@ class StorePageManagerScopeTest {
     }
 
     @Test
-    void cloudSpeakerEntryKeepsPreviousScopeAndSkipsManagerLookup() {
+    void cloudSpeakerEntrySharesStoreManagerRestriction() {
         var controller = new SysConfigController();
         ReflectionTestUtils.setField(controller, "systemStoreInfoService", service);
         try (var login = mockStatic(WebFrameworkUtils.class)) {
             login.when(WebFrameworkUtils::getLoginUserId).thenReturn(7L);
             var result = controller.getYlbConfigPage(new StorePageReqVO()).getCheckedData();
-            assertEquals(6L, result.getTotal());
-            assertEquals(Set.of(101L, 102L, 103L, 104L, 105L, 108L), new HashSet<>(selectedIds));
-            verifyNoInteractions(managers);
+            assertEquals(2L, result.getTotal());
+            assertEquals(Set.of(101L, 102L), new HashSet<>(selectedIds));
+            verify(managers).selectCount(any(Wrapper.class));
         }
     }
 
     @Test
-    void sharedServiceWithSuppliedOrgRangeDoesNotAddPermissionLookups() {
+    void sharedServiceWithSuppliedOrgRangeAlsoRestrictsOrglessManager() {
         var request = new StorePageReqVO(); request.setOrgIds(Set.of(100L));
         try (var login = mockStatic(WebFrameworkUtils.class)) {
             login.when(WebFrameworkUtils::getLoginUserId).thenReturn(7L);
             service.getStorePage(request);
-            assertEquals(Set.of(101L, 102L, 103L, 104L, 105L, 108L), new HashSet<>(selectedIds));
-            verifyNoInteractions(managers, orgUsers);
+            assertEquals(Set.of(101L, 102L), new HashSet<>(selectedIds));
+            verify(managers).selectCount(any(Wrapper.class));
+            verify(orgUsers).selectUserOrgIds(7L);
         }
     }
 

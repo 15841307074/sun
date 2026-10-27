@@ -269,15 +269,6 @@ public class SystemStoreInfoServiceImpl implements SystemStoreInfoService {
 
     @Override
     public PageResult<StoreResVO> getStorePage(StorePageReqVO pageReqVO ) {
-        return getStorePage(pageReqVO, false);
-    }
-
-    @Override
-    public PageResult<StoreResVO> getStorePageForAdmin(StorePageReqVO pageReqVO) {
-        return getStorePage(pageReqVO, true);
-    }
-
-    private PageResult<StoreResVO> getStorePage(StorePageReqVO pageReqVO, boolean restrictOrglessManager) {
         normalizeStorePageTagFilter(pageReqVO);
         //查询deptIDs
         Long businessId = BusinessContextHolder.getBusinessId();
@@ -286,12 +277,10 @@ public class SystemStoreInfoServiceImpl implements SystemStoreInfoService {
         }
         Set<Long> orgIds = new HashSet<>();
         Long userId = WebFrameworkUtils.getLoginUserId();
-        List<Long> userOrgIds = restrictOrglessManager || CollectionUtil.isEmpty(pageReqVO.getOrgIds())
-                ? Optional.ofNullable(orgUserService.selectUserOrgIds(userId))
-                .orElseGet(Collections::emptyList).stream().filter(Objects::nonNull).toList()
-                : Collections.emptyList();
+        List<Long> userOrgIds = Optional.ofNullable(orgUserService.selectUserOrgIds(userId))
+                .orElseGet(Collections::emptyList).stream().filter(Objects::nonNull).toList();
         // 无组织的店长只能查看本人担任店长的门店，不能因组织范围为空而放开查询。
-        boolean managerOnly = restrictOrglessManager && userId != null && userOrgIds.isEmpty()
+        boolean managerOnly = userId != null && userOrgIds.isEmpty()
                 && systemStoreUserMapper.selectCount(new LambdaQueryWrapperX<SystemStoreUserDO>()
                 .eq(SystemStoreUserDO::getUserId, userId)
                 .eq(SystemStoreUserDO::getBusinessId, BusinessContextHolder.getBusinessId())
