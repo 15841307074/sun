@@ -330,6 +330,12 @@ public class LotteryMobileServiceImpl implements LotteryMobileService {
         } else {
             result = queryAllLotteryLogByMemberId(memberId);
         }
+        // 同手机号记录仍跨端共享，支付宝端仅隐藏微信现金红包。
+        if (CollectionUtil.isNotEmpty(result)
+                && Objects.equals(getValidWxMember(memberId).getMemberCategory(), 1)) {
+            result = result.stream().filter(row -> !Objects.equals(row.getPrizeType(), 5))
+                    .collect(Collectors.toList());
+        }
         processLotteryLogResult(result);
         lotteryRecordStateService.enrich(result);
         return result;
