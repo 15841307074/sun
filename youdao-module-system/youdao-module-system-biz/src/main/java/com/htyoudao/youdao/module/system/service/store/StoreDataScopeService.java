@@ -15,16 +15,29 @@ import java.util.stream.Collectors;
 import static com.htyoudao.youdao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static com.htyoudao.youdao.framework.common.exception.enums.GlobalErrorCodeConstants.UNAUTHORIZED;
 
-/** 在请求线程计算导出权限，异步分页只使用固定的门店范围。 */
+/** 门店数据权限公共服务：本人担任店长的门店，与所属组织及下级门店的并集。
+ * 不自动改变任何接口权限，由业务入口显式调用；异步任务应在请求线程提前取得范围。
+ */
 @Service
-public class StoreExportScopeService {
+public class StoreDataScopeService {
     @Resource private OrgUserService orgUserService;
     @Resource private OrgMapper orgMapper;
     @Resource private SystemStoreUserMapper storeUserMapper;
     @Resource private SystemStoreInfoMapper storeMapper;
 
-    /** null 保留无组织且非店长账号的原有规则；空权限使用不可能的ID，禁止退化成全量导出。 */
-    public Set<Long> resolve(Long businessId, Long userId) {
+    /** 供同步业务入口使用；返回值语义与 getAccessibleStoreIds 相同。 */
+    public Set<Long> getCurrentUserAccessibleStoreIds() {
+        return getAccessibleStoreIds(
+                com.htyoudao.youdao.framework.context.BusinessContextHolder.getBusinessId(),
+                com.htyoudao.youdao.framework.web.core.util.WebFrameworkUtils.getLoginUserId());
+    }
+
+    /**
+     * 显式计算指定项目、用户的可见门店，便于查询、统计及异步任务复用。
+     * null：无组织且非店长，由调用方沿用原有权限规则，不代表自动开放所有数据。
+     * 非空集合：必须作为查询限制；仅含 -1 表示无可见门店，不能省略该限制。
+     */
+    public Set<Long> getAccessibleStoreIds(Long businessId, Long userId) {
         if (businessId == null || userId == null) throw exception(UNAUTHORIZED);
         Set<Long> ownStores = storeUserMapper.selectList(new LambdaQueryWrapperX<SystemStoreUserDO>()
                 .eq(SystemStoreUserDO::getBusinessId, businessId)

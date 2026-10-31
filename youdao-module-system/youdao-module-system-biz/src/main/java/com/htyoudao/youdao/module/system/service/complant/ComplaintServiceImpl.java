@@ -61,7 +61,7 @@ import static com.htyoudao.youdao.framework.common.exception.enums.GlobalErrorCo
 @Service
 @Slf4j
 public class ComplaintServiceImpl implements ComplaintService {
-    @Resource private com.htyoudao.youdao.module.system.service.store.StoreExportScopeService storeExportScopeService;
+    @Resource private com.htyoudao.youdao.module.system.service.store.StoreDataScopeService storeDataScopeService;
     @Resource private SystemStoreInfoMapper systemStoreInfoMapper;
     @Resource private OrgMapper orgMapper;
     @Resource private OrgUserMapper orgUserMapper;
@@ -331,7 +331,7 @@ public class ComplaintServiceImpl implements ComplaintService {
     }
 
     private void applyComplaintExportScope(ComplaintPageReqVO pageReqVO) {
-        Set<Long> allowed = storeExportScopeService.resolve(
+        Set<Long> allowed = storeDataScopeService.getAccessibleStoreIds(
                 BusinessContextHolder.getBusinessId(), WebFrameworkUtils.getLoginUserId());
         if (allowed == null) {
             applyAdminComplaintScope(pageReqVO);
