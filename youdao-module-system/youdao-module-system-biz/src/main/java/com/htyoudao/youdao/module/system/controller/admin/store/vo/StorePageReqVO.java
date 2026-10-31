@@ -50,6 +50,10 @@ public class StorePageReqVO extends PageParam {
 
     private Set<Long> orgIds;
 
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    @Schema(hidden = true)
+    private Set<Long> exportScopeStoreIds;
+
     @Schema(description = "每页条数，最大值为 2000", requiredMode = Schema.RequiredMode.REQUIRED, example = "10")
     @NotNull(message = "每页条数不能为空")
     @Min(value = 1, message = "每页条数最小值为 1")

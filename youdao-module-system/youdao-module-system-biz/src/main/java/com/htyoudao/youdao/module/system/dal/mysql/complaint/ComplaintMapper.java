@@ -22,6 +22,7 @@ public interface ComplaintMapper extends BaseMapperX<ComplaintDO> {
                 .eqIfPresent(ComplaintDO::getComplaintType, reqVO.getStatus())
                 .eqIfPresent(ComplaintDO::getBusinessType, reqVO.getType())
                 .eqIfPresent(ComplaintDO::getMemberId, reqVO.getMemberId())
+                .eqIfPresent(ComplaintDO::getAcceptFollowUp, reqVO.getAcceptFollowUp())
                 .inIfPresent(ComplaintDO::getStoreId, reqVO.getOrgIds())
                 .orderByDesc(ComplaintDO::getCreateTime);
         if (Boolean.TRUE.equals(reqVO.getIsBoss())&& reqVO.getStatus() == 1) {

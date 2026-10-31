@@ -125,6 +125,12 @@
         <if test="businessId != null">
             AND a.business_id = #{businessId}
         </if>
+        <if test="record.exportScopeStoreIds != null">
+            AND a.store_id IN
+            <foreach collection="record.exportScopeStoreIds" item="scopeStoreId" open="(" separator="," close=")">
+                #{scopeStoreId}
+            </foreach>
+        </if>
         <if test="managerOnly">
             AND su.user_id = #{userId}
             AND su.business_id = a.business_id

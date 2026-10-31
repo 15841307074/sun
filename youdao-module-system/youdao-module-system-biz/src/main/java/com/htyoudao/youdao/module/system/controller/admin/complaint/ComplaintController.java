@@ -26,6 +26,8 @@ import java.io.IOException;
 import java.util.stream.Collectors;
 
 import static com.htyoudao.youdao.framework.common.pojo.CommonResult.success;
+import com.htyoudao.youdao.framework.apilog.core.annotation.ApiAccessLog;
+import static com.htyoudao.youdao.framework.apilog.core.enums.OperateTypeEnum.EXPORT;
 
 
 /**
@@ -76,5 +78,13 @@ public class ComplaintController {
     @Operation(summary = "待处理数量")
     public CommonResult<Long> getComplaintCount() throws IOException {
         return success(complaintService.getComplaintCount());
+    }
+    @GetMapping("/export")
+    @Operation(summary = "导出投诉列表")
+    @PreAuthorize("@ss.hasPermission('system:complaint:query')")
+    @ApiAccessLog(operateType = EXPORT)
+    public CommonResult<String> exportComplaintList(@Valid ComplaintPageReqVO pageReqVO) {
+        complaintService.exportComplaintList(pageReqVO);
+        return success("数据下载中,请稍后到下载管理中查看..");
     }
 }

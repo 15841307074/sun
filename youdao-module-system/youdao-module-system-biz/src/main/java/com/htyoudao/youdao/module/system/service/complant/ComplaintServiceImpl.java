@@ -1,5 +1,21 @@
 package com.htyoudao.youdao.module.system.service.complant;
 
+import com.htyoudao.youdao.module.system.enums.ComplaintTypeEnum;
+import com.htyoudao.youdao.module.system.dal.mysql.user.AdminUserMapper;
+import com.htyoudao.youdao.module.system.dal.mysql.tagvalue.TagValueMapper;
+import com.htyoudao.youdao.module.system.dal.mysql.store.SystemStoreTagMapper;
+import com.htyoudao.youdao.module.system.dal.mysql.store.SystemStoreInfoMapper;
+import com.htyoudao.youdao.module.system.dal.mysql.orguser.OrgUserMapper;
+import com.htyoudao.youdao.module.system.dal.mysql.org.OrgMapper;
+import com.htyoudao.youdao.module.system.dal.dataobject.user.AdminUserDO;
+import com.htyoudao.youdao.module.system.dal.dataobject.tagvalue.TagValueDO;
+import com.htyoudao.youdao.module.system.dal.dataobject.store.SystemStoreTagDO;
+import com.htyoudao.youdao.module.system.dal.dataobject.store.SystemStoreInfoDO;
+import com.htyoudao.youdao.module.system.dal.dataobject.orguser.OrgUserDO;
+import com.htyoudao.youdao.module.system.dal.dataobject.org.OrgDO;
+import com.htyoudao.youdao.module.system.controller.admin.complaint.vo.ComplaintExportVO;
+import com.htyoudao.youdao.framework.excel.core.service.ExcelActionService;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollectionUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -45,6 +61,14 @@ import static com.htyoudao.youdao.framework.common.exception.enums.GlobalErrorCo
 @Service
 @Slf4j
 public class ComplaintServiceImpl implements ComplaintService {
+    @Resource private com.htyoudao.youdao.module.system.service.store.StoreExportScopeService storeExportScopeService;
+    @Resource private SystemStoreInfoMapper systemStoreInfoMapper;
+    @Resource private OrgMapper orgMapper;
+    @Resource private OrgUserMapper orgUserMapper;
+    @Resource private AdminUserMapper adminUserMapper;
+    @Resource private SystemStoreTagMapper systemStoreTagMapper;
+    @Resource private TagValueMapper tagValueMapper;
+    @Resource private ExcelActionService<ComplaintExportVO> complaintExportExcelActionService;
     @Resource
     private ComplaintMapper complaintMapper;
     @Resource
@@ -272,4 +296,211 @@ public class ComplaintServiceImpl implements ComplaintService {
 
         return complaintMapper.selectCount(queryWrapper);
     }
+    private void applyAdminComplaintScope(ComplaintPageReqVO pageReqVO) {
+        // 查询当前登入人所在组织以及下级
+        Set<Long> storeId = storeUserMapper.selectList(new LambdaQueryWrapperX<StoreUserDO>()
+                .eq(StoreUserDO::getUserId, WebFrameworkUtils.getLoginUserId())
+                .eq(StoreUserDO::getDeleted, 0)).stream().map(StoreUserDO::getStoreId).collect(Collectors.toSet());
+        Set<Long> storeList = new HashSet<>();
+        if (pageReqVO.getOrgId() != null) {
+            if (Objects.equals(pageReqVO.getIsStore(), 0)) {
+                storeList = orgService.getStoreIdListByOrgID(pageReqVO.getOrgId());
+            }
+            storeList.add(pageReqVO.getOrgId());
+        } else {
+            storeList = orgService.getStoreIdsByUser();
+            if (CollectionUtil.isNotEmpty(storeId)) {
+                if (CollectionUtil.isEmpty(storeList)) {
+                    storeList = new HashSet<>();
+                }
+                storeList.addAll(storeId);
+                pageReqVO.setOrgIds(storeId);
+            }
+        }
+        if (CollectionUtil.isNotEmpty(storeList)) {
+            pageReqVO.setOrgIds(storeList);
+        }
+    }
+
+    @Override
+    public void exportComplaintList(ComplaintPageReqVO pageReqVO) {
+        applyComplaintExportScope(pageReqVO);
+        Page<ComplaintExportVO> page = new Page<>(pageReqVO.getPageNo(), 100);
+        complaintExportExcelActionService.exportAsyncExcel(ComplaintExportVO.class, page,
+                currentPage -> selectComplaintExportList(currentPage, pageReqVO), "投诉列表");
+    }
+
+    private void applyComplaintExportScope(ComplaintPageReqVO pageReqVO) {
+        Set<Long> allowed = storeExportScopeService.resolve(
+                BusinessContextHolder.getBusinessId(), WebFrameworkUtils.getLoginUserId());
+        if (allowed == null) {
+            applyAdminComplaintScope(pageReqVO);
+            return;
+        }
+        Set<Long> scope = new HashSet<>(allowed);
+        if (pageReqVO.getOrgId() != null) {
+            Set<Long> selected = new HashSet<>();
+            if (Objects.equals(pageReqVO.getIsStore(), 0)) {
+                Set<Long> organizationStores = orgService.getStoreIdListByOrgID(pageReqVO.getOrgId());
+                if (organizationStores != null) selected.addAll(organizationStores);
+            } else {
+                selected.add(pageReqVO.getOrgId());
+            }
+            scope.retainAll(selected);
+        }
+        if (pageReqVO.getOrgIds() != null && !pageReqVO.getOrgIds().isEmpty()) {
+            scope.retainAll(pageReqVO.getOrgIds());
+        }
+        pageReqVO.setOrgIds(scope.isEmpty() ? Set.of(-1L) : Set.copyOf(scope));
+    }
+
+    private List<ComplaintExportVO> selectComplaintExportList(Page<ComplaintExportVO> page,
+                                                               ComplaintPageReqVO pageReqVO) {
+        pageReqVO.setPageNo(Math.toIntExact(page.getCurrent()));
+        pageReqVO.setPageSize(Math.toIntExact(page.getSize()));
+        List<ComplaintDO> complaints = complaintMapper.selectPage(pageReqVO).getList();
+        if (CollectionUtil.isEmpty(complaints)) {
+            return Collections.emptyList();
+        }
+
+        Set<Long> storeIds = complaints.stream().map(ComplaintDO::getStoreId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, SystemStoreInfoDO> storeMap = CollectionUtil.isEmpty(storeIds)
+                ? Collections.emptyMap()
+                : systemStoreInfoMapper.selectBatchIds(storeIds).stream()
+                .collect(Collectors.toMap(SystemStoreInfoDO::getStoreId, store -> store,
+                        (first, ignored) -> first));
+
+        Set<Long> orgIds = storeMap.values().stream().map(SystemStoreInfoDO::getOrgId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, OrgDO> orgMap = loadOrganizationMap(orgIds);
+        Map<Long, AdminUserDO> orgLeaderMap = loadOrganizationLeaderMap(orgMap.keySet());
+        Map<Long, String> storeTagMap = loadStoreTagMap(storeIds);
+        Map<Long, List<String>> complaintImageMap = loadComplaintImageMap(complaints);
+
+        Map<Integer, String> complaintTypeNames = Arrays.stream(ComplaintTypeEnum.values())
+                .collect(Collectors.toMap(ComplaintTypeEnum::getStatus, ComplaintTypeEnum::getName));
+        Map<Integer, String> complaintStatusNames = Arrays.stream(ComplaintStatusEnum.values())
+                .collect(Collectors.toMap(ComplaintStatusEnum::getStatus, ComplaintStatusEnum::getName));
+
+        return complaints.stream().map(complaint -> {
+            ComplaintExportVO export = BeanUtils.toBean(complaint, ComplaintExportVO.class);
+            SystemStoreInfoDO store = storeMap.get(complaint.getStoreId());
+            if (store != null) {
+                OrgDO org = orgMap.get(store.getOrgId());
+                export.setOrgNameAndLeader(formatOrganizationAndLeader(org, orgMap, orgLeaderMap));
+            }
+            export.setStoreTagNames(storeTagMap.get(complaint.getStoreId()));
+            export.setComplaintImageUrls(String.join("\n",
+                    complaintImageMap.getOrDefault(complaint.getId(), Collections.emptyList())));
+            export.setBusinessTypeName(complaintTypeNames.getOrDefault(complaint.getBusinessType(), ""));
+            export.setComplaintStatusName(complaintStatusNames.getOrDefault(complaint.getComplaintType(), ""));
+            export.setAcceptFollowUpName(Objects.equals(complaint.getAcceptFollowUp(), 1) ? "是" : "否");
+            return export;
+        }).toList();
+    }
+
+    private Map<Long, OrgDO> loadOrganizationMap(Set<Long> orgIds) {
+        if (CollectionUtil.isEmpty(orgIds)) {
+            return Collections.emptyMap();
+        }
+        List<OrgDO> directOrgs = orgMapper.selectBatchIds(orgIds);
+        Set<Long> allOrgIds = new HashSet<>(orgIds);
+        for (OrgDO org : directOrgs) {
+            if (!StringUtils.hasText(org.getAncestors())) {
+                continue;
+            }
+            Arrays.stream(org.getAncestors().split(","))
+                    .map(String::trim)
+                    .filter(StringUtils::hasText)
+                    .map(Long::valueOf)
+                    .forEach(allOrgIds::add);
+        }
+        return orgMapper.selectBatchIds(allOrgIds).stream()
+                .collect(Collectors.toMap(OrgDO::getId, org -> org, (first, ignored) -> first));
+    }
+
+    private Map<Long, AdminUserDO> loadOrganizationLeaderMap(Set<Long> orgIds) {
+        if (CollectionUtil.isEmpty(orgIds)) {
+            return Collections.emptyMap();
+        }
+        List<OrgUserDO> leaderRelations = orgUserMapper.selectList(new LambdaQueryWrapperX<OrgUserDO>()
+                .in(OrgUserDO::getOrgId, orgIds)
+                .eq(OrgUserDO::getType, 1));
+        Set<Long> userIds = leaderRelations.stream().map(OrgUserDO::getUserId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        if (CollectionUtil.isEmpty(userIds)) {
+            return Collections.emptyMap();
+        }
+        Map<Long, AdminUserDO> userMap = adminUserMapper.selectBatchIds(userIds).stream()
+                .collect(Collectors.toMap(AdminUserDO::getId, user -> user, (first, ignored) -> first));
+        return leaderRelations.stream()
+                .filter(relation -> userMap.containsKey(relation.getUserId()))
+                .collect(Collectors.toMap(OrgUserDO::getOrgId,
+                        relation -> userMap.get(relation.getUserId()), (first, ignored) -> first));
+    }
+
+    private Map<Long, String> loadStoreTagMap(Set<Long> storeIds) {
+        if (CollectionUtil.isEmpty(storeIds)) {
+            return Collections.emptyMap();
+        }
+        List<SystemStoreTagDO> relations = systemStoreTagMapper.selectList(
+                new LambdaQueryWrapperX<SystemStoreTagDO>().in(SystemStoreTagDO::getStoreId, storeIds));
+        Set<Long> tagIds = relations.stream().map(SystemStoreTagDO::getTagId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        if (CollectionUtil.isEmpty(tagIds)) {
+            return Collections.emptyMap();
+        }
+        Map<Long, String> tagNameMap = tagValueMapper.selectBatchIds(tagIds).stream()
+                .collect(Collectors.toMap(TagValueDO::getId, TagValueDO::getName, (first, ignored) -> first));
+        return relations.stream().collect(Collectors.groupingBy(SystemStoreTagDO::getStoreId,
+                Collectors.mapping(relation -> tagNameMap.get(relation.getTagId()),
+                        Collectors.filtering(Objects::nonNull, Collectors.joining(",")))));
+    }
+
+    private Map<Long, List<String>> loadComplaintImageMap(List<ComplaintDO> complaints) {
+        Set<Long> complaintIds = complaints.stream().map(ComplaintDO::getId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        if (CollectionUtil.isEmpty(complaintIds)) {
+            return Collections.emptyMap();
+        }
+        return complaintImgMapper.selectList(new LambdaQueryWrapperX<ComplaintImgDO>()
+                        .in(ComplaintImgDO::getComplaintId, complaintIds)
+                        .orderByAsc(ComplaintImgDO::getId)).stream()
+                .collect(Collectors.groupingBy(ComplaintImgDO::getComplaintId,
+                        Collectors.mapping(ComplaintImgDO::getImgUrl, Collectors.toList())));
+    }
+
+    private String formatOrganizationAndLeader(OrgDO org,
+                                                Map<Long, OrgDO> orgMap,
+                                                Map<Long, AdminUserDO> orgLeaderMap) {
+        if (org == null) {
+            return "";
+        }
+        AdminUserDO leader = findOrganizationLeader(org, orgMap, orgLeaderMap);
+        if (leader == null) {
+            return org.getName();
+        }
+        String leaderInfo = Optional.ofNullable(leader.getNickname()).orElse("");
+        if (StringUtils.hasText(leader.getMobile())) {
+            leaderInfo += " " + leader.getMobile();
+        }
+        return StringUtils.hasText(leaderInfo) ? org.getName() + "/" + leaderInfo : org.getName();
+    }
+
+    private AdminUserDO findOrganizationLeader(OrgDO org,
+                                                Map<Long, OrgDO> orgMap,
+                                                Map<Long, AdminUserDO> orgLeaderMap) {
+        Set<Long> visited = new HashSet<>();
+        OrgDO current = org;
+        while (current != null && visited.add(current.getId())) {
+            AdminUserDO leader = orgLeaderMap.get(current.getId());
+            if (leader != null) {
+                return leader;
+            }
+            current = orgMap.get(current.getParentId());
+        }
+        return null;
+    }
+
 }

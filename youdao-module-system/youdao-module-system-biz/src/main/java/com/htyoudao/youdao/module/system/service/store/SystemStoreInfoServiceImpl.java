@@ -141,6 +141,8 @@ import static com.htyoudao.youdao.module.system.enums.LogRecordConstants.*;
 @Slf4j
 public class SystemStoreInfoServiceImpl implements SystemStoreInfoService {
     @Resource
+    private StoreExportScopeService storeExportScopeService;
+    @Resource
     private StoreActivityTagCache storeActivityTagCache;
     @Resource
     private StoreActivityTagOutbox storeActivityTagOutbox;
@@ -1904,6 +1906,8 @@ public class SystemStoreInfoServiceImpl implements SystemStoreInfoService {
 
     @Override
     public void exportStoreList(StorePageReqVO pageReqVO, HttpServletRequest request, HttpServletResponse response) {
+        pageReqVO.setExportScopeStoreIds(storeExportScopeService.resolve(
+                BusinessContextHolder.getBusinessId(), WebFrameworkUtils.getLoginUserId()));
         normalizeStorePageTagFilter(pageReqVO);
         Long businessId = BusinessContextHolder.getBusinessId();
         Long userId = WebFrameworkUtils.getLoginUserId();

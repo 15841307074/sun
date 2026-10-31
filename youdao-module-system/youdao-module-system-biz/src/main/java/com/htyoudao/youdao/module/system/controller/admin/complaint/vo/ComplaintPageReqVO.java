@@ -32,4 +32,6 @@ public class ComplaintPageReqVO extends PageParam {
     private Long memberId;
 
     private Boolean isBoss =Boolean.FALSE;
+    /** 是否接收回访，与现有投诉导出保持一致。 */
+    private Integer acceptFollowUp;
 }

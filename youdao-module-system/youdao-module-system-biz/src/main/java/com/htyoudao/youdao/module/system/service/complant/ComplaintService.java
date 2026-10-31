@@ -42,4 +42,5 @@ public interface ComplaintService {
      * 投诉建议列表数量
      */
     Map<Integer, Long> pageByStoreSum(ComplaintPageReqVO pageReqVO);
+    void exportComplaintList(ComplaintPageReqVO pageReqVO);
 }
