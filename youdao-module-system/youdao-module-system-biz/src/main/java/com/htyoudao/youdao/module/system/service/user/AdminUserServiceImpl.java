@@ -1191,6 +1191,9 @@ public class AdminUserServiceImpl implements AdminUserService {
     @Override
     public UserRespVO getUserDetail(Long id) {
         AdminUserDO user = userMapper.selectById(id);
+        if (user == null) {
+            throw exception(USER_NOT_EXISTS);
+        }
         UserRespVO userRespVO = BeanUtils.toBean(user, UserRespVO.class);
         userRespVO.setSupplyName(user.getNickname());
         BusinessUserDO businessUserDO = businessUserMapper.selectOne(new LambdaQueryWrapperX<BusinessUserDO>().eq(BusinessUserDO::getBusinessId, BusinessContextHolder.getBusinessId()).eq(BusinessUserDO::getUserId, id));
