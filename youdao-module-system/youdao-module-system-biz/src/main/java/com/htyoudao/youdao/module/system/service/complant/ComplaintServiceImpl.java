@@ -332,7 +332,8 @@ public class ComplaintServiceImpl implements ComplaintService {
 
     private void applyComplaintExportScope(ComplaintPageReqVO pageReqVO) {
         Set<Long> allowed = storeDataScopeService.getAccessibleStoreIds(
-                BusinessContextHolder.getBusinessId(), WebFrameworkUtils.getLoginUserId());
+                BusinessContextHolder.getBusinessId(), WebFrameworkUtils.getLoginUserId(),
+                Objects.equals(pageReqVO.getIsStore(), 0) ? pageReqVO.getOrgId() : null);
         if (allowed == null) {
             applyAdminComplaintScope(pageReqVO);
             return;

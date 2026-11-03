@@ -1907,7 +1907,7 @@ public class SystemStoreInfoServiceImpl implements SystemStoreInfoService {
     @Override
     public void exportStoreList(StorePageReqVO pageReqVO, HttpServletRequest request, HttpServletResponse response) {
         pageReqVO.setExportScopeStoreIds(storeDataScopeService.getAccessibleStoreIds(
-                BusinessContextHolder.getBusinessId(), WebFrameworkUtils.getLoginUserId()));
+                BusinessContextHolder.getBusinessId(), WebFrameworkUtils.getLoginUserId(), pageReqVO.getOrgId()));
         normalizeStorePageTagFilter(pageReqVO);
         Long businessId = BusinessContextHolder.getBusinessId();
         Long userId = WebFrameworkUtils.getLoginUserId();
