@@ -172,6 +172,9 @@ public class SystemStoreInfoServiceImpl implements SystemStoreInfoService {
     private TagGroupMapper tagGroupMapper;
     @Resource
     private ExcelActionService<StoreResVO> storeRespVOExcelActionService;
+
+    @Resource
+    private ExcelActionService<StoreExportVO> storeExportVOExcelActionService;
     @Resource
     private SysStoreExtendService sysStoreExtendService;
     @Resource
@@ -1924,10 +1927,98 @@ public class SystemStoreInfoServiceImpl implements SystemStoreInfoService {
             orgIds.add(pageReqVO.getOrgId());
             pageReqVO.setOrgIds(orgIds);
         }
-        Page<StoreResVO> page = new Page<>(pageReqVO.getPageNo(), 500);
+        Page<StoreExportVO> page = new Page<>(pageReqVO.getPageNo(), 500);
 
         //异步分页导出
-        storeRespVOExcelActionService.exportAsyncExcel(StoreResVO.class, page, param -> selectPageList(page, pageReqVO, businessId, userId), "门店列表");
+        storeExportVOExcelActionService.exportAsyncExcel(StoreExportVO.class, page,
+                param -> selectStoreExportList(param, pageReqVO, businessId, userId), "门店列表");
+    }
+
+    private List<StoreExportVO> selectStoreExportList(Page<StoreExportVO> page,
+                                                       StorePageReqVO pageReqVO,
+                                                       Long businessId,
+                                                       Long userId) {
+        Page<StoreResVO> storePage = new Page<>(page.getCurrent(), page.getSize());
+        List<StoreResVO> stores = selectPageList(storePage, pageReqVO, businessId, userId);
+        List<StoreExportVO> exports = BeanUtils.toBean(stores, StoreExportVO.class);
+        Map<Long, String> parentOrganizations = loadExportParentOrganizations(stores, businessId);
+        for (int i = 0; i < exports.size(); i++) {
+            exports.get(i).setParentOrgNamesAndLeaders(
+                    parentOrganizations.getOrDefault(stores.get(i).getOrgId(), ""));
+        }
+        return exports;
+    }
+
+    /** 仅用于导出；按层批量读取祖级，避免逐门店、逐组织查询负责人。 */
+    private Map<Long, String> loadExportParentOrganizations(List<StoreResVO> stores, Long businessId) {
+        Set<Long> directOrgIds = stores.stream().map(StoreResVO::getOrgId)
+                .filter(Objects::nonNull).filter(id -> id > 0).collect(Collectors.toSet());
+        if (directOrgIds.isEmpty()) return Collections.emptyMap();
+        Map<Long, OrgDO> organizations = new HashMap<>();
+        Set<Long> visited = new HashSet<>();
+        Set<Long> pending = new HashSet<>(directOrgIds);
+        while (!pending.isEmpty()) {
+            visited.addAll(pending);
+            List<OrgDO> level = orgMapper.selectList(new LambdaQueryWrapperX<OrgDO>()
+                    .eq(OrgDO::getBusinessId, businessId).eq(OrgDO::getDeleted, false)
+                    .in(OrgDO::getId, pending));
+            pending = new HashSet<>();
+            for (OrgDO org : level) {
+                organizations.put(org.getId(), org);
+                Long parentId = org.getParentId();
+                if (parentId != null && parentId > 0 && !visited.contains(parentId)) pending.add(parentId);
+            }
+        }
+        Set<Long> parentIds = organizations.values().stream().map(OrgDO::getParentId)
+                .filter(Objects::nonNull).filter(organizations::containsKey)
+                .filter(id -> organizations.get(id).getParentId() != null
+                        && organizations.get(id).getParentId() > 0).collect(Collectors.toSet());
+        Map<Long, AdminUserDO> leaders = new HashMap<>();
+        if (!parentIds.isEmpty()) {
+            List<OrgUserDO> relations = userOrgMapper.selectList(new LambdaQueryWrapperX<OrgUserDO>()
+                    .eq(OrgUserDO::getBusinessId, businessId).eq(OrgUserDO::getDeleted, false)
+                    .eq(OrgUserDO::getType, 1).in(OrgUserDO::getOrgId, parentIds)
+                    .orderByAsc(OrgUserDO::getId));
+            Set<Long> userIds = relations.stream().map(OrgUserDO::getUserId)
+                    .filter(Objects::nonNull).collect(Collectors.toSet());
+            if (!userIds.isEmpty()) {
+                Map<Long, AdminUserDO> users = adminUserMapper.selectBatchIds(userIds).stream()
+                        .collect(Collectors.toMap(AdminUserDO::getId, user -> user, (first, ignored) -> first));
+                for (OrgUserDO relation : relations) {
+                    AdminUserDO user = users.get(relation.getUserId());
+                    if (user != null) leaders.putIfAbsent(relation.getOrgId(), user);
+                }
+            }
+        }
+        Map<Long, String> result = new HashMap<>();
+        for (Long orgId : directOrgIds) {
+            result.put(orgId, formatExportParentOrganizations(orgId, organizations, leaders));
+        }
+        return result;
+    }
+
+    private String formatExportParentOrganizations(Long orgId, Map<Long, OrgDO> organizations,
+                                                   Map<Long, AdminUserDO> leaders) {
+        List<String> names = new ArrayList<>();
+        Set<Long> visited = new HashSet<>();
+        visited.add(orgId);
+        OrgDO current = organizations.get(orgId);
+        while (current != null) {
+            current = organizations.get(current.getParentId());
+            if (current == null || current.getParentId() == null || current.getParentId() <= 0
+                    || !visited.add(current.getId())) break;
+            String name = Optional.ofNullable(current.getName()).orElse("");
+            AdminUserDO leader = leaders.get(current.getId());
+            if (leader != null) {
+                String leaderInfo = Optional.ofNullable(leader.getNickname()).orElse("");
+                if (org.springframework.util.StringUtils.hasText(leader.getMobile())) {
+                    leaderInfo += " " + leader.getMobile();
+                }
+                if (org.springframework.util.StringUtils.hasText(leaderInfo)) name += "/" + leaderInfo.trim();
+            }
+            names.add(name);
+        }
+        return String.join(" → ", names);
     }
 
     public List<StoreResVO> selectPageList(Page<StoreResVO> page, StorePageReqVO pageReqVO, Long businessId, Long userId) {
