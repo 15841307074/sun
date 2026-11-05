@@ -50,13 +50,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.dubbo.config.annotation.DubboReference;
 import org.elasticsearch.client.ResponseException;
 import org.springframework.stereotype.Service;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.TransientDataAccessException;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.InvalidDataAccessResourceUsageException;
 import org.springframework.dao.PermissionDeniedDataAccessException;
 import org.redisson.api.RedissonClient;
 import org.redisson.api.RBucket;
+import org.redisson.api.RLock;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -116,18 +116,13 @@ public class JobServiceImpl implements JobService{
     @Resource
     private RedissonClient redissonClient;
 
-    @Value("${member.points.unfreeze.batch-size:200}")
-    private int unfreezeBatchSize = 200;
-
-    @Value("${member.points.unfreeze.max-duration-seconds:300}")
-    private long unfreezeMaxDurationSeconds = 300;
-
-    @Value("${member.points.unfreeze.end-hour:6}")
-    private int unfreezeEndHour = 6;
+    @Resource
+    private UnfreezeJobProperties unfreezeJobProperties;
 
     private static final int UNFREEZE_MAX_CACHED_MEMBERS = 10000;
     private static final int UNFREEZE_DETAIL_LOG_LIMIT = 10;
-    private static final int UNFREEZE_MAX_PAGES = 100;
+
+    private enum UnfreezeSliceOutcome { COMPLETED, PAUSED, BUSY, WINDOW_CLOSED }
 
     @Resource
     private WxMemberService wxMemberService;
@@ -164,42 +159,132 @@ public class JobServiceImpl implements JobService{
         if (StringUtils.isBlank(value)) throw new IllegalArgumentException("释放冻结积分任务缺少项目编号");
         long projectId = Long.parseLong(value.trim());
         if (projectId <= 0) throw new IllegalArgumentException("释放冻结积分任务项目编号无效");
+        if (end > 0 && end <= Math.max(start, 2)) throw new IllegalArgumentException("解冻结束天数必须大于开始天数");
+        boolean automatic = businessId == 0;
+        var config = unfreezeJobProperties.snapshot();
+        if (automatic && unfreezeWindowClosed(config)) {
+            log.info("冻结积分自动任务已过运行窗口，等待下次调度，businessId={}, endHour={}",
+                    projectId, config.endHour());
+            XxlJobHelper.log("冻结积分自动任务已过运行窗口，等待下次调度");
+            return;
+        }
+        int total = automatic ? Math.max(1, XxlJobHelper.getShardTotal()) : 1;
+        int index = automatic ? XxlJobHelper.getShardIndex() : 0;
+        if (index < 0 || index >= total) throw new IllegalArgumentException("冻结积分任务分片参数无效");
+        List<Integer> shards = assignedUnfreezeShards(total, index, memberId, automatic, config.maxWorkers());
+        if (shards.isEmpty()) {
+            log.info("冻结积分Pod未分配分表，businessId={}, shardIndex={}, shardTotal={}", projectId, index, total);
+            return;
+        }
+        // 每个项目最多两个工作名额；固定锁名不随 Pod 扩缩容而变化，watchdog 负责续期。
+        RLock worker = null;
+        int firstSlot = automatic ? index : 0;
+        int lastSlot = automatic ? index : config.maxWorkers() - 1;
+        for (int slot = firstSlot; slot <= lastSlot; slot++) {
+            RLock candidate = redissonClient.getLock("member:points:unfreeze:" + projectId + ":worker:" + slot);
+            if (candidate.tryLock()) {
+                worker = candidate;
+                break;
+            }
+        }
+        if (worker == null) {
+            log.info("冻结积分工作名额已占用，本次不争抢数据库，businessId={}, shardIndex={}", projectId, index);
+            return;
+        }
+        long triggerDeadline = System.nanoTime()
+                + TimeUnit.SECONDS.toNanos(config.maxDurationSeconds());
+        if (automatic && config.dailyStopEnabled()) {
+            LocalDateTime triggerTime = LocalDateTime.now(BUSINESS_ZONE);
+            triggerDeadline = System.nanoTime() + java.time.Duration.between(triggerTime,
+                    triggerTime.toLocalDate().atStartOfDay().plusHours(config.endHour())).toNanos();
+        }
+        AtomicLong manualPages = new AtomicLong(config.maxPages());
+        int finished = 0;
+        int busy = 0;
+        try {
+            for (int shard : shards) {
+                while (!Thread.currentThread().isInterrupted()) {
+                    if (automatic && config.dailyStopEnabled()
+                            && (unfreezeWindowClosed(config) || triggerDeadline - System.nanoTime() <= 0)) {
+                        log.info("冻结积分自动任务到达运行窗口结束，保存进度后退出，businessId={}", projectId);
+                        XxlJobHelper.log("冻结积分自动任务到达运行窗口结束，保存进度后退出");
+                        return;
+                    }
+                    if (!automatic && (triggerDeadline - System.nanoTime() <= 0 || manualPages.get() <= 0)) return;
+                    var outcome = runMemberPointSlice(start, end, memberId, projectId, automatic, shard, triggerDeadline, manualPages, config);
+                    if (outcome == UnfreezeSliceOutcome.COMPLETED) { finished++; break; }
+                    if (outcome == UnfreezeSliceOutcome.BUSY) { busy++; break; }
+                    if (outcome == UnfreezeSliceOutcome.WINDOW_CLOSED || !automatic) return;
+                    try { TimeUnit.SECONDS.sleep(1); }
+                    catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); return; }
+                }
+                if (Thread.currentThread().isInterrupted()) return;
+            }
+        } finally {
+            try {
+                log.info("冻结积分Pod任务结束，businessId={}, shardIndex={}, 分配分表={}, 已完成分表={}, 占用分表={}, 本Pod全部完成={}",
+                        projectId, index, shards, finished, busy, finished == shards.size());
+                XxlJobHelper.log("冻结积分Pod任务结束，已完成分表={}，占用分表={}，本Pod全部完成={}", finished, busy, finished == shards.size());
+            } finally {
+                if (worker.isHeldByCurrentThread()) worker.unlock();
+            }
+        }
+    }
+
+    private List<Integer> assignedUnfreezeShards(int total, int index, long memberId, boolean automatic, int maxWorkers) {
+        int workers = Math.min(Math.max(1, total), maxWorkers);
+        if (automatic && index >= workers) return Collections.emptyList();
+        return IntStream.range(0, 10)
+                .filter(shard -> memberId == 0 || shard == memberId % 10)
+                .filter(shard -> !automatic || shard % workers == index).boxed().toList();
+    }
+
+    private boolean unfreezeWindowClosed(UnfreezeJobProperties.Snapshot config) {
+        return config.dailyStopEnabled() && LocalDateTime.now(BUSINESS_ZONE).getHour() >= config.endHour();
+    }
+
+    private UnfreezeSliceOutcome runMemberPointSlice(int start, int end, long memberId, long projectId,
+                                                    boolean automatic, int physicalShard, long triggerDeadline, AtomicLong manualPages,
+                                                    UnfreezeJobProperties.Snapshot config) {
         int days = Math.max(start, 2);
         if (end > 0 && end <= days) throw new IllegalArgumentException("解冻结束天数必须大于开始天数");
         LocalDateTime now = LocalDateTime.now(BUSINESS_ZONE);
-        int endHour = Math.max(1, Math.min(24, unfreezeEndHour));
-        if (businessId == 0 && now.getHour() >= endHour) {
+        int endHour = config.endHour();
+        if (automatic && config.dailyStopEnabled() && now.getHour() >= endHour) {
             log.info("冻结积分自动任务已过运行窗口，等待下次调度，businessId={}, endHour={}", projectId, endHour);
             XxlJobHelper.log("冻结积分自动任务已过运行窗口，等待下次调度");
-            return;
+            return UnfreezeSliceOutcome.WINDOW_CLOSED;
         }
         LocalDateTime frozenBefore = now.minusDays(days);
         // 默认任务补偿所有达到解冻期限的冻结记录；人工指定 end 时仍按指定范围处理。
         LocalDateTime notBefore = end > 0 ? now.minusDays(end) : null;
-        // 非阻塞分布式锁：同项目不叠加执行，使用已有 Redisson watchdog 续期。
-        var lock = redissonClient.getLock("member:points:unfreeze:" + projectId);
+        // 工作名额 -> 物理分表 -> 会员 -> 明细；Redis 锁均不等待，禁止反向加锁。
+        var lock = redissonClient.getLock("member:points:unfreeze:" + projectId + ":shard:" + physicalShard);
         if (!lock.tryLock()) {
-            log.info("冻结积分任务已有实例执行，businessId={}", projectId);
-            return;
+            log.info("冻结积分分表已有实例执行，businessId={}, shard={}", projectId, physicalShard);
+            return UnfreezeSliceOutcome.BUSY;
         }
         int failed = 0;
         int released = 0;
         int detailLogs = 0;
         boolean completed = false;
+        boolean slicePaused = false;
         long started = System.nanoTime();
-        long seconds = Math.max(1, Math.min(900, unfreezeMaxDurationSeconds));
-        if (businessId == 0) seconds = Math.min(seconds,
-                java.time.Duration.between(now, now.toLocalDate().atStartOfDay().plusHours(endHour)).getSeconds());
+        long seconds = config.maxDurationSeconds();
         long budget = TimeUnit.SECONDS.toNanos(seconds);
+        if (automatic && config.dailyStopEnabled()) budget = Math.min(budget,
+                java.time.Duration.between(now, now.toLocalDate().atStartOfDay().plusHours(endHour)).toNanos());
+        if (!automatic || config.dailyStopEnabled())
+            budget = Math.min(budget, Math.max(0, triggerDeadline - System.nanoTime()));
         int scannedPages = 0;
-        int limit = Math.max(1, Math.min(unfreezeBatchSize, 500));
+        int limit = config.batchSize();
         Set<Long> blockedMembers = new HashSet<>();
         Map<Long, Integer> levels = new HashMap<>();
         try {
-            int firstShard = memberId == 0 ? 0 : (int) (memberId % 10);
-            int lastShard = memberId == 0 ? 9 : firstShard;
+            int firstShard = physicalShard;
+            int lastShard = physicalShard;
             RBucket<String> checkpoint = redissonClient.getBucket(
-                    "member:points:unfreeze:cursor:" + projectId + ":" + memberId + ":" + days + ":" + end);
+                    "member:points:unfreeze:cursor:v2:" + projectId + ":" + physicalShard + ":" + memberId + ":" + days + ":" + end);
             String saved = checkpoint.get();
             LocalDateTime resumeTime = null;
             Long resumeId = null;
@@ -207,7 +292,7 @@ public class JobServiceImpl implements JobService{
                 String[] parts = saved.split("\\|", -1);
                 if (parts.length != 5) throw new IllegalStateException("冻结积分任务续跑游标格式异常");
                 firstShard = Integer.parseInt(parts[0]);
-                int minimumShard = memberId == 0 ? 0 : (int) (memberId % 10);
+                int minimumShard = physicalShard;
                 if (firstShard < minimumShard || firstShard > lastShard + 1)
                     throw new IllegalStateException("冻结积分任务续跑分片越界");
                 resumeTime = parts[1].isEmpty() ? null : LocalDateTime.parse(parts[1]);
@@ -223,19 +308,22 @@ public class JobServiceImpl implements JobService{
                 levels.clear();
                 while (true) {
                     if (Thread.currentThread().isInterrupted() || System.nanoTime() - started >= budget
-                            || scannedPages >= UNFREEZE_MAX_PAGES) {
+                            || scannedPages >= config.maxPages() || (!automatic && manualPages.get() <= 0)) {
                         saveUnfreezeCursor(checkpoint, shard, cursorTime, cursorId, frozenBefore, notBefore);
-                        return;
+                        slicePaused = true;
+                        return UnfreezeSliceOutcome.PAUSED;
                     }
                     var rows = frozenPointsReleaseService.pending(projectId, shard, memberId, frozenBefore, notBefore,
                             cursorTime, cursorId, limit);
                     if (rows.isEmpty()) break;
                     scannedPages++;
+                    if (!automatic) manualPages.decrementAndGet();
                     LocalDateTime checkedTime = cursorTime;
                     Long checkedId = cursorId;
                     if (rows.size() > limit) throw new IllegalStateException("冻结积分扫描返回记录超过批次上限");
                     for (var row : rows) {
                         if (row.getCreateTime() == null || row.getPointsLogId() == null || row.getMemberId() == null
+                                || row.getMemberId() % 10 != physicalShard
                                 || (checkedTime != null && (row.getCreateTime().isBefore(checkedTime)
                                 || (row.getCreateTime().equals(checkedTime) && row.getPointsLogId() <= checkedId))))
                             throw new IllegalStateException("冻结积分扫描游标未推进，停止查询避免死循环");
@@ -301,19 +389,33 @@ public class JobServiceImpl implements JobService{
                         cursorId = row.getPointsLogId();
                     }
                     saveUnfreezeCursor(checkpoint, shard, cursorTime, cursorId, frozenBefore, notBefore);
-                    if (paused) return;
+                    if (paused) {
+                        slicePaused = true;
+                        return UnfreezeSliceOutcome.PAUSED;
+                    }
+                    // 解冻事务和查询连接均已结束；只暂停当前任务线程，避免连续查表占满资源。
+                    if (config.pagePauseMillis() > 0) {
+                        try { TimeUnit.MILLISECONDS.sleep(config.pagePauseMillis()); }
+                        catch (InterruptedException interrupted) {
+                            Thread.currentThread().interrupt();
+                            slicePaused = true;
+                            return UnfreezeSliceOutcome.PAUSED;
+                        }
+                    }
                 }
                 saveUnfreezeCursor(checkpoint, shard + 1, null, null, frozenBefore, notBefore);
             }
             // 单条/会员账户异常已经回滚并记录；保留冻结状态供下次检查，不将整次任务标记为失败。
             checkpoint.delete();
             completed = true;
+            return UnfreezeSliceOutcome.COMPLETED;
         } finally {
             try {
-                log.info("冻结积分任务结束，businessId={}，本轮扫描完成={}，已解冻明细={}，暂未解冻明细={}，抑制异常日志={}，耗时秒={}",
-                        projectId, completed, released, failed, Math.max(0, detailLogs - UNFREEZE_DETAIL_LOG_LIMIT),
-                        TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - started));
-                XxlJobHelper.log("冻结积分任务结束，businessId={}，本轮扫描完成={}，已解冻明细={}，暂未解冻明细={}，抑制异常日志={}",
+                log.info("冻结积分分段结束，businessId={}，分表={}，本分表扫描完成={}，已解冻明细={}，暂未解冻明细={}，抑制异常日志={}，耗时秒={}，自动续跑={}",
+                        projectId, physicalShard, completed, released, failed, Math.max(0, detailLogs - UNFREEZE_DETAIL_LOG_LIMIT),
+                        TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - started),
+                        automatic && slicePaused && !Thread.currentThread().isInterrupted());
+                XxlJobHelper.log("冻结积分分段结束，businessId={}，本轮扫描完成={}，已解冻明细={}，暂未解冻明细={}，抑制异常日志={}",
                         projectId, completed, released, failed, Math.max(0, detailLogs - UNFREEZE_DETAIL_LOG_LIMIT));
             } finally {
                 if (lock.isHeldByCurrentThread()) lock.unlock();
