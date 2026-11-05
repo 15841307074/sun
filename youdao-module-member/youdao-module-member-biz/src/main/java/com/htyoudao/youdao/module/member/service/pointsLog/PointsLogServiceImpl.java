@@ -446,7 +446,8 @@ public class PointsLogServiceImpl extends ServiceImpl<PointsLogMapper, PointsLog
         queryWrapper.eq("member_id", wxMember.getMemberId());
         queryWrapper.eq("sharding_value", wxMember.getShardingValue());
         //用用户 id 查询到当前用户的对象
-        wxMember = wxMemberMapper.selectOne(queryWrapper);
+        // 与解冻事务统一先锁会员；避免读取旧余额后覆盖并发解冻结果。
+        wxMember = wxMemberMapper.selectOne(queryWrapper.clone().last("FOR UPDATE"));
 
         //如果用户是非会员，不产生积分记录
         if (ObjectUtils.isEmpty(wxMember) || wxMember.getUserIdentity() == 0) {

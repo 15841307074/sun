@@ -56,6 +56,7 @@ import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.InvalidDataAccessResourceUsageException;
 import org.springframework.dao.PermissionDeniedDataAccessException;
 import org.redisson.api.RedissonClient;
+import org.redisson.api.RBucket;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -118,6 +119,16 @@ public class JobServiceImpl implements JobService{
     @Value("${member.points.unfreeze.batch-size:200}")
     private int unfreezeBatchSize = 200;
 
+    @Value("${member.points.unfreeze.max-duration-seconds:300}")
+    private long unfreezeMaxDurationSeconds = 300;
+
+    @Value("${member.points.unfreeze.end-hour:6}")
+    private int unfreezeEndHour = 6;
+
+    private static final int UNFREEZE_MAX_CACHED_MEMBERS = 10000;
+    private static final int UNFREEZE_DETAIL_LOG_LIMIT = 10;
+    private static final int UNFREEZE_MAX_PAGES = 100;
+
     @Resource
     private WxMemberService wxMemberService;
 
@@ -156,6 +167,12 @@ public class JobServiceImpl implements JobService{
         int days = Math.max(start, 2);
         if (end > 0 && end <= days) throw new IllegalArgumentException("解冻结束天数必须大于开始天数");
         LocalDateTime now = LocalDateTime.now(BUSINESS_ZONE);
+        int endHour = Math.max(1, Math.min(24, unfreezeEndHour));
+        if (businessId == 0 && now.getHour() >= endHour) {
+            log.info("冻结积分自动任务已过运行窗口，等待下次调度，businessId={}, endHour={}", projectId, endHour);
+            XxlJobHelper.log("冻结积分自动任务已过运行窗口，等待下次调度");
+            return;
+        }
         LocalDateTime frozenBefore = now.minusDays(days);
         // 默认任务补偿所有达到解冻期限的冻结记录；人工指定 end 时仍按指定范围处理。
         LocalDateTime notBefore = end > 0 ? now.minusDays(end) : null;
@@ -167,39 +184,80 @@ public class JobServiceImpl implements JobService{
         }
         int failed = 0;
         int released = 0;
+        int detailLogs = 0;
+        boolean completed = false;
+        long started = System.nanoTime();
+        long seconds = Math.max(1, Math.min(900, unfreezeMaxDurationSeconds));
+        if (businessId == 0) seconds = Math.min(seconds,
+                java.time.Duration.between(now, now.toLocalDate().atStartOfDay().plusHours(endHour)).getSeconds());
+        long budget = TimeUnit.SECONDS.toNanos(seconds);
+        int scannedPages = 0;
         int limit = Math.max(1, Math.min(unfreezeBatchSize, 500));
         Set<Long> blockedMembers = new HashSet<>();
         Map<Long, Integer> levels = new HashMap<>();
         try {
             int firstShard = memberId == 0 ? 0 : (int) (memberId % 10);
             int lastShard = memberId == 0 ? 9 : firstShard;
+            RBucket<String> checkpoint = redissonClient.getBucket(
+                    "member:points:unfreeze:cursor:" + projectId + ":" + memberId + ":" + days + ":" + end);
+            String saved = checkpoint.get();
+            LocalDateTime resumeTime = null;
+            Long resumeId = null;
+            if (saved != null) {
+                String[] parts = saved.split("\\|", -1);
+                if (parts.length != 5) throw new IllegalStateException("冻结积分任务续跑游标格式异常");
+                firstShard = Integer.parseInt(parts[0]);
+                int minimumShard = memberId == 0 ? 0 : (int) (memberId % 10);
+                if (firstShard < minimumShard || firstShard > lastShard + 1)
+                    throw new IllegalStateException("冻结积分任务续跑分片越界");
+                resumeTime = parts[1].isEmpty() ? null : LocalDateTime.parse(parts[1]);
+                resumeId = parts[2].isEmpty() ? null : Long.valueOf(parts[2]);
+                frozenBefore = LocalDateTime.parse(parts[3]);
+                notBefore = parts[4].isEmpty() ? null : LocalDateTime.parse(parts[4]);
+            }
             // 不创建线程池；一次只扫描一个分片，查询连接在进入解冻事务前释放。
             for (int shard = firstShard; shard <= lastShard; shard++) {
-                LocalDateTime cursorTime = null;
-                Long cursorId = null;
+                LocalDateTime cursorTime = shard == firstShard ? resumeTime : null;
+                Long cursorId = shard == firstShard ? resumeId : null;
+                blockedMembers.clear();
+                levels.clear();
                 while (true) {
+                    if (Thread.currentThread().isInterrupted() || System.nanoTime() - started >= budget
+                            || scannedPages >= UNFREEZE_MAX_PAGES) {
+                        saveUnfreezeCursor(checkpoint, shard, cursorTime, cursorId, frozenBefore, notBefore);
+                        return;
+                    }
                     var rows = frozenPointsReleaseService.pending(projectId, shard, memberId, frozenBefore, notBefore,
                             cursorTime, cursorId, limit);
                     if (rows.isEmpty()) break;
-                    var tail = rows.get(rows.size() - 1);
-                    cursorTime = tail.getCreateTime();
-                    cursorId = tail.getPointsLogId();
+                    scannedPages++;
+                    LocalDateTime checkedTime = cursorTime;
+                    Long checkedId = cursorId;
+                    if (rows.size() > limit) throw new IllegalStateException("冻结积分扫描返回记录超过批次上限");
+                    for (var row : rows) {
+                        if (row.getCreateTime() == null || row.getPointsLogId() == null || row.getMemberId() == null
+                                || (checkedTime != null && (row.getCreateTime().isBefore(checkedTime)
+                                || (row.getCreateTime().equals(checkedTime) && row.getPointsLogId() <= checkedId))))
+                            throw new IllegalStateException("冻结积分扫描游标未推进，停止查询避免死循环");
+                        checkedTime = row.getCreateTime();
+                        checkedId = row.getPointsLogId();
+                    }
                     Map<Long, List<Long>> groups = new LinkedHashMap<>();
                     for (var row : rows) groups.computeIfAbsent(row.getMemberId(), ignored -> new ArrayList<>()).add(row.getPointsLogId());
+                    Set<Long> processedMembers = new HashSet<>();
+                    boolean paused = false;
                     for (var group : groups.entrySet()) {
                         long currentMember = group.getKey();
-                        if (blockedMembers.contains(currentMember)) continue;
-                        if (!levels.containsKey(currentMember)) {
-                            Integer level = null;
-                            try { level = frozenPointsReleaseService.memberLevel(currentMember, projectId, frozenBefore, notBefore); }
-                            catch (DataAccessResourceFailureException unavailable) { throw unavailable; }
-                            catch (RuntimeException error) {
-                                log.warn("会员卡等级匹配失败，保留原等级并继续解冻，businessId={}, memberId={}", projectId, currentMember, error);
-                            }
-                            levels.put(currentMember, level);
+                        if (Thread.currentThread().isInterrupted() || System.nanoTime() - started >= budget
+                                || (!levels.containsKey(currentMember)
+                                && levels.size() + blockedMembers.size() >= UNFREEZE_MAX_CACHED_MEMBERS)) {
+                            paused = true;
+                            break;
                         }
+                        processedMembers.add(currentMember);
+                        if (blockedMembers.contains(currentMember)) continue;
                         try {
-                            released += frozenPointsReleaseService.release(currentMember, projectId, group.getValue(), frozenBefore, notBefore, levels.get(currentMember));
+                            released += releaseFrozenMember(currentMember, projectId, group.getValue(), frozenBefore, notBefore, levels);
                         } catch (DataAccessResourceFailureException unavailable) {
                             throw unavailable; // 数据库不可用时快速停止，避免反复抢连接。
                         } catch (InvalidDataAccessResourceUsageException | PermissionDeniedDataAccessException configurationError) {
@@ -207,33 +265,84 @@ public class JobServiceImpl implements JobService{
                         } catch (FrozenPointsReleaseService.AccountUnavailable | TransientDataAccessException blocked) {
                             failed += group.getValue().size();
                             blockedMembers.add(currentMember);
-                            log.info("会员解冻暂不可执行，跳过本次其他同会员记录，下次继续重试，businessId={}, memberId={}, reason={}", projectId, currentMember, blocked.getMessage());
+                            if (detailLogs++ < UNFREEZE_DETAIL_LOG_LIMIT)
+                                log.info("会员解冻暂不可执行，跳过本次其他同会员记录，下次继续重试，businessId={}, memberId={}, reason={}", projectId, currentMember, blocked.getMessage());
                         } catch (RuntimeException batchError) {
                             // 整批已回滚。仅对数据/明细异常降级为单条事务，一条失败不毒化整个批次。
                             for (long id : group.getValue()) {
+                                if (Thread.currentThread().isInterrupted() || System.nanoTime() - started >= budget) {
+                                    processedMembers.remove(currentMember);
+                                    paused = true;
+                                    break;
+                                }
                                 try {
-                                    released += frozenPointsReleaseService.release(currentMember, projectId, List.of(id), frozenBefore, notBefore, levels.get(currentMember));
+                                    released += releaseFrozenMember(currentMember, projectId, List.of(id), frozenBefore, notBefore, levels);
                                 } catch (DataAccessResourceFailureException unavailable) { throw unavailable; }
                                 catch (InvalidDataAccessResourceUsageException | PermissionDeniedDataAccessException configurationError) { throw configurationError; }
                                 catch (FrozenPointsReleaseService.AccountUnavailable | TransientDataAccessException blocked) {
                                     failed++;
                                     blockedMembers.add(currentMember);
-                                    log.info("会员解冻暂不可执行，businessId={}, memberId={}, pointsLogId={}, reason={}", projectId, currentMember, id, blocked.getMessage());
+                                    if (detailLogs++ < UNFREEZE_DETAIL_LOG_LIMIT)
+                                        log.info("会员解冻暂不可执行，businessId={}, memberId={}, pointsLogId={}, reason={}", projectId, currentMember, id, blocked.getMessage());
                                     break;
                                 } catch (RuntimeException recordError) {
                                     failed++;
-                                    log.info("单条冻结积分暂未解冻，保留记录重试，businessId={}, memberId={}, pointsLogId={}, reason={}", projectId, currentMember, id, recordError.getMessage());
+                                    if (detailLogs++ < UNFREEZE_DETAIL_LOG_LIMIT)
+                                        log.info("单条冻结积分暂未解冻，保留记录重试，businessId={}, memberId={}, pointsLogId={}, reason={}", projectId, currentMember, id, recordError.getMessage());
                                 }
                             }
                         }
+                        if (paused) break;
                     }
+                    // 只能推进到连续处理完的前缀，分组中的会员可能在页内交错出现。
+                    for (var row : rows) {
+                        if (!processedMembers.contains(row.getMemberId())) break;
+                        cursorTime = row.getCreateTime();
+                        cursorId = row.getPointsLogId();
+                    }
+                    saveUnfreezeCursor(checkpoint, shard, cursorTime, cursorId, frozenBefore, notBefore);
+                    if (paused) return;
                 }
+                saveUnfreezeCursor(checkpoint, shard + 1, null, null, frozenBefore, notBefore);
             }
             // 单条/会员账户异常已经回滚并记录；保留冻结状态供下次检查，不将整次任务标记为失败。
-            log.info("冻结积分任务结束，businessId={}，已解冻明细={}，暂未解冻明细={}，跳过会员数={}", projectId, released, failed, blockedMembers.size());
+            checkpoint.delete();
+            completed = true;
         } finally {
-            if (lock.isHeldByCurrentThread()) lock.unlock();
+            try {
+                log.info("冻结积分任务结束，businessId={}，本轮扫描完成={}，已解冻明细={}，暂未解冻明细={}，抑制异常日志={}，耗时秒={}",
+                        projectId, completed, released, failed, Math.max(0, detailLogs - UNFREEZE_DETAIL_LOG_LIMIT),
+                        TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - started));
+                XxlJobHelper.log("冻结积分任务结束，businessId={}，本轮扫描完成={}，已解冻明细={}，暂未解冻明细={}，抑制异常日志={}",
+                        projectId, completed, released, failed, Math.max(0, detailLogs - UNFREEZE_DETAIL_LOG_LIMIT));
+            } finally {
+                if (lock.isHeldByCurrentThread()) lock.unlock();
+            }
         }
+    }
+
+    private int releaseFrozenMember(long memberId, long businessId, List<Long> ids,
+                                    LocalDateTime before, LocalDateTime after, Map<Long, Integer> levels) {
+        var result = frozenPointsReleaseService.releaseChecked(memberId, businessId, ids, before, after,
+                levels.get(memberId), !levels.containsKey(memberId));
+        levels.put(memberId, result.level());
+        if (result.repaired()) {
+            // 在事务代理返回后记录，明细更新失败回滚时不会打印修复成功日志。
+            log.info("冻结积分余额修复，businessId={}, memberId={}, 修复前={}, 明细合计={}, 差额={}, 修复后={}, 本次解冻={}, 解冻后={}",
+                    businessId, memberId, result.previousFrozen(), result.ledgerFrozen(),
+                    java.math.BigInteger.valueOf(result.ledgerFrozen()).subtract(java.math.BigInteger.valueOf(
+                            result.previousFrozen() == null ? 0 : result.previousFrozen())),
+                    result.ledgerFrozen(), result.ledgerFrozen() - result.remainingFrozen(), result.remainingFrozen());
+        }
+        if (result.levelWarning() != null)
+            log.debug("会员卡等级匹配失败，保留原等级，businessId={}, memberId={}, reason={}", businessId, memberId, result.levelWarning());
+        return result.released();
+    }
+
+    private void saveUnfreezeCursor(RBucket<String> checkpoint, int shard,
+                                    LocalDateTime time, Long id, LocalDateTime before, LocalDateTime after) {
+        checkpoint.set(shard + "|" + (time == null ? "" : time) + "|" + (id == null ? "" : id)
+                + "|" + before + "|" + (after == null ? "" : after), 7, TimeUnit.DAYS);
     }
 
     @Override

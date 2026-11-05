@@ -9,6 +9,25 @@ import java.util.List;
 /** 单分片、有限批次的解冻 SQL；锁等待也受 JDBC statement timeout 约束。 */
 @Mapper
 public interface FrozenPointsReleaseMapper {
+    record FrozenBalance(long total, long matureTotal, long invalidCount) { }
+
+    /** 会员行锁取得后进行当前读，不受事务早先快照影响；核对全部冻结明细而非仅到期明细。 */
+    @Select("""
+            <script>SELECT COALESCE(SUM(points_change),0) AS frozen_total,
+            COALESCE(SUM(CASE WHEN create_time &lt;= #{before}
+            <if test="after != null">AND create_time &gt;= #{after}</if>
+            THEN points_change ELSE 0 END),0) AS mature_total,
+            COALESCE(SUM(CASE WHEN points_change IS NULL OR points_change &lt; 0 THEN 1 ELSE 0 END),0) AS invalid_count
+            FROM (SELECT points_change,create_time FROM points_log
+            WHERE member_id=#{member} AND business_id=#{business} AND sharding_value=#{shard}
+            AND deleted=0 AND points_type=4 FOR UPDATE) frozen_ledger</script>
+            """)
+    @ConstructorArgs({@Arg(column="frozen_total",javaType=long.class),
+            @Arg(column="mature_total",javaType=long.class),@Arg(column="invalid_count",javaType=long.class)})
+    @Options(timeout = 5)
+    FrozenBalance frozenBalance(@Param("member") long member, @Param("business") long business,
+                                @Param("shard") int shard, @Param("before") LocalDateTime before,
+                                @Param("after") LocalDateTime after);
     @Select("""
             <script>SELECT points_log_id AS pointsLogId,member_id AS memberId,create_time AS createTime FROM points_log
             WHERE business_id=#{business} AND sharding_value=#{shard} AND deleted=0 AND points_type=4

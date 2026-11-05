@@ -11,6 +11,14 @@ public interface FrozenPointsReleaseService {
     Integer memberLevel(long memberId, long businessId, LocalDateTime before, LocalDateTime after);
     int release(long memberId, long businessId, List<Long> pointIds, LocalDateTime frozenBefore, LocalDateTime notBefore, Integer memberLevel);
 
+    ReleaseResult releaseChecked(long memberId, long businessId, List<Long> pointIds,
+                                 LocalDateTime frozenBefore, LocalDateTime notBefore, Integer level, boolean resolveLevel);
+
+    record ReleaseResult(int released, Long previousFrozen, long ledgerFrozen, long remainingFrozen,
+                         Integer level, String levelWarning) {
+        public boolean repaired() { return released > 0 && (previousFrozen == null || previousFrozen != ledgerFrozen); }
+    }
+
     /** 账户缺失或账务不一致，不能把本次候选记录盲目当作可发积分。 */
     class AccountUnavailable extends IllegalStateException {
         public AccountUnavailable(String message) { super(message); }
