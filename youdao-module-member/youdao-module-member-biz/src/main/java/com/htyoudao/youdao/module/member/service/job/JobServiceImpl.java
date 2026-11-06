@@ -162,6 +162,22 @@ public class JobServiceImpl implements JobService{
         if (end > 0 && end <= Math.max(start, 2)) throw new IllegalArgumentException("解冻结束天数必须大于开始天数");
         boolean automatic = businessId == 0;
         var config = unfreezeJobProperties.snapshot();
+        // 临时只诊断自动任务的 Pod 分片；确认后删除此分支，恢复时间窗口和正常解冻流程。
+        if (automatic) {
+            int shardTotal = XxlJobHelper.getShardTotal();
+            int shardIndex = XxlJobHelper.getShardIndex();
+            if (shardTotal < 1 || shardIndex < 0 || shardIndex >= shardTotal)
+                throw new IllegalArgumentException("冻结积分任务分片参数无效");
+            List<Integer> assigned = assignedUnfreezeShards(shardTotal, shardIndex, memberId, true, config.maxWorkers());
+            String pod = System.getenv("HOSTNAME");
+            if (StringUtils.isBlank(pod)) pod = java.lang.management.ManagementFactory.getRuntimeMXBean().getName();
+            String message = "冻结积分仅检查Pod分片，businessId=" + projectId + ", pod=" + pod
+                    + ", shardIndex=" + shardIndex + ", shardTotal=" + shardTotal
+                    + ", maxWorkers=" + config.maxWorkers() + ", assignedShards=" + assigned + "，跳过时间限制及解冻流程";
+            log.info(message);
+            XxlJobHelper.log(message);
+            return;
+        }
         if (automatic && unfreezeWindowClosed(config)) {
             log.info("冻结积分自动任务已过运行窗口，等待下次调度，businessId={}, endHour={}",
                     projectId, config.endHour());
