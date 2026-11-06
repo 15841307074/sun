@@ -28,9 +28,9 @@
 
 ## 多 Pod 分片广播
 
-- 参考会员卡任务读取 XXL-Job 的 shardIndex/shardTotal，不创建分表线程池。每项目最多两个 Pod 同时工作，每个 Pod 内串行处理。
-- 参与 Pod 数为实际实例数与 `max-workers` 的较小值，上限 2。一个参与 Pod 时，编号 0 处理 0～9；两个时，编号 0 处理 0、2、4、6、8，编号 1 处理 1、3、5、7、9，其余 Pod 退出不查表。
-- 固定项目工作名额锁 `member:points:unfreeze:{project}:worker:{0|1}` 防止重复广播或人工调用突破并发上限；分表锁 `member:points:unfreeze:{project}:shard:{0..9}` 防止映射变化或人工任务重叠扫描。
+- 参考会员卡任务读取 XXL-Job 的 shardIndex/shardTotal，不创建分表线程池。每项目默认最多两个 Pod 同时工作，可配置到八个，每个 Pod 内串行处理。
+- 参与 Pod 数为当次 XXL-Job 分片总数与 `max-workers` 的较小值，上限 8。一个参与 Pod 时，编号 0 处理 0～9；两个时，编号 0 处理 0、2、4、6、8，编号 1 处理 1、3、5、7、9；八个时，编号 0 处理 0、8，编号 1 处理 1、9，编号 2～7 各处理同编号分表，其余 Pod 退出不查表。
+- 固定项目工作名额锁 `member:points:unfreeze:{project}:worker:{0..maxWorkers-1}` 防止重复广播或人工调用突破并发上限；分表锁 `member:points:unfreeze:{project}:shard:{0..9}` 防止映射变化或人工任务重叠扫描。
 - Redis 锁均为非阻塞 tryLock，使用 watchdog；严格按“工作名额→分表→数据库会员→明细”获取，逆序在 finally 释放。不持一把分表锁等待另一把分表锁。工作名额拿不到就退出，分表锁拿不到就跳过并记录。
 - 数据库锁冲突沿用事务回滚、该会员本段跳过和 SQL 超时；数据库或 Redis 故障停止当前触发，不无限重试。固定锁顺序不能证明整个业务系统绝无死锁，生产仍需监控锁等待和死锁日志。
 
@@ -40,6 +40,8 @@
 
 参见 `docs/member-points-unfreeze-nacos.example.yaml`，合并到会员服务加载的配置中。使用独立的 `UnfreezeJobProperties` RefreshScope bean，不刷新其他任务所在的 JobServiceImpl。每次触发只读取一次不可变快照，运行中的任务保持原有规则，配置刷新从下一次触发生效。
 
-可调整 `max-workers`（1～2）、`batch-size`（1～500）、`max-duration-seconds`（1～900）、`max-pages`（1～100）、`page-pause-millis`（0～1000）、`daily-stop-enabled`（默认 true）、`end-hour`（1～24，默认 6）。非法数值收敛到边界，不能通过配置突破资源保护上限。查询间隔发生在当前页事务和数据库连接释放之后，仅暂停本任务线程。
+可调整 `max-workers`（1～8，默认 2）、`batch-size`（1～500）、`max-duration-seconds`（1～900）、`max-pages`（1～100）、`page-pause-millis`（0～1000）、`daily-stop-enabled`（默认 true）、`end-hour`（1～24，默认 6）。非法数值收敛到边界，不能通过配置突破资源保护上限。查询间隔发生在当前页事务和数据库连接释放之后，仅暂停本任务线程。增加参与 Pod 数会增加数据库并发，应按实际负载逐步调整。
+
+每次触发输出一条分片配置日志，包含 automatic、shardIndex、shardTotal、maxWorkers 和 assignedShards。max-workers 只是上限，不增加执行器注册数量。分片广播的 shardTotal 来自当次调度的注册地址列表；单 Pod 仍会拿到全部十张分表。排查时查看 XXL-Job 当次“调度备注”的执行器注册地址及分片参数，并检查会员执行器的注册地址列表、自动/手动录入方式、各 Pod 的 AppName、注册 IP 和端口及注册错误。多个 Pod 需要在同一执行器下注册各自可达的不同地址；不能共用一个负载均衡地址代替 Pod 地址。运行中的触发不会因新增注册或配置刷新而重新分配。
 
 所有 Pod 必须使用同一配置；改变参与 Pod 数前应等待旧触发结束再统一刷新并触发，避免同一轮使用不同的分配规则。`daily-stop-enabled=false` 仅用于明确需要绕过时间限制的验证场景，生产建议保留 true。上述配置与会员卡权益的 10 线程、500 条分块配置互不影响。

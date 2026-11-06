@@ -25,7 +25,7 @@ public class UnfreezeJobProperties {
 
     /** 每次触发固定一次配置快照，动态刷新从下一次触发生效；保护上限不可被配置突破。 */
     public Snapshot snapshot() {
-        return new Snapshot(Math.max(1, Math.min(2, maxWorkers)), Math.max(1, Math.min(500, batchSize)),
+        return new Snapshot(Math.max(1, Math.min(8, maxWorkers)), Math.max(1, Math.min(500, batchSize)),
                 Math.max(1, Math.min(900, maxDurationSeconds)), Math.max(1, Math.min(100, maxPages)),
                 Math.max(0, Math.min(1000, pagePauseMillis)), dailyStopEnabled,
                 Math.max(1, Math.min(24, endHour)));

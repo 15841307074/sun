@@ -172,11 +172,13 @@ public class JobServiceImpl implements JobService{
         int index = automatic ? XxlJobHelper.getShardIndex() : 0;
         if (index < 0 || index >= total) throw new IllegalArgumentException("冻结积分任务分片参数无效");
         List<Integer> shards = assignedUnfreezeShards(total, index, memberId, automatic, config.maxWorkers());
+        log.info("冻结积分任务分片配置，businessId={}, automatic={}, shardIndex={}, shardTotal={}, maxWorkers={}, assignedShards={}",
+                projectId, automatic, index, total, config.maxWorkers(), shards);
         if (shards.isEmpty()) {
             log.info("冻结积分Pod未分配分表，businessId={}, shardIndex={}, shardTotal={}", projectId, index, total);
             return;
         }
-        // 每个项目最多两个工作名额；固定锁名不随 Pod 扩缩容而变化，watchdog 负责续期。
+        // 每个项目默认两个工作名额，可配置到八个；固定锁名不随 Pod 扩缩容而变化，watchdog 负责续期。
         RLock worker = null;
         int firstSlot = automatic ? index : 0;
         int lastSlot = automatic ? index : config.maxWorkers() - 1;

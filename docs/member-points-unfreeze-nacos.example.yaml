@@ -3,7 +3,7 @@
 member:
   points:
     unfreeze:
-      max-workers: 2               # 参与处理的 Pod 数，范围 1～2，超出按 2 限制
+      max-workers: 2               # 默认 2，参与处理的 Pod 数上限，范围 1～8，超出按 8 限制
       batch-size: 200              # 单次查询条数，上限 500
       max-duration-seconds: 300    # 单段时长，上限 900 秒，自动任务会继续下一段
       max-pages: 100               # 自动任务每段页数，人工接口整次页数，上限 100
