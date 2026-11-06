@@ -2,6 +2,10 @@
 
 临时 Pod 诊断：当前自动任务在读取分片配置后直接输出 Pod、shardIndex、shardTotal、maxWorkers 和 assignedShards 并返回，跳过时间窗口、Redis 锁、查询及解冻流程。即使夜间自动触发也仅诊断，不处理积分。确认后删除 JobServiceImpl 中标注“临时只诊断自动任务”的分支即可恢复下述正常流程；明确指定项目的人工接口仍执行原有流程。
 
+额外配置诊断包含 `configProbe=unfreeze-limit8-v1`、环境原值 environmentMaxWorkers、注入值 injectedMaxWorkers、代码上限及已知配置来源名称，并输出 Namespace/Group、执行器 AppName、IP/端口配置及自动检测 IP。不打印完整配置、令牌或数据库凭据。环境原值为 `<unset>` 时检查配置加载及 YAML 层级；原值为 2 时检查同名覆盖；原值为 8 而注入值为 2 时检查刷新；注入值为 8 时本版快照应为 8。配置加载仍需部署环境验证，本诊断不连接 Nacos 或调度中心。执行器注册在启动时使用配置，此处当前环境值不能代替调度中心的实际注册地址，自动检测 IP 也不代表注册成功。
+
+UAT 当前反馈会员执行器为自动注册且仅有一个注册地址，这与 shardTotal=1 一致。仓库中的 testing/dev/local 会员部署脚本均设置 REPLICAS=1，但没有 UAT 部署脚本，因此不能据此确定 UAT 实际副本数。应在 UAT 的 Kubernetes 工作负载中检查会员部署的就绪副本及 Running Pod 数；若实际只有一个，需要部署端扩容，max-workers 不会创建 Pod。若已有多个，则逐 Pod 对照相同 AppName、不同可达 IP/端口及注册错误；不要手工编造注册地址。
+
 `updateMemberPointJobHandler` 原来一次扫描十个分片的全部历史待解冻记录，会员等级和异常会员集合保留到任务结束。大量账务不一致的会员会逐个输出日志，增加长任务的内存和日志写入压力。生产实际查询耗时和索引情况仍需现场确认。
 
 本次保留解冻期限、项目/分片条件、分布式锁、账户与明细事务、冻结余额校验和防重复入账逻辑，仅调整任务运行控制：

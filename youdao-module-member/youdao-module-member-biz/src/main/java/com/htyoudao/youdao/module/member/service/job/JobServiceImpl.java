@@ -176,6 +176,9 @@ public class JobServiceImpl implements JobService{
                     + ", maxWorkers=" + config.maxWorkers() + ", assignedShards=" + assigned + "，跳过时间限制及解冻流程";
             log.info(message);
             XxlJobHelper.log(message);
+            String configuration = unfreezeJobProperties.diagnostics();
+            log.info("冻结积分配置诊断，pod={}, {}", pod, configuration);
+            XxlJobHelper.log("冻结积分配置诊断，pod={}, {}", pod, configuration);
             return;
         }
         if (automatic && unfreezeWindowClosed(config)) {
