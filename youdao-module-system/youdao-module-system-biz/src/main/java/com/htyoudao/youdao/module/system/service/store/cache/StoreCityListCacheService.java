@@ -1,6 +1,7 @@
 package com.htyoudao.youdao.module.system.service.store.cache;
 
 import com.htyoudao.youdao.framework.common.util.json.JsonUtils;
+import com.htyoudao.youdao.framework.context.BusinessContextHolder;
 import com.htyoudao.youdao.framework.datapermission.core.annotation.DataPermission;
 import com.htyoudao.youdao.framework.datapermission.core.util.DataPermissionUtils;
 import com.htyoudao.youdao.framework.mybatis.core.query.LambdaQueryWrapperX;
@@ -62,7 +63,7 @@ import java.util.stream.Collectors;
 @DataPermission(enable = false)
 public class StoreCityListCacheService {
 
-    private static final long BUSINESS_ID = 10L;
+    private static final long CACHE_BUSINESS_ID = 10L;
     private static final int BATCH_SIZE = 500;
     private static final int MAX_READ_RETRY = 3;
     private static final int CITY_CACHE_WAIT_RETRY = 40;
@@ -135,16 +136,20 @@ public class StoreCityListCacheService {
     }
 
     /**
-     * 按城市读取门店快照。缓存命中时不会访问数据库。
+     * 按当前项目和城市读取门店快照。项目 10 缓存命中时不会访问数据库。
      *
      * @param cityName 完整城市名称
      * @return 城市门店快照
      */
     public List<StoreCityListCacheValue> getStoresByCity(String cityName) {
-        if (!StringUtils.hasText(cityName)) {
+        Long businessId = BusinessContextHolder.getBusinessId();
+        if (businessId == null || !StringUtils.hasText(cityName)) {
             return Collections.emptyList();
         }
         String normalizedCity = cityName.trim();
+        if (businessId != CACHE_BUSINESS_ID) {
+            return queryCityWithPermit(businessId, normalizedCity);
+        }
         try {
             String generation = getOrCreateActiveGeneration();
             List<StoreCityListCacheValue> cached = readCity(generation, normalizedCity);
@@ -162,7 +167,7 @@ public class StoreCityListCacheService {
         } catch (Exception ex) {
             log.error("读取城市门店缓存失败，降级查询数据库，城市={}", normalizedCity, ex);
         }
-        return queryCityWithPermit(normalizedCity);
+        return queryCityWithPermit(CACHE_BUSINESS_ID, normalizedCity);
     }
 
     /**
@@ -349,7 +354,7 @@ public class StoreCityListCacheService {
             String expectedRevision = currentRevision();
             String generation = String.valueOf(System.currentTimeMillis());
             Map<Long, StoreCityListCacheValue> values = executeWithDatabasePermit(
-                    () -> loadCacheValues(selectEligibleStores(null, null)), "城市门店缓存全量预热繁忙");
+                    () -> loadCacheValues(selectEligibleStores(CACHE_BUSINESS_ID, null, null)), "城市门店缓存全量预热繁忙");
             writeGeneration(generation, values.values());
             // 新代数写完后先释放预热锁，再获取短时版本锁完成切换，避免嵌套 Redis 锁。
             unlock(lock, true);
@@ -488,7 +493,7 @@ public class StoreCityListCacheService {
             }
             stringRedisTemplate.opsForHash().delete(readyKey(generation), cityName);
             String expectedRevision = currentRevision();
-            List<StoreCityListCacheValue> values = queryCityWithPermit(cityName);
+            List<StoreCityListCacheValue> values = queryCityWithPermit(CACHE_BUSINESS_ID, cityName);
             if (!Objects.equals(expectedRevision, currentRevision())) {
                 log.warn("城市门店缓存回源期间数据版本已变化，放弃写入，城市={}", cityName);
                 return true;
@@ -539,7 +544,7 @@ public class StoreCityListCacheService {
     private void reloadMissingStores(String generation, String cityName, List<Long> storeIds) {
         String expectedRevision = currentRevision();
         Map<Long, StoreCityListCacheValue> values = executeWithDatabasePermit(
-                () -> loadCacheValues(selectEligibleStores(null, storeIds)), "城市门店缓存单店刷新繁忙");
+                () -> loadCacheValues(selectEligibleStores(CACHE_BUSINESS_ID, null, storeIds)), "城市门店缓存单店刷新繁忙");
         if (!Objects.equals(expectedRevision, currentRevision())) {
             log.warn("城市门店缓存缺失数据查询期间版本已变化，放弃本次补齐，城市={}，门店数量={}",
                     cityName, storeIds.size());
@@ -578,9 +583,9 @@ public class StoreCityListCacheService {
     /**
      * 查询指定城市并合并门店、费用和企微数据。
      */
-    private List<StoreCityListCacheValue> queryCityWithPermit(String cityName) {
+    private List<StoreCityListCacheValue> queryCityWithPermit(long businessId, String cityName) {
         return executeWithDatabasePermit(() -> {
-            List<SystemStoreInfoDO> stores = selectEligibleStores(cityName, null);
+            List<SystemStoreInfoDO> stores = selectEligibleStores(businessId, cityName, null);
             return new ArrayList<>(loadCacheValues(stores).values());
         }, "城市门店缓存回源任务繁忙");
     }
@@ -609,16 +614,16 @@ public class StoreCityListCacheService {
     /**
      * 查询满足小程序门店列表基础条件的门店。
      */
-    private List<SystemStoreInfoDO> selectEligibleStores(String cityName, Collection<Long> storeIds) {
+    private List<SystemStoreInfoDO> selectEligibleStores(long businessId, String cityName, Collection<Long> storeIds) {
         LambdaQueryWrapperX<SystemStoreInfoDO> wrapper = new LambdaQueryWrapperX<>();
-        wrapper.eq(SystemStoreInfoDO::getBusinessId, BUSINESS_ID);
+        wrapper.eq(SystemStoreInfoDO::getBusinessId, businessId);
         wrapper.eq(SystemStoreInfoDO::getStoreSource, 0);
         wrapper.eq(SystemStoreInfoDO::getStoreStatus, StoreStatusEnum.OPEN.getStatus());
         wrapper.in(SystemStoreInfoDO::getOrderType, 0, 2);
         wrapper.eqIfPresent(SystemStoreInfoDO::getStoreCity, cityName);
         wrapper.inIfPresent(SystemStoreInfoDO::getStoreId, storeIds);
         return systemStoreInfoMapper.selectList(wrapper).stream()
-                .filter(this::isEligible)
+                .filter(store -> isEligible(store, businessId))
                 .toList();
     }
 
@@ -636,9 +641,9 @@ public class StoreCityListCacheService {
     /**
      * 判断门店是否满足城市门店列表的基础条件。
      */
-    private boolean isEligible(SystemStoreInfoDO store) {
+    private boolean isEligible(SystemStoreInfoDO store, long businessId) {
         return store != null
-                && Objects.equals(store.getBusinessId(), BUSINESS_ID)
+                && Objects.equals(store.getBusinessId(), businessId)
                 && Objects.equals(String.valueOf(store.getStoreSource()), "0")
                 && Objects.equals(store.getStoreStatus(), StoreStatusEnum.OPEN.getStatus())
                 && (Objects.equals(store.getOrderType(), 0) || Objects.equals(store.getOrderType(), 2))
@@ -955,7 +960,8 @@ public class StoreCityListCacheService {
             String expectedRevision = currentRevision();
             List<SystemStoreInfoDO> currentStores = executeWithDatabasePermit(
                     () -> selectStoresByIds(storeIds), "城市门店缓存异步刷新繁忙");
-            List<SystemStoreInfoDO> eligibleStores = currentStores.stream().filter(this::isEligible).toList();
+            List<SystemStoreInfoDO> eligibleStores = currentStores.stream()
+                    .filter(store -> isEligible(store, CACHE_BUSINESS_ID)).toList();
             Map<Long, StoreCityListCacheValue> values = executeWithDatabasePermit(
                     () -> loadCacheValues(eligibleStores), "城市门店缓存异步刷新繁忙");
             if (!Objects.equals(expectedRevision, currentRevision())) {
