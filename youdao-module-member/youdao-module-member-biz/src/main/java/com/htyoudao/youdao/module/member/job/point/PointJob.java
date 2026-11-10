@@ -19,6 +19,25 @@ public class PointJob {
     @XxlJob("updateMemberPointJobHandler")
 //    @TenantJob
     public void updateMemberPointJobHandler() {
+        String jobParam = XxlJobHelper.getJobParam();
+        if (jobParam != null && jobParam.contains(":")) {
+            String[] params = jobParam.split(":", -1);
+            if (params.length != 2) {
+                throw new IllegalArgumentException("单会员解冻参数格式为 项目ID:会员ID");
+            }
+            long businessId = Long.parseLong(params[0].trim());
+            long memberId = Long.parseLong(params[1].trim());
+            if (businessId <= 0 || memberId <= 0) {
+                throw new IllegalArgumentException("单会员解冻的项目ID和会员ID必须大于0");
+            }
+            if (XxlJobHelper.getShardIndex() > 0) {
+                XxlJobHelper.log("单会员解冻由分片0执行，当前分片跳过");
+                return;
+            }
+            XxlJobHelper.log("开始单会员解冻，businessId={}, memberId={}", businessId, memberId);
+            jobService.updateMemberPointTask(0, 0, memberId, businessId);
+            return;
+        }
         log.info("updateMemberPointJobHandler is running.");
         jobService.updateMemberPointTask(0,0,0, 0);
         XxlJobHelper.log("updateMemberPointJobHandler is running.");
