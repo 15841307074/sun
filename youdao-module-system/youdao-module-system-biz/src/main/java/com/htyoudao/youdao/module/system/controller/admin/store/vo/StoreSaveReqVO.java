@@ -292,8 +292,27 @@ public class StoreSaveReqVO {
     /**
      * 出餐时间
      */
-    @Schema(description = "出餐时间")
+    @Schema(description = "各高峰时段的出餐时长（分钟），逗号分隔，每段最多60分钟", example = "30,60")
     private String mealTime;
+
+    @JsonIgnore
+    @AssertTrue(message = "高峰时段出餐时长必须为整数且不能超过60分钟")
+    public boolean isMealTimeValid() {
+        if (mealTime == null || mealTime.isBlank()) {
+            return true;
+        }
+        for (String minutes : mealTime.split(",")) {
+            try {
+                if (Integer.parseInt(minutes) > 60) {
+                    return false;
+                }
+            } catch (NumberFormatException e) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /**
      * 是否弹出提示窗  0 否 1是
      */
