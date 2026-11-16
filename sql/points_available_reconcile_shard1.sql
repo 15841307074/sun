@@ -1,7 +1,7 @@
 -- MySQL 5.7/8.0。默认一次修复当前会员库内项目 10 的 1 号分表。
 -- 修复前先用 points_available_reconcile_shard1_preview.sql 查询差额明细。
 -- 首次先执行 points_available_reconcile_audit.sql。修复期间暂停本项目该分表的积分写入。
--- 用专用连接从头执行。开头回滚本连接已有的未提交事务，末尾由操作者提交或回滚。
+-- 用专用连接从头执行。开头回滚本连接已有的未提交事务，全表校验通过后自动提交。
 ROLLBACK AND NO CHAIN NO RELEASE;
 SET @business_id = 10;
 SET @repair_time = NOW();
@@ -9,7 +9,8 @@ SET @repair_time = NOW();
 SET @repair_prefix = CONCAT(LEFT(SHA2(UUID(), 256), 19), '-');
 SET @repair_first = CONCAT(@repair_prefix, '0000000000000000');
 SET @repair_last = CONCAT(@repair_prefix, 'FFFFFFFFFFFFFFFF');
-SET @archived_rows = -1, @locked_rows = -1, @inserted_rows = -1, @updated_rows = -1, @verified_rows = -1;
+SET @archived_rows = -1, @out_of_range_rows = -1, @planned_rows = -1,
+    @locked_rows = -1, @inserted_rows = -1, @updated_rows = -1, @verified_rows = -1;
 
 SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
 START TRANSACTION;
@@ -55,7 +56,7 @@ SELECT COUNT(*) INTO @out_of_range_rows
 FROM points_available_reconcile_audit
 WHERE repair_no BETWEEN @repair_first AND @repair_last AND business_id = @business_id AND shard_no = 1
   AND repair_action = 'AMOUNT_OUT_OF_RANGE';
-SET @planned_rows = @archived_rows - @out_of_range_rows;
+SET @planned_rows = IF(@out_of_range_rows >= 0, @archived_rows - @out_of_range_rows, -1);
 
 -- 2. 锁定待修复会员。待修复余额均与留档一致才执行写入。
 SELECT COUNT(*) INTO @locked_rows
@@ -130,25 +131,36 @@ FROM points_available_reconcile_audit
 WHERE repair_no BETWEEN @repair_first AND @repair_last AND business_id = @business_id AND shard_no = 1
   AND check_result = 'MATCHED';
 
+SET @repair_check_result = CASE
+    WHEN @business_id IS NULL OR @repair_time IS NULL OR @repair_prefix IS NULL
+      OR @repair_first IS NULL OR @repair_last IS NULL THEN 'NOT_INITIALIZED'
+    WHEN @planned_rows IS NULL OR @planned_rows < 0 OR @locked_rows IS NULL
+      OR @locked_rows <> @planned_rows THEN 'NOT_READY'
+    WHEN @inserted_rows IS NULL OR @updated_rows IS NULL OR @verified_rows IS NULL
+      OR @inserted_rows < 0 OR @updated_rows < 0 OR @inserted_rows + @updated_rows <> @planned_rows
+      OR @verified_rows <> @planned_rows THEN 'NOT_MATCHED'
+    WHEN @out_of_range_rows > 0 THEN 'AMOUNT_OUT_OF_RANGE'
+    WHEN @planned_rows = 0 THEN 'NO_CHANGES'
+    ELSE 'MATCHED'
+END;
+
+-- 校验通过才提交。其余结果通过下面的 ROLLBACK 结束本轮事务。
+SET @repair_finish_sql = IF(@repair_check_result = 'MATCHED', 'COMMIT AND NO CHAIN NO RELEASE', 'DO 0');
+PREPARE points_repair_finish FROM @repair_finish_sql;
+EXECUTE points_repair_finish;
+SET @repair_finish_rows = ROW_COUNT();
+DEALLOCATE PREPARE points_repair_finish;
+ROLLBACK AND NO CHAIN NO RELEASE;
+SET @repair_rollback_rows = ROW_COUNT();
+
+-- 结果 2 在事务结束后显示。若客户端因报错提前停止且未显示结果 2，执行 ROLLBACK 后再排查。
 SELECT @business_id AS business_id, 1 AS shard_no, @repair_prefix AS repair_prefix, DATABASE() AS database_name,
        @planned_rows AS planned_rows, @archived_rows AS archived_rows, @locked_rows AS locked_rows,
        @out_of_range_rows AS out_of_range_rows,
        @inserted_rows AS inserted_ledger_rows, @updated_rows AS updated_member_rows, @verified_rows AS verified_rows,
+       @repair_check_result AS check_result,
        CASE
-           WHEN @business_id IS NULL OR @repair_time IS NULL OR @repair_prefix IS NULL
-             OR @repair_first IS NULL OR @repair_last IS NULL THEN 'NOT_INITIALIZED'
-           WHEN @planned_rows IS NULL OR @planned_rows < 0 OR @locked_rows IS NULL
-             OR @locked_rows <> @planned_rows THEN 'NOT_READY'
-           WHEN @inserted_rows IS NULL OR @updated_rows IS NULL OR @verified_rows IS NULL
-             OR @inserted_rows < 0 OR @updated_rows < 0 OR @inserted_rows + @updated_rows <> @planned_rows
-             OR @verified_rows <> @planned_rows THEN 'NOT_MATCHED'
-           WHEN @out_of_range_rows > 0 THEN 'AMOUNT_OUT_OF_RANGE'
-           WHEN @planned_rows = 0 THEN 'NO_CHANGES'
-           ELSE 'MATCHED'
-       END AS check_result;
-
--- 看到 MATCHED 可提交。AMOUNT_OUT_OF_RANGE 表示有记录超出字段范围，需复核留档后决定。
--- NOT_INITIALIZED 时回滚，在选好会员库的同一查询窗口从第一行重新执行整份脚本。
--- 有报错或结果为 NOT_READY / NOT_MATCHED 时回滚。NO_CHANGES 可直接回滚结束事务。
--- COMMIT AND NO CHAIN NO RELEASE;
--- ROLLBACK AND NO CHAIN NO RELEASE;
+           WHEN NOT (@repair_finish_rows <=> 0 AND @repair_rollback_rows <=> 0) THEN 'FINALIZE_FAILED'
+           WHEN @repair_check_result = 'MATCHED' THEN 'COMMITTED'
+           ELSE 'ROLLED_BACK'
+       END AS transaction_result;
