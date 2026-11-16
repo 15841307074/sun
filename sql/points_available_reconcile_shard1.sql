@@ -1,4 +1,5 @@
 -- MySQL 5.7/8.0。默认一次修复当前会员库内项目 10 的 1 号分表。
+-- 修复前先用 points_available_reconcile_shard1_preview.sql 查询差额明细。
 -- 首次先执行 points_available_reconcile_audit.sql。修复期间暂停本项目该分表的积分写入。
 -- 用专用连接从头执行。开头回滚本连接已有的未提交事务，末尾由操作者提交或回滚。
 ROLLBACK AND NO CHAIN NO RELEASE;
