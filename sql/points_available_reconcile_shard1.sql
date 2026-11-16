@@ -129,13 +129,17 @@ FROM points_available_reconcile_audit
 WHERE repair_no BETWEEN @repair_first AND @repair_last AND business_id = @business_id AND shard_no = 1
   AND check_result = 'MATCHED';
 
-SELECT @business_id AS business_id, 1 AS shard_no, @repair_prefix AS repair_prefix,
+SELECT @business_id AS business_id, 1 AS shard_no, @repair_prefix AS repair_prefix, DATABASE() AS database_name,
        @planned_rows AS planned_rows, @archived_rows AS archived_rows, @locked_rows AS locked_rows,
        @out_of_range_rows AS out_of_range_rows,
        @inserted_rows AS inserted_ledger_rows, @updated_rows AS updated_member_rows, @verified_rows AS verified_rows,
        CASE
-           WHEN @planned_rows < 0 OR @locked_rows <> @planned_rows THEN 'NOT_READY'
-           WHEN @inserted_rows < 0 OR @updated_rows < 0 OR @inserted_rows + @updated_rows <> @planned_rows
+           WHEN @business_id IS NULL OR @repair_time IS NULL OR @repair_prefix IS NULL
+             OR @repair_first IS NULL OR @repair_last IS NULL THEN 'NOT_INITIALIZED'
+           WHEN @planned_rows IS NULL OR @planned_rows < 0 OR @locked_rows IS NULL
+             OR @locked_rows <> @planned_rows THEN 'NOT_READY'
+           WHEN @inserted_rows IS NULL OR @updated_rows IS NULL OR @verified_rows IS NULL
+             OR @inserted_rows < 0 OR @updated_rows < 0 OR @inserted_rows + @updated_rows <> @planned_rows
              OR @verified_rows <> @planned_rows THEN 'NOT_MATCHED'
            WHEN @out_of_range_rows > 0 THEN 'AMOUNT_OUT_OF_RANGE'
            WHEN @planned_rows = 0 THEN 'NO_CHANGES'
@@ -143,6 +147,7 @@ SELECT @business_id AS business_id, 1 AS shard_no, @repair_prefix AS repair_pref
        END AS check_result;
 
 -- 看到 MATCHED 可提交。AMOUNT_OUT_OF_RANGE 表示有记录超出字段范围，需复核留档后决定。
+-- NOT_INITIALIZED 时回滚，在选好会员库的同一查询窗口从第一行重新执行整份脚本。
 -- 有报错或结果为 NOT_READY / NOT_MATCHED 时回滚。NO_CHANGES 可直接回滚结束事务。
 -- COMMIT AND NO CHAIN NO RELEASE;
 -- ROLLBACK AND NO CHAIN NO RELEASE;

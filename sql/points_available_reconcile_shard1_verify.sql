@@ -3,9 +3,14 @@ SET @verify_business_id = 10;
 
 -- 1. 统计仍有差额的会员数。
 SELECT @verify_business_id AS business_id, 1 AS shard_no,
-       COUNT(*) AS remaining_mismatch_members,
-       COALESCE(SUM(diff.available_points > diff.ledger_points), 0) AS member_balance_higher,
-       COALESCE(SUM(diff.available_points < diff.ledger_points), 0) AS ledger_higher
+       IF(@verify_business_id IS NULL, NULL, COUNT(*)) AS remaining_mismatch_members,
+       IF(@verify_business_id IS NULL, NULL, COALESCE(SUM(diff.available_points > diff.ledger_points), 0)) AS member_balance_higher,
+       IF(@verify_business_id IS NULL, NULL, COALESCE(SUM(diff.available_points < diff.ledger_points), 0)) AS ledger_higher,
+       CASE
+           WHEN @verify_business_id IS NULL THEN 'NOT_INITIALIZED'
+           WHEN COUNT(*) = 0 THEN 'NO_MISMATCHES'
+           ELSE 'HAS_MISMATCHES'
+       END AS check_result
 FROM (
     SELECT m.member_id, m.member_integral AS available_points, COALESCE(SUM(p.points_change), 0) AS ledger_points
     FROM wx_member_1 m
