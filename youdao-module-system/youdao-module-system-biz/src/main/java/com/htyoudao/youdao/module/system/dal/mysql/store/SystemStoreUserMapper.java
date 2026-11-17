@@ -16,8 +16,13 @@ import org.apache.ibatis.annotations.Mapper;
 public interface SystemStoreUserMapper extends BaseMapperX<SystemStoreUserDO> {
 
     default List<Long> getStoreIdsByUserId(Long userId){
+        return getStoreIdsByUserId(userId, null);
+    }
+
+    default List<Long> getStoreIdsByUserId(Long userId, Long businessId) {
         LambdaQueryWrapper<SystemStoreUserDO>  queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(SystemStoreUserDO::getUserId, userId);
+        queryWrapper.eq(businessId != null, SystemStoreUserDO::getBusinessId, businessId);
         queryWrapper.eq(SystemStoreUserDO::getType, 1);
         return selectList(queryWrapper).stream().map(SystemStoreUserDO::getStoreId).toList();
     }
