@@ -375,7 +375,7 @@ public class PermissionServiceImpl implements PermissionService {
         }
 
         // storeIds
-        List<Long> storeIds = systemStoreInfoMapper.selectStoreIdsByOrgIds(result.getOrgIds());
+        List<Long> storeIds = systemStoreInfoMapper.selectStoreIdsByOrgIds(businessId, result.getOrgIds());
         List<Long> storeIdsByUserId = systemStoreUserMapper.getStoreIdsByUserId(userId);
         result.setStoreIds(new HashSet<>(storeIds));
         result.getStoreIds().addAll(storeIdsByUserId);

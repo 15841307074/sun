@@ -1,7 +1,7 @@
 package com.htyoudao.youdao.module.system.dal.mysql.store;
 
+import cn.hutool.core.collection.CollectionUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.htyoudao.youdao.framework.datapermission.core.annotation.DataPermission;
@@ -40,9 +40,14 @@ public interface SystemStoreInfoMapper extends BaseMapperX<SystemStoreInfoDO> {
     List<Long> selectStoreOrgIds(@Param("storeIds") List<Long> storeIds);
 
 
-    default List<Long> selectStoreIdsByOrgIds(@Param("orgIds") Collection<Long> orgIds){
-        QueryWrapper<SystemStoreInfoDO> queryWrapper = new QueryWrapper<>();
-        queryWrapper.lambda().eq(SystemStoreInfoDO::getOrgId, orgIds);
+    default List<Long> selectStoreIdsByOrgIds(Long businessId, Collection<Long> orgIds) {
+        if (businessId == null || CollectionUtil.isEmpty(orgIds)) {
+            return List.of();
+        }
+        LambdaQueryWrapper<SystemStoreInfoDO> queryWrapper = new LambdaQueryWrapper<SystemStoreInfoDO>()
+                .select(SystemStoreInfoDO::getStoreId)
+                .eq(SystemStoreInfoDO::getBusinessId, businessId)
+                .in(SystemStoreInfoDO::getOrgId, orgIds);
         return selectList(queryWrapper).stream().map(SystemStoreInfoDO::getStoreId).toList();
     }
 
