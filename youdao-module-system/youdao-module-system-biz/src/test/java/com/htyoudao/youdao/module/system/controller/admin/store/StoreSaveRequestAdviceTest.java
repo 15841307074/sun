@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.htyoudao.youdao.module.system.controller.admin.store.vo.StoreSaveReqVO;
 import com.htyoudao.youdao.module.system.service.store.SystemStoreInfoService;
+import com.htyoudao.youdao.module.system.util.store.StoreSaveRequestAdvice;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
