@@ -3,6 +3,8 @@ package com.htyoudao.youdao.module.system.util.store;
 import cn.hutool.core.util.StrUtil;
 import com.htyoudao.youdao.module.system.controller.admin.store.SystemStoreInfoController;
 import com.htyoudao.youdao.module.system.controller.admin.store.vo.StoreSaveReqVO;
+import com.htyoudao.youdao.module.system.controller.app.store.AppStoreInfoController;
+import com.htyoudao.youdao.module.system.controller.app.store.DCStoreInfoController;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpInputMessage;
 import org.springframework.http.converter.HttpMessageConverter;
@@ -13,7 +15,7 @@ import java.lang.reflect.Type;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-@ControllerAdvice(assignableTypes = SystemStoreInfoController.class)
+@ControllerAdvice(assignableTypes = {SystemStoreInfoController.class, DCStoreInfoController.class, AppStoreInfoController.class})
 public class StoreSaveRequestAdvice extends RequestBodyAdviceAdapter {
 
     private static final Pattern GRAPHEME = Pattern.compile("\\X");

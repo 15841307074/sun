@@ -3,6 +3,8 @@ package com.htyoudao.youdao.module.system.controller.admin.store;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.htyoudao.youdao.module.system.controller.admin.store.vo.StoreSaveReqVO;
+import com.htyoudao.youdao.module.system.controller.app.store.AppStoreInfoController;
+import com.htyoudao.youdao.module.system.controller.app.store.DCStoreInfoController;
 import com.htyoudao.youdao.module.system.service.store.SystemStoreInfoService;
 import com.htyoudao.youdao.module.system.util.store.StoreSaveRequestAdvice;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,6 +15,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+
+import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -33,9 +37,12 @@ class StoreSaveRequestAdviceTest {
 
     @BeforeEach
     void setUp() {
-        SystemStoreInfoController controller = new SystemStoreInfoController();
+        mvc = mockMvcFor(new SystemStoreInfoController());
+    }
+
+    private MockMvc mockMvcFor(Object controller) {
         ReflectionTestUtils.setField(controller, "systemStoreInfoService", service);
-        mvc = MockMvcBuilders.standaloneSetup(controller)
+        return MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new StoreSaveRequestAdvice()).build();
     }
 
@@ -83,6 +90,41 @@ class StoreSaveRequestAdviceTest {
         assertRequiredMessage(error, "storeLeaderPhone", "门店负责人电话不能为空");
         assertRequiredMessage(error, "storeAddress", "门店地址不能为空");
         verifyNoInteractions(service);
+    }
+
+    @Test
+    void filtersEmojiBeforeDcStoreUpdateValidation() throws Exception {
+        verifyAppStoreUpdate(mockMvcFor(new DCStoreInfoController()), "/system/DC/store/updateStoreInfo",
+                captured -> verify(service).updateStoreByDC(captured.capture()));
+    }
+
+    @Test
+    void filtersEmojiBeforeBossStoreUpdateValidation() throws Exception {
+        verifyAppStoreUpdate(mockMvcFor(new AppStoreInfoController()), "/system/store/updateStoreInfoByBoss",
+                captured -> verify(service).updateStoreByBoss(captured.capture()));
+    }
+
+    private void verifyAppStoreUpdate(MockMvc appMvc, String path,
+                                      Consumer<ArgumentCaptor<StoreSaveReqVO>> verifyUpdate) throws Exception {
+        ObjectNode request = validRequest();
+        request.put("storeId", 7);
+        request.put("storeName", " 🍔 ");
+        var result = appMvc.perform(put(path).contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsBytes(request)))
+                .andExpect(status().isBadRequest()).andReturn();
+        var error = assertInstanceOf(MethodArgumentNotValidException.class, result.getResolvedException());
+        assertRequiredMessage(error, "storeName", "门店名称不能为空");
+        verifyNoInteractions(service);
+
+        request.put("storeName", "汉堡店🍔");
+        request.put("storeAddress", "一楼🇨🇳A区");
+        appMvc.perform(put(path).contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsBytes(request)))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<StoreSaveReqVO> captured = ArgumentCaptor.forClass(StoreSaveReqVO.class);
+        verifyUpdate.accept(captured);
+        assertEquals("汉堡店", captured.getValue().getStoreName());
+        assertEquals("一楼A区", captured.getValue().getStoreAddress());
     }
 
     private ObjectNode validRequest() {
