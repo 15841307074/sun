@@ -2,6 +2,7 @@ package com.htyoudao.youdao.module.member.api.point.VO;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 /**
  * <p>
@@ -25,6 +26,8 @@ public class ClientAddMemberPointReqVO implements Serializable {
     private Long projectOwnerShip;
 
     private Long businessId;
+    /** 订单支付日期，旧请求可以不传。 */
+    private LocalDate payDate;
 
     public Long getProjectOwnerShip() {
         return projectOwnerShip;
@@ -77,6 +80,15 @@ public class ClientAddMemberPointReqVO implements Serializable {
 
     public ClientAddMemberPointReqVO setBusinessId(Long businessId) {
         this.businessId = businessId;
+        return this;
+    }
+
+    public LocalDate getPayDate() {
+        return payDate;
+    }
+
+    public ClientAddMemberPointReqVO setPayDate(LocalDate payDate) {
+        this.payDate = payDate;
         return this;
     }
 }

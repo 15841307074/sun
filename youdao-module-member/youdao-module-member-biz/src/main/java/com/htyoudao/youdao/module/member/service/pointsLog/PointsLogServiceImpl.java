@@ -65,6 +65,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.math.BigInteger;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
@@ -459,8 +460,9 @@ public class PointsLogServiceImpl extends ServiceImpl<PointsLogMapper, PointsLog
         Long integralFrozen = wxMember.getIntegralFrozen();
         Long changePoint = 0L;
         if (memberBirthday != null) {
-            //计算出用户这次应该加的积分
-            changePoint = calculatePointsForUser(reqVO.getPayAmount(), memberBirthday, integralFrozen);
+            // 旧订单服务未传支付日期时，沿用积分处理当天。
+            LocalDate payDate = Objects.requireNonNullElse(reqVO.getPayDate(), currentDate);
+            changePoint = calculateBirthdayOrderPoints(reqVO.getPayAmount(), memberBirthday, payDate);
         } else {
             changePoint = calculatePointsForUserWithOutMemberBirthday(reqVO.getPayAmount(), integralFrozen,reqVO.getBusinessId());
         }
@@ -581,32 +583,12 @@ public class PointsLogServiceImpl extends ServiceImpl<PointsLogMapper, PointsLog
     }
 
 
-    public Long calculatePointsForUser(BigDecimal orderAmount, Date memberBirthday, Long integralFrozen) {
-
-        //WxMemberCard wxMemberCard  = wxMemberCardService.selectWxMemberCardByMemberLevel(allPoint);
-        //通过冻结积分查询出用户对应的会员卡面信息
-//        QueryWrapper<WxMemberCardDO> queryWrapper = new QueryWrapper<WxMemberCardDO>();
-//        queryWrapper.gt("max_points_threshold", integralFrozen);
-//        queryWrapper.lt("min_points_threshold", integralFrozen);
-//        queryWrapper.eq("card_status", 1);
-
-        // 根据订单金额取整加积分
-        long points = orderAmount.setScale(0, BigDecimal.ROUND_DOWN).longValue();
-
-//        WxMemberCardDO wxMemberCard = wxMemberCardMapper.selectOne(queryWrapper);
-
-        /*if (ObjectUtils.isEmpty(wxMemberCard)) {
-            return points;
-        }*/
-
-//        //得到该会员的会员卡日
-//        Date memberDay = wxMemberCard.getMemberDay();
-//        //得到会员等级
-//        Integer memberLevel = wxMemberCard.getMemberLevel();
-
-        // 根据生日加倍积分
-        double multiplier = calculateMultiplier(memberBirthday);
-        return (long) (points * multiplier);
+    /** 实付金额取整后按支付日判断生日，每年同月同日享双倍。 */
+    private static long calculateBirthdayOrderPoints(BigDecimal payAmount, Date memberBirthday, LocalDate payDate) {
+        long points = payAmount.setScale(0, RoundingMode.DOWN).longValue();
+        LocalDate birthday = Instant.ofEpochMilli(memberBirthday.getTime())
+                .atZone(ZoneId.of("Asia/Shanghai")).toLocalDate();
+        return MonthDay.from(payDate).equals(MonthDay.from(birthday)) ? points * 2 : points;
     }
 
     private Long calculatePointsForUserWithOutMemberBirthday(BigDecimal orderAmount, Long integralFrozen,Long buss) {
@@ -668,16 +650,6 @@ public class PointsLogServiceImpl extends ServiceImpl<PointsLogMapper, PointsLog
                     multiplier = 2.0;
                 }
                 break;
-        }
-        return multiplier;
-    }
-
-    //计算积分加倍系数
-    private static double calculateMultiplier(Date memberBirthday) {
-        double multiplier = 1.0;
-        boolean isBirthday = isSameDay(new Date(), memberBirthday);
-        if (isBirthday){
-            multiplier = 2;
         }
         return multiplier;
     }

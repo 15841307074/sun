@@ -1100,7 +1100,8 @@ public class BzOrderPayServiceImpl extends ServiceImpl<BzOrderPayMapper, BzOrder
                                 .setMemberId(bzOrderDO.getMemberId())
                                 .setOrderSn(bzOrderDO.getOrderSn())
                                 .setPayAmount(bzOrderDO.getPayAmount())
-                                .setOrderAmount(bzOrderDO.getOrderAmount());
+                                .setOrderAmount(bzOrderDO.getOrderAmount())
+                                .setPayDate(bzOrderDO.getPayTime().toLocalDate());
                         pointLogApi.addMemberPoint(reqVO);
                     } catch (Exception e) {
                         log.error("==> 【notify】增加积分 失败 {}", bzOrderDO.getOrderSn(), e);
