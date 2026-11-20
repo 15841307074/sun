@@ -643,7 +643,7 @@ public class LotteryLogServiceImpl implements LotteryLogService {
         logExportRespVOExcelActionService.exportAsyncExcel(
                 LotteryLogExportRespVO.class,
                 pageParam,
-                (Page<LotteryLogExportRespVO> param) -> getLotteryLogData(param, queryWrapper),
+                createExportPageSupplier(queryWrapper),
                 buildExportFileName(lotteryLogExportVO),
                 statistics
         );
@@ -930,13 +930,35 @@ public class LotteryLogServiceImpl implements LotteryLogService {
         }
     }
 
-    private List<LotteryLogExportRespVO> getLotteryLogData(Page<LotteryLogExportRespVO> pageParam, LambdaQueryWrapper<LotteryLogDO> queryWrapper) {
-        // 创建DO的分页参数
-        Page<LotteryLogDO> currentPageParam = new Page<>(pageParam.getCurrent(), pageParam.getSize());
-        // 通过Service方法调用，确保@DS注解生效
-        Page<LotteryLogDO> resultPage = lotteryLogQueryService.selectPage(currentPageParam, queryWrapper);
-        List<LotteryLogDO> logList = resultPage.getRecords();
+    /** 单次导出按创建时间和主键向后读取，避免筛选范围变化时跨页重复。 */
+    private Function<Page<LotteryLogExportRespVO>, List<LotteryLogExportRespVO>> createExportPageSupplier(
+            LambdaQueryWrapper<LotteryLogDO> queryWrapper) {
+        return new Function<>() {
+            private LotteryLogDO lastRow;
 
+            @Override
+            public List<LotteryLogExportRespVO> apply(Page<LotteryLogExportRespVO> page) {
+                LambdaQueryWrapper<LotteryLogDO> batchQuery = queryWrapper.clone();
+                if (lastRow != null) {
+                    LocalDateTime lastTime = lastRow.getCreateTime();
+                    Long lastId = lastRow.getId();
+                    batchQuery.and(w -> w.gt(LotteryLogDO::getCreateTime, lastTime)
+                            .or(sameTime -> sameTime.eq(LotteryLogDO::getCreateTime, lastTime)
+                                    .gt(LotteryLogDO::getId, lastId)));
+                }
+                Page<LotteryLogDO> batch = new Page<>(1, page.getSize(), false);
+                List<LotteryLogDO> records = lotteryLogQueryService.selectPage(batch, batchQuery).getRecords();
+                List<LotteryLogExportRespVO> rows = toExportRows(records);
+                // 转换失败时保留上次游标，让重试从同一位置读取。
+                if (!records.isEmpty()) {
+                    lastRow = records.get(records.size() - 1);
+                }
+                return rows;
+            }
+        };
+    }
+
+    private List<LotteryLogExportRespVO> toExportRows(List<LotteryLogDO> logList) {
         // 转换为响应对象
         List<LotteryLogExportRespVO> respList = new ArrayList<>(logList.size());
         for (LotteryLogDO lotteryLogDO : logList) {
